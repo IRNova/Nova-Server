@@ -147,6 +147,44 @@ if ! command -v awg >/dev/null 2>&1; then
   fi
 fi
 
+# ---- Tor + Psiphon exits (optional egress paths) -----------------------------
+# Local SOCKS services the panel's routing rules can send an inbound out through
+# (random / DPI-resistant IPs). Best-effort: if a download fails the matching
+# "Tor exit" / "Psiphon exit" toggle simply has nothing behind it.
+if ! command -v tor >/dev/null 2>&1; then
+  say "Installing Tor (local SOCKS exit on 9050)"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y tor >/dev/null 2>&1 \
+    && systemctl enable --now tor >/dev/null 2>&1 && ok "Tor installed" \
+    || warn "Could not install Tor; the Tor exit will be unavailable."
+fi
+if [ ! -x /etc/psiphon/psiphon-tunnel-core-x86_64 ]; then
+  say "Installing Psiphon (local SOCKS exit on 1080)"
+  mkdir -p /etc/psiphon
+  arch="$(uname -m)"; pbin="psiphon-tunnel-core-x86_64"
+  [ "$arch" = "aarch64" ] && pbin="psiphon-tunnel-core-arm64"
+  if curl -fsSL -o /etc/psiphon/"$pbin" "https://raw.githubusercontent.com/Psiphon-Labs/psiphon-tunnel-core-binaries/master/linux/$pbin" \
+     && curl -fsSL -o /etc/psiphon/psiphon.config "https://raw.githubusercontent.com/IRNova/Nova-Server/main/psiphon.config"; then
+    chmod +x /etc/psiphon/"$pbin"
+    cat > /etc/systemd/system/psiphon.service <<PSI
+[Unit]
+Description=Psiphon tunnel (local SOCKS exit for Nova)
+After=network-online.target
+Wants=network-online.target
+[Service]
+WorkingDirectory=/etc/psiphon
+ExecStart=/etc/psiphon/$pbin -config /etc/psiphon/psiphon.config
+Restart=on-failure
+RestartSec=5
+[Install]
+WantedBy=multi-user.target
+PSI
+    systemctl daemon-reload && systemctl enable --now psiphon >/dev/null 2>&1 && ok "Psiphon installed" \
+      || warn "Psiphon installed but the service did not start."
+  else
+    warn "Could not install Psiphon; the Psiphon exit will be unavailable."
+  fi
+fi
+
 # ---- agent code --------------------------------------------------------------
 say "Fetching the Nova node agent"
 mkdir -p "$AGENT_DIR" "$DB_DIR" "$CERT_DIR"
