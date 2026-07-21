@@ -185,6 +185,61 @@ PSI
   fi
 fi
 
+# ---- tunnel backends (Iran bridge <-> foreign exit) --------------------------
+# Selectable reverse-tunnel tools so an Iran box can front a foreign Nova exit
+# over a censorship-resistant transport. Best-effort: a missing binary just means
+# that backend is greyed out in the panel's Tunnel section. All carry UDP so
+# Hysteria2 survives the hop.
+tarch="$(uname -m)"; garch="amd64"; [ "$tarch" = "aarch64" ] && garch="arm64"
+install -d /usr/local/bin
+
+# Resolve a release asset's download URL by matching a substring against the
+# latest release (handles versioned/arch-specific asset names that a static
+# /latest/download/ path cannot).
+gh_asset() { # repo  match
+  curl -fsSL "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
+    | grep browser_download_url | grep -i "$2" | head -1 | cut -d'"' -f4
+}
+
+# Backhaul (default): widest transport set, connection pooling, self-signed OK.
+if ! command -v backhaul >/dev/null 2>&1; then
+  say "Installing Backhaul tunnel backend"
+  if curl -fsSL -o /tmp/backhaul.tgz "https://github.com/Musixal/Backhaul/releases/latest/download/backhaul_linux_${garch}.tar.gz" \
+     && tar -xzf /tmp/backhaul.tgz -C /usr/local/bin backhaul 2>/dev/null; then
+    chmod +x /usr/local/bin/backhaul && ok "Backhaul installed"
+  else
+    warn "Could not install Backhaul; that tunnel backend will be unavailable."
+  fi
+fi
+
+# rathole: lightweight Rust, TCP+UDP, Noise/TLS. (aarch64 ships musl only.)
+if ! command -v rathole >/dev/null 2>&1; then
+  say "Installing rathole tunnel backend"
+  rmatch="x86_64-unknown-linux-gnu.zip"; [ "$tarch" = "aarch64" ] && rmatch="aarch64-unknown-linux-musl.zip"
+  rurl="$(gh_asset rapiz1/rathole "$rmatch")"
+  if [ -n "$rurl" ] && curl -fsSL -o /tmp/rathole.zip "$rurl" \
+     && unzip -o /tmp/rathole.zip -d /usr/local/bin rathole >/dev/null 2>&1; then
+    chmod +x /usr/local/bin/rathole && ok "rathole installed"
+  else
+    warn "Could not install rathole; that tunnel backend will be unavailable."
+  fi
+fi
+
+# wstunnel: tunnels over WebSocket/HTTPS, fronts cleanly behind a CDN. Asset
+# names carry the version, so resolve via the API.
+if ! command -v wstunnel >/dev/null 2>&1; then
+  say "Installing wstunnel tunnel backend"
+  warch="amd64"; [ "$tarch" = "aarch64" ] && warch="arm64"
+  wurl="$(gh_asset erebe/wstunnel "linux_${warch}.tar.gz")"
+  if [ -n "$wurl" ] && curl -fsSL "$wurl" -o /tmp/wstunnel.tgz \
+     && tar -xzf /tmp/wstunnel.tgz -C /usr/local/bin wstunnel 2>/dev/null; then
+    chmod +x /usr/local/bin/wstunnel && ok "wstunnel installed"
+  else
+    warn "Could not install wstunnel; that tunnel backend will be unavailable."
+  fi
+fi
+mkdir -p /etc/nova/tunnel && chmod 700 /etc/nova/tunnel
+
 # ---- agent code --------------------------------------------------------------
 say "Fetching the Nova node agent"
 mkdir -p "$AGENT_DIR" "$DB_DIR" "$CERT_DIR"
