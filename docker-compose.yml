@@ -1,0 +1,25 @@
+# Nova Server, one-click WebSocket-only deploy for any Docker host (or a PaaS).
+#
+# Usage:
+#   NOVA_PUBLIC_HOST=your.domain docker compose up -d
+#
+# A TLS edge (Cloudflare, or a reverse proxy like Caddy / nginx / Traefik, or the
+# PaaS itself) sits in front and forwards HTTPS to port 3000. For a full node with
+# the UDP protocols (Hysteria2, WireGuard) use the VPS installer instead. See
+# DEPLOY.md.
+
+services:
+  nova:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - nova-data:/data
+    environment:
+      # Your public domain, so subscription links point at it. Optional; you can
+      # also set the host in the panel after first login.
+      - NOVA_PUBLIC_HOST=${NOVA_PUBLIC_HOST:-}
+
+volumes:
+  nova-data:
