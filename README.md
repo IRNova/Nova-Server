@@ -72,6 +72,23 @@ nova-passwd 'YourNewPassword' --clear-2fa
 
 ---
 
+## 📱 No computer? Install from your phone
+
+You can set up a node entirely from your phone, no terminal needed.
+
+**Cloud-init (no SSH):** when you create your VPS on your provider's app or website, paste this into the **User data** / **Startup script** / **Cloud-init** box:
+
+```bash
+#!/bin/bash
+bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
+```
+
+The server installs Nova by itself on first boot (about 3 to 5 minutes). Then open `https://YOUR_SERVER_IP` in your phone browser and set your admin password.
+
+**Telegram installer bot:** a guided bot can walk you through creating the VPS and tell you when your node is online, or install it for you over SSH. Find it via our [Telegram channel](https://t.me/irnova_proxy).
+
+---
+
 ## 🧩 Features
 
 | Area | What you get |
