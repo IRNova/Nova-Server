@@ -1,20 +1,62 @@
 <div align="center">
 
+<img src="https://raw.githubusercontent.com/iiviirv/irnova-site/main/brand/nova-logo-badge-round.png" width="70" alt="Nova">
+
+<div align="right">
+  <a href="README.fa.md"><img src="https://raw.githubusercontent.com/IRNova/Nova-Proxy/main/flag-iran.svg" height="16" alt="Iran (Lion and Sun)" /> فارسی</a>
+</div>
+
 # Nova Server
 
-**Your own proxy server on any VPS, with a full admin panel.**
+**Your own censorship-resistant proxy server and full admin panel on any VPS.**
 
-Turn a plain Linux server into a private, censorship-resistant proxy node in a few minutes. Multi-protocol, multi-user, multi-node, with a modern panel in English, Persian, and Russian.
+VLESS · VMess · Trojan · Shadowsocks · Reality · Hysteria2 · WireGuard, with a modern
+trilingual (English · فارسی · Русский) panel, per-user accounts, multi-node fleet, Iran
+bridge tunnels, one-click SSL, a Telegram bot with a Mini App, and two-factor auth.
 
-`Xray-core` + `sing-box` (Hysteria2) + `AmneziaWG` behind one port, driven by a single self-hosted agent.
+[![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
+[![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
 
 ---
 
-## Install
+## 🌐 Links
 
-On a fresh Ubuntu/Debian server, run:
+<div align="center">
+
+[![Website](https://img.shields.io/badge/🌐%20Website-novaproxy.online-0ea5e9?style=for-the-badge)](https://novaproxy.online/)
+[![Telegram Channel](https://img.shields.io/badge/✈️%20Telegram%20Channel-@irnova__proxy-0ea5e9?style=for-the-badge&logo=telegram)](https://t.me/irnova_proxy)
+[![Telegram Group](https://img.shields.io/badge/👥%20Telegram%20Group-@irnovaproxy__group-0ea5e9?style=for-the-badge&logo=telegram)](https://t.me/irnovaproxy_group)
+[![YouTube](https://img.shields.io/badge/▶️%20YouTube-@novaproxyir-ff0000?style=for-the-badge&logo=youtube)](https://www.youtube.com/@novaproxyir)
+[![X (Twitter)](https://img.shields.io/badge/𝕏%20X-@irNovaProxy-000000?style=for-the-badge&logo=x)](https://x.com/irNovaProxy)
+[![Instagram](https://img.shields.io/badge/📸%20Instagram-@irnova__proxy-E4405F?style=for-the-badge&logo=instagram)](https://www.instagram.com/irnova_proxy)
+
+</div>
+
+---
+
+## 📖 What is Nova Server?
+
+Nova Server turns a plain Linux VPS into your own private, censorship-resistant proxy node with a **full admin panel**. It runs `Xray-core`, `sing-box` (Hysteria2), and `AmneziaWG` behind a single port, all driven by one self-hosted agent. Where Nova Proxy runs on Cloudflare's free tier, Nova Server is the **self-hosted big brother**: a real proxy core with everything a serious node operator needs.
+
+**What makes Nova Server different:**
+- 🧩 **Every protocol that matters** — VLESS, VMess, Trojan, Shadowsocks, Reality, Hysteria2, and native WireGuard
+- 🇮🇷 **Iran bridge tunnels** — front a foreign exit with a clean-IP server inside Iran (Backhaul, BackPack, rathole, wstunnel)
+- 🔐 **One-click SSL** — Let's Encrypt or full-auto Cloudflare (auto-DNS + wildcard), no manual port 80
+- 👥 **Per-user everything** — quota, expiry, device limit, data reset, and per-user protocol access
+- 🛰️ **Multi-node fleet** — manage many servers from one panel
+- 🤖 **Telegram bot + Mini App** — run the whole panel inside Telegram
+- 🛡️ **Anti-censorship egress** — WARP (with your own WARP+ license), Tor, and Psiphon, built in
+- ⚙️ **Automated** — backups, health alerts, auto-update, clean-IP refresh, and a first-run setup wizard
+- 🌍 **Trilingual panel** — English, Persian (RTL), and Russian, with a built-in manual
+
+---
+
+## ⚡ Quick Install
+
+On a fresh Ubuntu 20.04+ or Debian 11+ server (x86_64 or arm64), run:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
@@ -22,7 +64,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 
 The installer sets up the proxy cores, the panel, and the tunnel backends, then prints your panel URL. Open it, set an admin password, and use the **Setup Wizard** to add a domain, a recommended protocol, and your first user.
 
-To reset a forgotten password from the server:
+Forgot your password? Reset it from the server:
 
 ```bash
 nova-passwd 'YourNewPassword' --clear-2fa
@@ -30,96 +72,79 @@ nova-passwd 'YourNewPassword' --clear-2fa
 
 ---
 
-## Features
+## 🧩 Features
 
-### Protocols and inbounds
-- **VLESS, VMess, Trojan, Shadowsocks** over TLS/WS/gRPC/XHTTP/HTTPUpgrade
-- **VLESS-Reality** with XTLS-Vision (DPI-resistant, no domain needed)
-- **Hysteria2** (QUIC/UDP) with Brutal congestion control and Salamander obfuscation
-- **WireGuard** native inbound (per-peer keys and downloadable `.conf` + QR)
-- **AmneziaWG** (obfuscated WireGuard with junk packets)
-- Add standalone inbounds on any port, assign each to all users or a chosen few
-
-### Users
-- Data quota (total, or split upload/download), expiry (fixed or from first connection), device/IP limit, and daily/weekly/monthly data reset
-- Per-user access control: pick exactly which protocols and inbounds each user gets
-- One personal subscription link per user with a live usage page and every config as a QR
-- Auto-enforcement: over-quota, expired, or over-device-limit users are cut off automatically
-
-### Routing and egress
-- Point-and-click routing: geosite/geoip/CIDR/domain/protocol matchers
-- **Direct Iran** and domestic bypass (keep your real IP for .ir sites), bypass China/Russia, block ads/porn/BitTorrent/QUIC
-- Extra exits built in: **WARP** (with your own WARP+ license), **Tor**, and **Psiphon**, each with install/test/status
-- Custom outbounds (SOCKS/HTTP upstream, freedom, blackhole, raw) and per-inbound egress assignment
-- Secure DNS (resolve on the node) and anti-sanction DNS
-
-### Iran bridge tunnels
-- Front your foreign exit with a clean-IP server inside Iran
-- Selectable backends: **Backhaul** and **BackPack** (recommended), **rathole**, **wstunnel**
-- Carries TCP and UDP, so Hysteria2 keeps working through the tunnel
-- Step-by-step setup wizard right in the panel
-
-### Domain and free SSL
-- One-click **Let's Encrypt** (Xray steps aside automatically, no manual port 80)
-- **Cloudflare full-auto**: connect a token once, then Nova creates the DNS record and issues a wildcard certificate for you
-- Or paste a Cloudflare Origin certificate
-- Auto-renewal, applied across all users and inbounds
-
-### Operations
-- **Multi-node fleet**: manage many Nova servers from one panel, aggregate users and usage, provision remotely
-- **REST API** (`/api/v1`, token auth) and a **full Telegram bot** (button menu + a Mini App that opens the whole panel inside Telegram)
-- **Multiple admins** with an owner and reseller roles
-- **Two-factor auth** (Google Authenticator)
-- **Automation**: nightly backups (to disk and Telegram), proactive alerts, opt-in auto-update, and clean-IP refresh
-- **Health check** and one-click self-update
-- Backup and restore, per-ISP client auto-tuning, and an in-panel manual in three languages
+| Area | What you get |
+|------|--------------|
+| **Protocols** | VLESS, VMess, Trojan, Shadowsocks-2022, VLESS-Reality (XTLS-Vision), Hysteria2, native WireGuard, AmneziaWG |
+| **Transports** | TCP, WebSocket, gRPC, XHTTP, HTTPUpgrade, mKCP, over TLS or Reality |
+| **Users** | Data quota (total or up/down split), expiry (fixed or first-use), device/IP limit, daily/weekly/monthly reset, per-user protocol and inbound access |
+| **Subscriptions** | One auto-updating link per user, live usage page, QR codes, Clash/Mihomo and sing-box formats |
+| **Routing** | Point-and-click geosite/geoip/CIDR/domain/protocol rules, Direct-Iran and domestic bypass, ad/porn/BitTorrent/QUIC blocking, secure and anti-sanction DNS |
+| **Egress** | Direct, block, WARP (with WARP+ license), Tor, Psiphon, custom SOCKS/HTTP outbounds, and per-inbound egress assignment |
+| **Iran tunnels** | Bridge-to-exit with Backhaul, BackPack, rathole, or wstunnel; carries TCP and UDP so Hysteria2 keeps working |
+| **Domain and SSL** | One-click Let's Encrypt, full-auto Cloudflare (auto-DNS + wildcard), or a pasted Origin cert, all auto-renewing |
+| **Fleet** | Register and manage multiple Nova nodes from one panel, aggregate users and usage, provision remotely |
+| **API and bot** | Token-authed REST API (`/api/v1`) and a full Telegram bot with a Mini App that opens the whole panel in Telegram |
+| **Security** | Multiple admins with owner and reseller roles, two-factor auth (Google Authenticator), server-side password reset |
+| **Automation** | Nightly backups (disk and Telegram), proactive alerts, opt-in auto-update, clean-IP refresh, health check |
+| **Panel** | English, Persian (RTL), Russian; global search, setup wizard, per-section guides, and a full in-panel manual; light and dark |
 
 ---
 
-## Panel
+## 🆚 How it compares
 
-- Modern, responsive UI in **English, Persian (RTL), and Russian**
-- Global search (Cmd/Ctrl+K), a first-run setup wizard, and a full built-in guide for every section
-- Light and dark themes
+| | Nova Server | 3x-ui | Marzban |
+|---|:--:|:--:|:--:|
+| Xray + sing-box (Hysteria2) | ✅ | Xray only | Xray only |
+| Native WireGuard inbound | ✅ | plain | — |
+| Reality | ✅ | ✅ | ✅ |
+| Iran bridge tunnels (built in) | ✅ | — | — |
+| WARP / Tor / Psiphon egress | ✅ all three | WARP | raw config |
+| One-click Cloudflare auto-DNS + SSL | ✅ | — | — |
+| Per-user protocol/inbound access | ✅ | — | — |
+| REST API | ✅ | ✅ | ✅ |
+| Full Telegram bot + Mini App | ✅ | control bot | control bot |
+| Multi-admin + resellers | ✅ | — | WIP |
+| Multi-node fleet | ✅ | — | ✅ |
+| 2FA | ✅ | — | — |
+| Trilingual panel + in-panel manual | ✅ EN/FA/RU | 13 langs | multi |
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
 ```
                          :443 (TCP/UDP)
   clients  ───────────────────────────────►  Nova node
-                                              ├─ Xray-core   (VLESS/VMess/Trojan/Reality/SS)
-                                              ├─ sing-box    (Hysteria2, UDP)
-                                              ├─ AmneziaWG   (obfuscated WireGuard)
-                                              └─ Nova agent  (panel, API, Telegram, automations)
+                                              ├─ Xray-core   VLESS / VMess / Trojan / Reality / SS
+                                              ├─ sing-box    Hysteria2 (UDP)
+                                              ├─ AmneziaWG   obfuscated WireGuard
+                                              └─ Nova agent  panel · REST API · Telegram · automations
 ```
 
-The agent is a single Node.js process. Settings live in a local SQLite store. The panel, the REST API, and the Telegram bot all drive the same internal service functions.
+The agent is a single Node.js process backed by a local SQLite store. The panel, the REST API, and the Telegram bot all drive the same internal service functions.
 
 ---
 
-## Requirements
+## 📋 Prerequisites
 
-- A VPS running Ubuntu 20.04+ or Debian 11+ (x86_64 or arm64)
-- Root access
-- A domain is optional (needed only for a trusted certificate and the Telegram Mini App)
-
----
-
-## Updating
-
-The panel checks for new versions and updates in one click, or turn on automatic updates. Users, inbounds, and settings are preserved.
+- A VPS running **Ubuntu 20.04+** or **Debian 11+** (x86_64 or arm64)
+- **Root** access
+- A **domain** is optional (needed only for a trusted certificate and the Telegram Mini App)
 
 ---
 
-## Links
+## 🔄 Updating
 
-- Panel client apps and more: [novaproxy.online](https://novaproxy.online)
-- Telegram: [@irnova_proxy](https://t.me/irnova_proxy)
+The panel checks for new versions and updates in one click, or turn on **automatic updates**. Your users, inbounds, and settings are preserved.
 
 ---
 
 <div align="center">
-Nova Server. All rights reserved.
+
+Made with care for a free and open internet.
+
+**Nova Server. All rights reserved.**
+
 </div>
