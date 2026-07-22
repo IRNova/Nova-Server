@@ -267,6 +267,14 @@ exec node /opt/nova-node-agent/bin/reset-password.mjs "$@"
 NPW
 chmod +x /usr/local/bin/nova-passwd 2>/dev/null || true
 
+# Shortcut to configure + enable the built-in Telegram control bot, e.g.
+#   nova-tgbot '123456789:AA...' '<admin-chat-id>'
+cat > /usr/local/bin/nova-tgbot <<'NTB'
+#!/bin/bash
+exec node /opt/nova-node-agent/bin/set-tgbot.mjs "$@"
+NTB
+chmod +x /usr/local/bin/nova-tgbot 2>/dev/null || true
+
 # ---- agent code --------------------------------------------------------------
 say "Fetching the Nova node agent"
 mkdir -p "$AGENT_DIR" "$DB_DIR" "$CERT_DIR"
