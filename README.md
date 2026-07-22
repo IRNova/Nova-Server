@@ -89,21 +89,38 @@ The server installs Nova by itself on first boot (about 3 to 5 minutes). Then op
 
 ---
 
+## 🐳 Docker and PaaS (runflare and similar)
+
+No VPS? Nova also runs as a WebSocket-only container on any Docker host, or on Iranian PaaS platforms like [runflare](https://runflare.com) where port 22 is closed and only HTTP/WebSocket is exposed.
+
+```bash
+curl -fsSL -O https://raw.githubusercontent.com/IRNova/Nova-Server/main/docker-compose.yml
+curl -fsSL -O https://raw.githubusercontent.com/IRNova/Nova-Server/main/Dockerfile
+NOVA_PUBLIC_HOST=your.domain docker compose up -d
+```
+
+The image ships the obfuscated release and needs a TLS edge in front (Cloudflare, a reverse proxy, or the PaaS). This path is WebSocket-only: VLESS/VMess/Trojan over WS work (and VoIP), but the UDP protocols (Hysteria2, WireGuard) need a VPS. Full step-by-step for VPS, Docker, and runflare is in **[DEPLOY.md](./DEPLOY.md)**.
+
+---
+
 ## 🧩 Features
 
 | Area | What you get |
 |------|--------------|
-| **Protocols** | VLESS, VMess, Trojan, Shadowsocks-2022, VLESS-Reality (XTLS-Vision), Hysteria2, native WireGuard, AmneziaWG |
+| **Protocols** | VLESS, VMess, Trojan, Shadowsocks-2022, VLESS-Reality (XTLS-Vision), Hysteria2, native WireGuard, AmneziaWG, all managed on one Inbounds page |
 | **Transports** | TCP, WebSocket, gRPC, XHTTP, HTTPUpgrade, mKCP, over TLS or Reality |
+| **Deploy** | VPS installer (full features), Docker one-click, or a PaaS like runflare (WebSocket-only). See DEPLOY.md |
 | **Users** | Data quota (total or up/down split), expiry (fixed or first-use), device/IP limit, daily/weekly/monthly reset, per-user protocol and inbound access |
-| **Subscriptions** | One auto-updating link per user, live usage page, QR codes, Clash/Mihomo and sing-box formats |
+| **Subscriptions** | One auto-updating link per user, live usage page + native usage/expiry header, QR codes, Clash/Mihomo and sing-box formats, multi-profile inbounds (one inbound, many CDN domains) |
+| **Per-country exits** | Let users pick their exit country in their app; per-country Tor/Psiphon instances, one config per country in the subscription |
 | **Routing** | Point-and-click geosite/geoip/CIDR/domain/protocol rules, Direct-Iran and domestic bypass, ad/porn/BitTorrent/QUIC blocking, secure and anti-sanction DNS |
 | **Egress** | Direct, block, WARP (with WARP+ license), Tor, Psiphon, custom SOCKS/HTTP outbounds, and per-inbound egress assignment |
+| **Diagnostics** | Config/port health check (is each config actually listening and reachable), firewall and reserved-ports view, one-click fixes |
 | **Iran tunnels** | Bridge-to-exit with Backhaul, BackPack, rathole, or wstunnel; carries TCP and UDP so Hysteria2 keeps working |
 | **Domain and SSL** | One-click Let's Encrypt, full-auto Cloudflare (auto-DNS + wildcard), or a pasted Origin cert, all auto-renewing |
 | **Fleet** | Register and manage multiple Nova nodes from one panel, aggregate users and usage, provision remotely |
 | **API and bot** | Token-authed REST API (`/api/v1`) and a full Telegram bot with a Mini App that opens the whole panel in Telegram |
-| **Security** | Multiple admins with owner and reseller roles, two-factor auth (Google Authenticator), server-side password reset |
+| **Resellers** | Owner, managers, and resellers with custom per-capability permissions; resellers see only their own users and build them on your inbounds; two-factor auth per admin; server-side password reset |
 | **Automation** | Nightly backups (disk and Telegram), proactive alerts, opt-in auto-update, clean-IP refresh, health check |
 | **Panel** | English, Persian (RTL), Russian; global search, setup wizard, per-section guides, and a full in-panel manual; light and dark |
 
