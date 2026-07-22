@@ -212,6 +212,25 @@ if ! command -v backhaul >/dev/null 2>&1; then
   fi
 fi
 
+# BackPack: Backhaul-class Go reverse tunnel; ships checksum-verified binaries.
+if ! command -v backpack >/dev/null 2>&1; then
+  say "Installing BackPack tunnel backend"
+  bpurl="$(gh_asset AminMGMT/BackPack "backpack_linux_${garch}.tar.gz")"
+  bpsum="$(gh_asset AminMGMT/BackPack "SHA256SUMS")"
+  if [ -n "$bpurl" ] && curl -fsSL -o /tmp/backpack.tgz "$bpurl" && curl -fsSL -o /tmp/backpack.sums "${bpsum:-/dev/null}" 2>/dev/null; then
+    # Verify against the published SHA256SUMS before trusting the binary.
+    want="$(grep -i "backpack_linux_${garch}.tar.gz" /tmp/backpack.sums 2>/dev/null | awk '{print $1}' | head -1)"
+    got="$(sha256sum /tmp/backpack.tgz 2>/dev/null | awk '{print $1}')"
+    if [ -n "$want" ] && [ "$want" = "$got" ] && tar -xzf /tmp/backpack.tgz -C /usr/local/bin backpack 2>/dev/null; then
+      chmod +x /usr/local/bin/backpack && ok "BackPack installed (checksum verified)"
+    else
+      warn "BackPack checksum mismatch or extract failed; skipping that backend."
+    fi
+  else
+    warn "Could not download BackPack; that tunnel backend will be unavailable."
+  fi
+fi
+
 # rathole: lightweight Rust, TCP+UDP, Noise/TLS. (aarch64 ships musl only.)
 if ! command -v rathole >/dev/null 2>&1; then
   say "Installing rathole tunnel backend"
@@ -239,6 +258,14 @@ if ! command -v wstunnel >/dev/null 2>&1; then
   fi
 fi
 mkdir -p /etc/nova/tunnel && chmod 700 /etc/nova/tunnel
+
+# A convenience shortcut so a locked-out admin can reset their password over SSH:
+#   nova-passwd 'NewPassword' [--clear-2fa]
+cat > /usr/local/bin/nova-passwd <<'NPW'
+#!/bin/bash
+exec node /opt/nova-node-agent/bin/reset-password.mjs "$@"
+NPW
+chmod +x /usr/local/bin/nova-passwd 2>/dev/null || true
 
 # ---- agent code --------------------------------------------------------------
 say "Fetching the Nova node agent"
