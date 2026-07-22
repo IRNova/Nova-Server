@@ -1,126 +1,125 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/iiviirv/irnova-site/main/brand/nova-logo-badge-round.png" width="70" alt="Nova">
-
-<div align="right">
-  <a href="README.fa.md"><img src="https://raw.githubusercontent.com/IRNova/Nova-Proxy/main/flag-iran.svg" height="16" alt="Iran (Lion and Sun)" /> فارسی</a>
-</div>
-
 # Nova Server
 
-**The full Nova panel on your own VPS.**
+**Your own proxy server on any VPS, with a full admin panel.**
 
-xray-core plus the Nova node agent behind one public port (443), managed from the same
-Nova app, browser, or Telegram bot you already use. Multi-protocol (VLESS, Trojan,
-Shadowsocks, Hysteria2), per-ISP client optimization, and add-a-domain TLS. Everything
-runs on **your** server, and nothing about your traffic is sent out.
+Turn a plain Linux server into a private, censorship-resistant proxy node in a few minutes. Multi-protocol, multi-user, multi-node, with a modern panel in English, Persian, and Russian.
 
-[![License](https://img.shields.io/badge/license-MIT-purple?style=for-the-badge)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Debian%20%2F%20Ubuntu-0ea5e9?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/IRNova/Nova-Server)
-[![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=8957e5)](https://github.com/IRNova/Nova-Server)
+`Xray-core` + `sing-box` (Hysteria2) + `AmneziaWG` behind one port, driven by a single self-hosted agent.
 
 </div>
 
 ---
 
-## 🌐 Links
+## Install
 
-<div align="center">
-
-[![Website](https://img.shields.io/badge/🌐%20Website-novaproxy.online-0ea5e9?style=for-the-badge)](https://novaproxy.online/)
-[![Telegram Channel](https://img.shields.io/badge/✈️%20Telegram%20Channel-@irnova__proxy-0ea5e9?style=for-the-badge&logo=telegram)](https://t.me/irnova_proxy)
-[![Telegram Group](https://img.shields.io/badge/👥%20Telegram%20Group-@irnovaproxy__group-0ea5e9?style=for-the-badge&logo=telegram)](https://t.me/irnovaproxy_group)
-[![YouTube](https://img.shields.io/badge/▶️%20YouTube-@novaproxyir-ff0000?style=for-the-badge&logo=youtube)](https://www.youtube.com/@novaproxyir)
-[![X (Twitter)](https://img.shields.io/badge/𝕏%20X-@irNovaProxy-000000?style=for-the-badge&logo=x)](https://x.com/irNovaProxy)
-[![Instagram](https://img.shields.io/badge/📸%20Instagram-@irnova__proxy-E4405F?style=for-the-badge&logo=instagram)](https://www.instagram.com/irnova_proxy)
-
-</div>
-
----
-
-## 📖 What is Nova Server?
-
-Nova Server is the VPS side of Nova. One command installs **xray-core** plus the **Nova node agent** on your own Debian or Ubuntu server and wires them together so a single public port (443) serves both the admin panel and the tunnel. You manage it from the same Nova app, a browser at `https://your-vps`, or the built-in Telegram bot.
-
-Where the Cloudflare Worker cannot run native TCP or handle UDP, a Nova Server can. That means full **VLESS**, real **UDP for voice and video calls**, and **Hysteria2** for low-latency gaming, all on infrastructure you control.
-
-**What makes it different:**
-- 🔒 **Your server, your traffic.** Nothing is logged, nothing is sent out.
-- ⚡ **One-line install.** Xray and the whole Nova panel, wired up in minutes.
-- 🧩 **Multi-protocol.** VLESS, Trojan, Shadowsocks, and Hysteria2 with a configurable UDP port for port-hopping.
-- 🌍 **Per-ISP optimization.** Fingerprint and fragmentation auto-tuned for each carrier.
-- 🔐 **Add-a-domain TLS.** Point a domain at the server for a real certificate (Let's Encrypt or Cloudflare Origin), or run on the public IP with a self-signed cert.
-- 📱 **Managed anywhere.** From the Nova app, a browser, or Telegram.
-
----
-
-## ⚡ Quick Install
-
-Run on your own VPS (Debian or Ubuntu, as root):
+On a fresh Ubuntu/Debian server, run:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
 ```
 
-Optional environment variables:
+The installer sets up the proxy cores, the panel, and the tunnel backends, then prints your panel URL. Open it, set an admin password, and use the **Setup Wizard** to add a domain, a recommended protocol, and your first user.
 
-- `NOVA_ADMIN_PASS=...` sets the panel admin password (a random one is generated if unset).
-- `NOVA_DOMAIN=...` a domain that points at this server. Without one, the node uses the public IP with a self-signed certificate.
+To reset a forgotten password from the server:
 
-When it finishes, open `https://your-vps` in a browser or add the node straight from the Nova app.
-
----
-
-## 📋 Requirements
-
-- A **VPS with root SSH access** (Debian or Ubuntu).
-- Optional: a **domain** pointing at the server, for a trusted TLS certificate.
+```bash
+nova-passwd 'YourNewPassword' --clear-2fa
+```
 
 ---
 
-## 🛠 How it works
+## Features
 
-Xray terminates TLS on port 443 and dispatches by path: the tunnel path routes to the VLESS, VMess, Trojan and Hysteria2 inbounds on loopback, and everything else goes to the agent's HTTP panel and browser dashboard. The agent is managed from the Nova app, a browser, or the built-in Telegram bot, and it all runs entirely on your server.
+### Protocols and inbounds
+- **VLESS, VMess, Trojan, Shadowsocks** over TLS/WS/gRPC/XHTTP/HTTPUpgrade
+- **VLESS-Reality** with XTLS-Vision (DPI-resistant, no domain needed)
+- **Hysteria2** (QUIC/UDP) with Brutal congestion control and Salamander obfuscation
+- **WireGuard** native inbound (per-peer keys and downloadable `.conf` + QR)
+- **AmneziaWG** (obfuscated WireGuard with junk packets)
+- Add standalone inbounds on any port, assign each to all users or a chosen few
+
+### Users
+- Data quota (total, or split upload/download), expiry (fixed or from first connection), device/IP limit, and daily/weekly/monthly data reset
+- Per-user access control: pick exactly which protocols and inbounds each user gets
+- One personal subscription link per user with a live usage page and every config as a QR
+- Auto-enforcement: over-quota, expired, or over-device-limit users are cut off automatically
+
+### Routing and egress
+- Point-and-click routing: geosite/geoip/CIDR/domain/protocol matchers
+- **Direct Iran** and domestic bypass (keep your real IP for .ir sites), bypass China/Russia, block ads/porn/BitTorrent/QUIC
+- Extra exits built in: **WARP** (with your own WARP+ license), **Tor**, and **Psiphon**, each with install/test/status
+- Custom outbounds (SOCKS/HTTP upstream, freedom, blackhole, raw) and per-inbound egress assignment
+- Secure DNS (resolve on the node) and anti-sanction DNS
+
+### Iran bridge tunnels
+- Front your foreign exit with a clean-IP server inside Iran
+- Selectable backends: **Backhaul** and **BackPack** (recommended), **rathole**, **wstunnel**
+- Carries TCP and UDP, so Hysteria2 keeps working through the tunnel
+- Step-by-step setup wizard right in the panel
+
+### Domain and free SSL
+- One-click **Let's Encrypt** (Xray steps aside automatically, no manual port 80)
+- **Cloudflare full-auto**: connect a token once, then Nova creates the DNS record and issues a wildcard certificate for you
+- Or paste a Cloudflare Origin certificate
+- Auto-renewal, applied across all users and inbounds
+
+### Operations
+- **Multi-node fleet**: manage many Nova servers from one panel, aggregate users and usage, provision remotely
+- **REST API** (`/api/v1`, token auth) and a **full Telegram bot** (button menu + a Mini App that opens the whole panel inside Telegram)
+- **Multiple admins** with an owner and reseller roles
+- **Two-factor auth** (Google Authenticator)
+- **Automation**: nightly backups (to disk and Telegram), proactive alerts, opt-in auto-update, and clean-IP refresh
+- **Health check** and one-click self-update
+- Backup and restore, per-ISP client auto-tuning, and an in-panel manual in three languages
 
 ---
 
-## 💜 Support
+## Panel
 
-If Nova Server helps you, please **⭐ star the repo**. It keeps the project alive and free for everyone.
+- Modern, responsive UI in **English, Persian (RTL), and Russian**
+- Global search (Cmd/Ctrl+K), a first-run setup wizard, and a full built-in guide for every section
+- Light and dark themes
+
+---
+
+## Architecture
+
+```
+                         :443 (TCP/UDP)
+  clients  ───────────────────────────────►  Nova node
+                                              ├─ Xray-core   (VLESS/VMess/Trojan/Reality/SS)
+                                              ├─ sing-box    (Hysteria2, UDP)
+                                              ├─ AmneziaWG   (obfuscated WireGuard)
+                                              └─ Nova agent  (panel, API, Telegram, automations)
+```
+
+The agent is a single Node.js process. Settings live in a local SQLite store. The panel, the REST API, and the Telegram bot all drive the same internal service functions.
+
+---
+
+## Requirements
+
+- A VPS running Ubuntu 20.04+ or Debian 11+ (x86_64 or arm64)
+- Root access
+- A domain is optional (needed only for a trusted certificate and the Telegram Mini App)
+
+---
+
+## Updating
+
+The panel checks for new versions and updates in one click, or turn on automatic updates. Users, inbounds, and settings are preserved.
+
+---
+
+## Links
+
+- Panel client apps and more: [novaproxy.online](https://novaproxy.online)
+- Telegram: [@irnova_proxy](https://t.me/irnova_proxy)
+
+---
 
 <div align="center">
-
-### ⭐ [Star Nova Server on GitHub](https://github.com/IRNova/Nova-Server) ⭐
-
-| Coin | Address |
-|------|---------|
-| **TON** | `UQD51lGC35rP_SbVYgbFA7CEEii4GVMFgqj4N8fiGi6m425w` |
-
-</div>
-
----
-
-## 🙏 Credits
-
-Built with ❤️ for a free and open internet.
-
-- [@iiviirv](https://github.com/iiviirv) — contributor
-- [Xray-core](https://github.com/XTLS/xray-core)
-- [Nova Proxy](https://github.com/IRNova/Nova-Proxy) — the Cloudflare Worker side of Nova
-
----
-
-## License
-
-MIT, see the [LICENSE](LICENSE) file.
-
----
-
-<div align="center">
-
-Made for Iran <img src="https://raw.githubusercontent.com/IRNova/Nova-Proxy/main/flag-iran.svg" height="16" alt="Iran (Lion and Sun)" /> and anyone who needs a free, open internet.
-**Nothing about your traffic is logged. The server is yours.**
-
-📖 [Persian version](README.fa.md)
-
+Nova Server. All rights reserved.
 </div>
