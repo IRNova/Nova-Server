@@ -1,13 +1,10 @@
-# Nova Server v1.1.7
+# Nova Server v1.1.8
 
-Fixes from real-world Iran testing.
+Two fixes on top of 1.1.7.
 
 ## Fixes
-- **"Could not access the node" when saving is fixed.** On a node with VMess or Trojan enabled, every Save was restarting xray (which briefly drops the panel it is served through), so saving settings often failed. xray now reloads only when a change actually needs it (a config or user change), not on every Save.
-- **Subscriptions now load in normal client apps on a no-domain node.** Apps like Hiddify, sing-box, Shadowrocket, HAPP, FoxRay and V2Box reject a self-signed certificate when fetching the subscription URL. A no-domain node now also serves the read-only subscription over plain HTTP, and hands out an http subscription link, so those apps can fetch it. Only the subscription is served this way; the admin panel is never exposed over HTTP. If you use a domain (trusted certificate), nothing changes.
-- The panel now quietly retries a read once if a config change briefly restarts xray, so a Save that does reload no longer shows a connection error.
-- Fixed the per-carrier optimization toggles (TLS fragment, Mux) overlapping their labels.
-- Rewrote the Tunnel setup guide for the new lightweight Iran bridge: you no longer install the full stack on the Iran box, you run one generated command.
+- **Saving settings no longer errors on a node with standalone inbounds.** A settings save (for example the per-operator carriers) was still triggering a full xray restart, because the hot-patch path is skipped when standalone inbounds exist, and the restart briefly drops the panel ("cannot reach the node"). A settings save that does not change users or the xray config now leaves xray completely alone, so it is instant and the panel never drops. Saves that do change the config still apply, but only after responding, so the panel stays put.
+- **Per-carrier optimization toggles render correctly.** The TLS fragment and Mux switches were collapsing (the knob floated over the labels) because a general form rule was overriding the switch layout. Fixed, and verified by rendering.
 
 ## Install
 ```bash
