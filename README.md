@@ -89,17 +89,19 @@ The server installs Nova by itself on first boot (about 3 to 5 minutes). Then op
 
 ---
 
-## 🐳 Docker and PaaS (runflare and similar)
+## 🧹 Uninstall
 
-No VPS? Nova also runs as a WebSocket-only container on any Docker host, or on Iranian PaaS platforms like [runflare](https://runflare.com) where port 22 is closed and only HTTP/WebSocket is exposed.
+To completely remove Nova, xray, sing-box and all Nova data from the server, run:
 
 ```bash
-curl -fsSL -O https://raw.githubusercontent.com/IRNova/Nova-Server/main/docker-compose.yml
-curl -fsSL -O https://raw.githubusercontent.com/IRNova/Nova-Server/main/Dockerfile
-NOVA_PUBLIC_HOST=your.domain docker compose up -d
+nova-uninstall
 ```
 
-The image ships the obfuscated release and needs a TLS edge in front (Cloudflare, a reverse proxy, or the PaaS). This path is WebSocket-only: VLESS/VMess/Trojan over WS work (and VoIP), but the UDP protocols (Hysteria2, WireGuard) need a VPS. Full step-by-step for VPS, Docker, and runflare is in **[DEPLOY.md](./DEPLOY.md)**.
+It asks you to confirm first. To skip the prompt (for scripts), use `nova-uninstall --yes`. If the `nova-uninstall` command is not available, run it directly:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-uninstall.sh)
+```
 
 ---
 
@@ -109,7 +111,7 @@ The image ships the obfuscated release and needs a TLS edge in front (Cloudflare
 |------|--------------|
 | **Protocols** | VLESS, VMess, Trojan, Shadowsocks-2022, VLESS-Reality (XTLS-Vision), Hysteria2, native WireGuard, AmneziaWG, all managed on one Inbounds page |
 | **Transports** | TCP, WebSocket, gRPC, XHTTP, HTTPUpgrade, mKCP, over TLS or Reality |
-| **Deploy** | VPS installer (full features), Docker one-click, or a PaaS like runflare (WebSocket-only). See DEPLOY.md |
+| **Deploy** | One-line VPS installer with every feature; `nova-uninstall` to remove it all |
 | **Users** | Data quota (total or up/down split), expiry (fixed or first-use), device/IP limit, daily/weekly/monthly reset, per-user protocol and inbound access |
 | **Subscriptions** | One auto-updating link per user, live usage page + native usage/expiry header, QR codes, Clash/Mihomo and sing-box formats, multi-profile inbounds (one inbound, many CDN domains) |
 | **Per-country exits** | Let users pick their exit country in their app; per-country Tor/Psiphon instances, one config per country in the subscription |

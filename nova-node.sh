@@ -275,9 +275,20 @@ exec node /opt/nova-node-agent/bin/set-tgbot.mjs "$@"
 NTB
 chmod +x /usr/local/bin/nova-tgbot 2>/dev/null || true
 
+# Shortcut to remove Nova and all its data:  nova-uninstall  (add --yes to skip
+# the prompt). Bundled with the agent, so it works offline after install.
+cat > /usr/local/bin/nova-uninstall <<'NUN'
+#!/bin/bash
+exec bash /opt/nova-node-agent/install/nova-uninstall.sh "$@"
+NUN
+chmod +x /usr/local/bin/nova-uninstall 2>/dev/null || true
+
 # ---- agent code --------------------------------------------------------------
 say "Fetching the Nova node agent"
 mkdir -p "$AGENT_DIR" "$DB_DIR" "$CERT_DIR"
+# xray writes its access log here and runs as 'nobody'; create it up front owned by
+# that user so xray can write it (the agent also self-heals this, belt and braces).
+mkdir -p /var/log/nova && chown nobody:nogroup /var/log/nova 2>/dev/null || true
 tmp="$(mktemp -d)"
 curl -fsSL "$TARBALL_URL" -o "$tmp/agent.tar.gz" || die "Could not download the agent."
 # --warning=no-unknown-keyword: hide the harmless "Ignoring unknown extended
@@ -434,4 +445,6 @@ fi
 echo
 printf '  %s\n' "Manage it: open the Nova app -> Connect your VPS -> enter the address"
 printf '  %s\n' "and admin password above, or just open the web panel URL."
+echo
+printf '  %s\n' "Uninstall anytime with:  ${c_bld}nova-uninstall${c_rst}"
 echo
