@@ -1,19 +1,14 @@
-# Nova Server v1.1.2
+# Nova Server v1.1.3
 
-An important reliability release. Update in one click from the panel (Settings, General, self-update), or reinstall with the one-line installer.
+A fix for a broken transport in the latest xray. Update in one click from the panel (Settings, General, self-update).
 
-## Fixes
-- **Fresh installs now come up reliably.** On a brand-new server the xray access-log directory did not exist yet when the config was validated, so xray rejected a perfectly valid config and the panel never became reachable on port 443. Nova now creates that directory (owned by the xray user) before validating, so a fresh node serves the panel right away. This also fixes the "site not loading" after a clean install.
-- Re-running the installer reliably applies updates (it now restarts the agent), and install output is clean (no stray `tar` warnings).
+## Fix
+- **mKCP no longer breaks the node.** The current xray release removed the old mKCP transport format, so a node that had an mKCP inbound could not save any change, including creating a user (xray rejected the whole config). Nova now:
+  - skips any mKCP inbound when building the config, so a leftover one can never brick the node,
+  - removes an existing mKCP inbound automatically on update,
+  - and no longer offers mKCP when adding an inbound.
 
-## New
-- **One-command uninstall.** Remove Nova, xray, sing-box and all data with `nova-uninstall` (add `--yes` to skip the prompt), or run it directly:
-  ```bash
-  bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-uninstall.sh)
-  ```
-
-## Changed
-- Nova is now VPS-only. The Docker and PaaS (runflare) path has been removed to keep one clear, fully featured install.
+  If you saw "xray rejected the new config" or could not create users, this fixes it. Existing users, inbounds, and settings are untouched.
 
 ## Install
 
