@@ -1,52 +1,48 @@
 # Deploying Nova Server
 
-Nova runs three ways. Pick the one your host supports.
+Nova runs on any Linux VPS with root. One command installs the proxy cores (xray, sing-box for Hysteria2, AmneziaWG), the admin panel, and the tunnel backends, and supports every protocol including the UDP ones.
 
-| Option | Where | Protocols | UDP (Hysteria2 / WireGuard) |
-|---|---|---|---|
-| VPS installer | A Linux server with root | All | Yes |
-| Docker | Any Docker host | VLESS / VMess / Trojan over WebSocket | No |
-| PaaS (runflare, etc.) | Container platforms, port 22 closed | VLESS / VMess / Trojan over WebSocket | No |
+## Install
 
-## 1. VPS (recommended, full features)
-
-A Linux server with root. Installs xray, sing-box and AmneziaWG natively and supports every protocol, including the UDP ones (Hysteria2, WireGuard) and the Iran bridge tunnels.
+On a fresh Ubuntu 20.04+ or Debian 11+ server (x86_64 or arm64):
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
 ```
 
-Then open the panel on your server's IP or domain and set an admin password.
+Then open the panel on your server's IP or domain and set an admin password. The Setup Wizard walks you through a domain, a recommended protocol, and your first user.
 
-## 2. Docker (self-host, one-click)
+### Install from your phone (no SSH)
 
-Any Docker host. WebSocket-only (VLESS / VMess / Trojan over WS). Put a TLS edge in front (Cloudflare, or a reverse proxy like Caddy / nginx / Traefik) that forwards HTTPS to the container's port 3000.
+When you create the VPS, paste this into your provider's **User data** / **Cloud-init** box:
 
 ```bash
-curl -fsSL -O https://raw.githubusercontent.com/IRNova/Nova-Server/main/docker-compose.yml
-curl -fsSL -O https://raw.githubusercontent.com/IRNova/Nova-Server/main/Dockerfile
-NOVA_PUBLIC_HOST=your.domain docker compose up -d
+#!/bin/bash
+bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
 ```
 
-The image pulls Nova's obfuscated release automatically. Data lives on a named volume, so it survives restarts.
+The server installs Nova by itself on first boot (about 3 to 5 minutes), then you open `https://YOUR_SERVER_IP` and set a password.
 
-## 3. PaaS / provider (runflare and similar), one-click
+## Update
 
-For Iranian and other container platforms where port 22 is closed to the outside and only HTTP/WebSocket is exposed. WebSocket-only, and the platform provides TLS.
+The panel checks for new versions and updates in one click (Settings, General, self-update), or turn on automatic updates. Re-running the install command also updates an existing node. Your users, inbounds, and settings are preserved.
 
-**runflare** (https://runflare.com):
+## Reset the admin password
 
-1. Create a project, then a service. Runtime: **Docker**. Expose Port: **3000**.
-2. Deploy this repo (it contains the Dockerfile) via the runflare CLI, GitHub, or upload:
-   ```bash
-   runflare deploy
-   ```
-3. Add an environment variable `NOVA_PUBLIC_HOST` = your service domain (for example `name.runflare.run`) so subscription links point at it.
-4. Attach a disk mounted at `/data` so the user database persists across redeploys.
-5. Open the service domain and set your admin password.
+```bash
+nova-passwd 'YourNewPassword' --clear-2fa
+```
 
-Any other Docker or Kubernetes PaaS works the same way: build the Dockerfile, route the platform's HTTPS to the container's port 3000, mount a volume at `/data`, and set `NOVA_PUBLIC_HOST`.
+## Uninstall
 
-## What is different on PaaS / Docker
+Remove Nova, xray, sing-box and all Nova data:
 
-No UDP, so no Hysteria2 and no WireGuard there (those need a VPS). Normal browsing, VLESS / VMess / Trojan over WebSocket, and VoIP calls (tunneled over the WebSocket connection) all work. If you need the UDP protocols, use a VPS.
+```bash
+nova-uninstall
+```
+
+Add `--yes` to skip the confirmation prompt. If the command is not present, run it directly:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-uninstall.sh)
+```
