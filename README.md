@@ -15,7 +15,7 @@ trilingual (English · فارسی · Русский) panel, per-user accounts, m
 bridge tunnels, one-click SSL, a Telegram bot with a Mini App, and two-factor auth.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
+[![Version](https://img.shields.io/badge/version-1.1.6-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server/releases)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
@@ -43,7 +43,7 @@ Nova Server turns a plain Linux VPS into your own private, censorship-resistant 
 
 **What makes Nova Server different:**
 - 🧩 **Every protocol that matters** — VLESS, VMess, Trojan, Shadowsocks, Reality, Hysteria2, and native WireGuard
-- 🇮🇷 **Iran bridge tunnels** — front a foreign exit with a clean-IP server inside Iran (Backhaul, BackPack, rathole, wstunnel)
+- 🇮🇷 **Iran bridge tunnels** — front a foreign exit with a clean-IP server inside Iran (Backhaul, BackPack, rathole, wstunnel). The Iran side installs with **one lightweight command** the panel generates for you, no full stack needed there
 - 🔐 **One-click SSL** — Let's Encrypt or full-auto Cloudflare (auto-DNS + wildcard), no manual port 80
 - 👥 **Per-user everything** — quota, expiry, device limit, data reset, and per-user protocol access
 - 🛰️ **Multi-node fleet** — manage many servers from one panel
@@ -89,6 +89,23 @@ The server installs Nova by itself on first boot (about 3 to 5 minutes). Then op
 
 ---
 
+## 🌉 Iran bridge (lightweight)
+
+Want a clean Iran IP fronting your foreign exit, without installing the whole stack on the Iran box? You don't have to.
+
+1. On your **foreign (exit)** node's panel, open **Tunnels**, configure the tunnel, and click **Generate the Iran bridge command**.
+2. Copy the one-line command and run it on your **Iran VPS**. It installs only the tunnel backend (Backhaul, BackPack, rathole, or wstunnel) and starts it, no xray, no sing-box, no panel.
+
+Your users then connect to the clean Iran IP and the traffic tunnels to your foreign exit. The command carries the shared tunnel secret, so keep it private.
+
+---
+
+## 📶 Per-operator configs (optional)
+
+Turn on **Per-operator configs in subscription** in Settings, and each user's subscription gains one extra config per Iranian carrier (Irancell, MCI, Rightel, Shatel, MobinNet), each tuned with that carrier's TLS fingerprint and labeled by carrier. Users on normal clients (v2rayNG, sing-box, Clash) just pick the one matching their SIM, no custom app needed. Off by default, and it applies to the plain, Clash, and sing-box subscription formats.
+
+---
+
 ## 🧹 Uninstall
 
 To completely remove Nova, xray, sing-box and all Nova data from the server, run:
@@ -113,12 +130,12 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 | **Transports** | TCP, WebSocket, gRPC, XHTTP, HTTPUpgrade, mKCP, over TLS or Reality |
 | **Deploy** | One-line VPS installer with every feature; `nova-uninstall` to remove it all |
 | **Users** | Data quota (total or up/down split), expiry (fixed or first-use), device/IP limit, daily/weekly/monthly reset, per-user protocol and inbound access |
-| **Subscriptions** | One auto-updating link per user, live usage page + native usage/expiry header, QR codes, Clash/Mihomo and sing-box formats, multi-profile inbounds (one inbound, many CDN domains) |
+| **Subscriptions** | One auto-updating link per user, live usage page + native usage/expiry header, QR codes, Clash/Mihomo and sing-box formats, multi-profile inbounds (one inbound, many CDN domains), optional per-operator configs (one tuned config per Iranian carrier, works in normal clients) |
 | **Per-country exits** | Let users pick their exit country in their app; per-country Tor/Psiphon instances, one config per country in the subscription |
 | **Routing** | Point-and-click geosite/geoip/CIDR/domain/protocol rules, Direct-Iran and domestic bypass, ad/porn/BitTorrent/QUIC blocking, secure and anti-sanction DNS |
 | **Egress** | Direct, block, WARP (with WARP+ license), Tor, Psiphon, custom SOCKS/HTTP outbounds, and per-inbound egress assignment |
 | **Diagnostics** | Config/port health check (is each config actually listening and reachable), firewall and reserved-ports view, one-click fixes |
-| **Iran tunnels** | Bridge-to-exit with Backhaul, BackPack, rathole, or wstunnel; carries TCP and UDP so Hysteria2 keeps working |
+| **Iran tunnels** | Bridge-to-exit with Backhaul, BackPack, rathole, or wstunnel; carries TCP and UDP so Hysteria2 keeps working. The Iran bridge sets up from one panel-generated command (slim installer, no full stack on the Iran box) |
 | **Domain and SSL** | One-click Let's Encrypt, full-auto Cloudflare (auto-DNS + wildcard), or a pasted Origin cert, all auto-renewing |
 | **Fleet** | Register and manage multiple Nova nodes from one panel, aggregate users and usage, provision remotely |
 | **API and bot** | Token-authed REST API (`/api/v1`) and a full Telegram bot with a Mini App that opens the whole panel in Telegram |

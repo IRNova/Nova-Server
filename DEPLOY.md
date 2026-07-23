@@ -27,6 +27,15 @@ The server installs Nova by itself on first boot (about 3 to 5 minutes), then yo
 
 The panel checks for new versions and updates in one click (Settings, General, self-update), or turn on automatic updates. Re-running the install command also updates an existing node. Your users, inbounds, and settings are preserved.
 
+## Iran bridge (lightweight, no full install)
+
+To front your foreign exit with a clean Iran IP, you do not install the full node on the Iran box:
+
+1. On the foreign (exit) node's panel, open **Tunnels**, configure the tunnel, and click **Generate the Iran bridge command**.
+2. Run that one command on the Iran VPS. It installs only the tunnel backend (Backhaul, BackPack, rathole, or wstunnel) and starts it as a service (`nova-tunnel`).
+
+Remove the bridge later with `systemctl disable --now nova-tunnel`. The command contains the shared tunnel secret, so keep it private.
+
 ## Reset the admin password
 
 ```bash
