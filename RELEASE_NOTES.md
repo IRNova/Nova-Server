@@ -1,17 +1,12 @@
-# Nova Server v1.1.3
+# Nova Server v1.1.4
 
-A fix for a broken transport in the latest xray. Update in one click from the panel (Settings, General, self-update).
+A fix for per-country exits. Update in one click from the panel (Settings, General, self-update).
 
 ## Fix
-- **mKCP no longer breaks the node.** The current xray release removed the old mKCP transport format, so a node that had an mKCP inbound could not save any change, including creating a user (xray rejected the whole config). Nova now:
-  - skips any mKCP inbound when building the config, so a leftover one can never brick the node,
-  - removes an existing mKCP inbound automatically on update,
-  - and no longer offers mKCP when adding an inbound.
-
-  If you saw "xray rejected the new config" or could not create users, this fixes it. Existing users, inbounds, and settings are untouched.
+- **Adding several per-country exits in a row no longer errors.** Each add used to restart xray immediately, which briefly dropped the panel it is served through, so a country clicked during that moment failed with "internal error" or "could not reach the node". Now the add responds first, starts the country instance, and coalesces the xray reload (one restart for a batch of changes). Add or remove as many countries as you like, back to back.
+- Clearer messages: a duplicate country, an unavailable region, or no free port now returns a plain message instead of "internal error".
 
 ## Install
-
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
 ```
