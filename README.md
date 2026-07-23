@@ -10,8 +10,8 @@
 
 **Your own censorship-resistant proxy server and full admin panel on any VPS.**
 
-VLESS · VMess · Trojan · Shadowsocks · Reality · Hysteria2 · WireGuard, with a modern
-trilingual (English · فارسی · Русский) panel, per-user accounts, multi-node fleet, Iran
+VLESS, VMess, Trojan, Shadowsocks, Reality, Hysteria2 and WireGuard, with a modern
+trilingual (English, فارسی, Русский) panel, per-user accounts, multi-node fleet, Iran
 bridge tunnels, one-click SSL, a Telegram bot with a Mini App, and two-factor auth.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
@@ -42,15 +42,15 @@ bridge tunnels, one-click SSL, a Telegram bot with a Mini App, and two-factor au
 Nova Server turns a plain Linux VPS into your own private, censorship-resistant proxy node with a **full admin panel**. It runs `Xray-core`, `sing-box` (Hysteria2), and `AmneziaWG` behind a single port, all driven by one self-hosted agent. Where Nova Proxy runs on Cloudflare's free tier, Nova Server is the **self-hosted big brother**: a real proxy core with everything a serious node operator needs.
 
 **What makes Nova Server different:**
-- 🧩 **Every protocol that matters** — VLESS, VMess, Trojan, Shadowsocks, Reality, Hysteria2, and native WireGuard
-- 🇮🇷 **Iran bridge tunnels** — front a foreign exit with a clean-IP server inside Iran (Backhaul, BackPack, rathole, wstunnel). The Iran side installs with **one lightweight command** the panel generates for you, no full stack needed there
-- 🔐 **One-click SSL** — Let's Encrypt or full-auto Cloudflare (auto-DNS + wildcard), no manual port 80
-- 👥 **Per-user everything** — quota, expiry, device limit, data reset, and per-user protocol access
-- 🛰️ **Multi-node fleet** — manage many servers from one panel
-- 🤖 **Telegram bot + Mini App** — run the whole panel inside Telegram
-- 🛡️ **Anti-censorship egress** — WARP (with your own WARP+ license), Tor, and Psiphon, built in
-- ⚙️ **Automated** — backups, health alerts, auto-update, clean-IP refresh, and a first-run setup wizard
-- 🌍 **Trilingual panel** — English, Persian (RTL), and Russian, with a built-in manual
+- 🧩 **Every protocol that matters**: VLESS, VMess, Trojan, Shadowsocks, Reality, Hysteria2, and native WireGuard
+- 🇮🇷 **Iran bridge tunnels**: front a foreign exit with a clean-IP server inside Iran (Backhaul, BackPack, rathole, wstunnel). The Iran side installs with **one lightweight command** the panel generates for you, no full stack needed there
+- 🔐 **One-click SSL**: Let's Encrypt or full-auto Cloudflare (auto-DNS + wildcard), no manual port 80
+- 👥 **Per-user everything**: quota, expiry, device limit, data reset, and per-user protocol access
+- 🛰️ **Multi-node fleet**: manage many servers from one panel
+- 🤖 **Telegram bot + Mini App**: run the whole panel inside Telegram
+- 🛡️ **Anti-censorship egress**: WARP (with your own WARP+ license), Tor, and Psiphon, built in
+- ⚙️ **Automated**: backups, health alerts, auto-update, clean-IP refresh, and a first-run setup wizard
+- 🌍 **Trilingual panel**: English, Persian (RTL), and Russian, with a built-in manual
 
 ---
 
@@ -127,7 +127,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 | Area | What you get |
 |------|--------------|
 | **Protocols** | VLESS, VMess, Trojan, Shadowsocks-2022, VLESS-Reality (XTLS-Vision), Hysteria2, native WireGuard, AmneziaWG, all managed on one Inbounds page |
-| **Transports** | TCP, WebSocket, gRPC, XHTTP, HTTPUpgrade, mKCP, over TLS or Reality |
+| **Transports** | TCP, WebSocket, gRPC, XHTTP, HTTPUpgrade, over TLS or Reality |
 | **Deploy** | One-line VPS installer with every feature; `nova-uninstall` to remove it all |
 | **Users** | Data quota (total or up/down split), expiry (fixed or first-use), device/IP limit, daily/weekly/monthly reset, per-user protocol and inbound access |
 | **Subscriptions** | One auto-updating link per user, live usage page + native usage/expiry header, QR codes, Clash/Mihomo and sing-box formats, multi-profile inbounds (one inbound, many CDN domains), optional per-operator configs (one tuned config per Iranian carrier, works in normal clients) |
@@ -150,17 +150,17 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 | | Nova Server | 3x-ui | Marzban |
 |---|:--:|:--:|:--:|
 | Xray + sing-box (Hysteria2) | ✅ | Xray only | Xray only |
-| Native WireGuard inbound | ✅ | plain | — |
+| Native WireGuard inbound | ✅ | plain |  ✗ |
 | Reality | ✅ | ✅ | ✅ |
-| Iran bridge tunnels (built in) | ✅ | — | — |
+| Iran bridge tunnels (built in) | ✅ |  ✗ |  ✗ |
 | WARP / Tor / Psiphon egress | ✅ all three | WARP | raw config |
-| One-click Cloudflare auto-DNS + SSL | ✅ | — | — |
-| Per-user protocol/inbound access | ✅ | — | — |
+| One-click Cloudflare auto-DNS + SSL | ✅ |  ✗ |  ✗ |
+| Per-user protocol/inbound access | ✅ |  ✗ |  ✗ |
 | REST API | ✅ | ✅ | ✅ |
 | Full Telegram bot + Mini App | ✅ | control bot | control bot |
-| Multi-admin + resellers | ✅ | — | WIP |
-| Multi-node fleet | ✅ | — | ✅ |
-| 2FA | ✅ | — | — |
+| Multi-admin + resellers | ✅ |  ✗ | WIP |
+| Multi-node fleet | ✅ |  ✗ | ✅ |
+| 2FA | ✅ |  ✗ |  ✗ |
 | Trilingual panel + in-panel manual | ✅ EN/FA/RU | 13 langs | multi |
 
 ---
