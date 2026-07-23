@@ -341,7 +341,12 @@ WantedBy=multi-user.target
 UNIT
 
 systemctl daemon-reload
-systemctl enable --now nova-agent >/dev/null 2>&1 || die "Could not start nova-agent."
+systemctl enable nova-agent >/dev/null 2>&1 || true
+# restart (not just enable --now): on a re-run the agent is already active and
+# "enable --now" would NOT pick up freshly extracted code. restart starts it when
+# stopped and reloads new code when running, so re-running the one-liner also
+# updates an existing node.
+systemctl restart nova-agent >/dev/null 2>&1 || die "Could not start nova-agent."
 
 # wait for the agent's local API
 for i in $(seq 1 20); do
