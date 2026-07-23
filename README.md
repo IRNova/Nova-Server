@@ -173,7 +173,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
                                               ├─ Xray-core   VLESS / VMess / Trojan / Reality / SS
                                               ├─ sing-box    Hysteria2 (UDP)
                                               ├─ AmneziaWG   obfuscated WireGuard
-                                              └─ Nova agent  panel · REST API · Telegram · automations
+                                              └─ Nova agent  panel, REST API, Telegram, automations
 ```
 
 The agent is a single Node.js process backed by a local SQLite store. The panel, the REST API, and the Telegram bot all drive the same internal service functions.
