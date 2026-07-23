@@ -280,7 +280,11 @@ say "Fetching the Nova node agent"
 mkdir -p "$AGENT_DIR" "$DB_DIR" "$CERT_DIR"
 tmp="$(mktemp -d)"
 curl -fsSL "$TARBALL_URL" -o "$tmp/agent.tar.gz" || die "Could not download the agent."
-tar xzf "$tmp/agent.tar.gz" -C "$AGENT_DIR" || die "Could not extract the agent."
+# --warning=no-unknown-keyword: hide the harmless "Ignoring unknown extended
+# header keyword" lines GNU tar prints when a release tarball was built on macOS
+# (Apple provenance xattrs). Extraction succeeds either way; the flag keeps the
+# output clean so a successful install never looks like it errored.
+tar --warning=no-unknown-keyword -xzf "$tmp/agent.tar.gz" -C "$AGENT_DIR" || die "Could not extract the agent."
 rm -rf "$tmp"
 ok "agent installed at $AGENT_DIR"
 
