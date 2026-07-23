@@ -422,6 +422,16 @@ fi
 
 SUBTOKEN="$(curl -fsS -b "$CJ" "$B/admin/network-settings.json" -H "$UA" 2>/dev/null | grep -oE '"subToken":"[a-f0-9]+"' | cut -d'"' -f4 || true)"
 rm -f "$CJ"
+
+# Return the panel to its first-run "create your password" screen unless the
+# operator pinned a password with NOVA_ADMIN_PASS. The temporary password above
+# only existed so this installer could seed host, protocols and a starter user
+# over the local API; clearing it now means the admin sets their own password on
+# first visit, and nothing else (host, users, settings) is touched.
+FIRST_RUN=0
+if [ -z "${NOVA_ADMIN_PASS:-}" ] && [ "$ADMIN_PASS" != "(unchanged from a previous install)" ]; then
+  NOVA_DB="$DB_DIR/nova.db" node -e 'import("/opt/nova-node-agent/src/kv/sqlite.mjs").then(async m=>{const kv=m.openKv(process.env.NOVA_DB);await kv.delete("admin_pass");}).catch(()=>{})' >/dev/null 2>&1 && FIRST_RUN=1 || true
+fi
 sleep 2
 ok "panel configured; xray $(systemctl is-active xray 2>/dev/null)"
 
@@ -430,10 +440,18 @@ echo
 printf '%s\n' "${c_grn}${c_bld}Nova node is ready.${c_rst}"
 echo
 printf '  %-16s %s\n' "Server address:" "$HOST"
-printf '  %-16s %s\n' "Admin password:" "$ADMIN_PASS"
+if [ "${FIRST_RUN:-0}" = 1 ]; then
+  printf '  %-16s %s\n' "Admin password:" "you set it on first visit (see below)"
+else
+  printf '  %-16s %s\n' "Admin password:" "$ADMIN_PASS"
+fi
 printf '  %-16s %s\n' "Web panel:" "https://$HOST/"
 [ -n "${SUBTOKEN:-}" ] && printf '  %-16s %s\n' "Subscription:" "https://$HOST/sub?token=$SUBTOKEN"
 echo
+if [ "${FIRST_RUN:-0}" = 1 ]; then
+  printf '  %s\n' "${c_cyn}${c_bld}Open the web panel above and create your admin password to begin.${c_rst}"
+  echo
+fi
 if [ "$INSECURE" = true ]; then
   printf '  %s\n' "${c_yel}No domain: this uses a self-signed certificate.${c_rst}"
   printf '  %s\n' "  - In the Nova app: Connect your VPS, turn ON \"My server has no domain\"."
