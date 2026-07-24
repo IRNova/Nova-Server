@@ -430,14 +430,22 @@ systemctl enable nova-agent >/dev/null 2>&1 || true
 # updates an existing node.
 systemctl restart nova-agent >/dev/null 2>&1 || die "Could not start nova-agent."
 
-# wait for the agent's local API. Any HTTP answer counts as "up": on a re-run of
-# the installer a stealth panel path may be set, and then /install/status without
-# the path correctly answers 404 -- the agent is still clearly running.
-for i in $(seq 1 20); do
-  code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8088/install/status" 2>/dev/null || echo 000)"
-  [ "$code" != "000" ] && break
+# Wait for the agent's local API to answer /install/status with a real JSON body,
+# and read whether the panel is already configured. Reading the actual state (not
+# just "did any HTTP code come back") is what lets us tell a genuine re-install
+# from a momentary hiccup during first boot, so a single transient can never make
+# the installer skip configuring a fresh node.
+CONFIGURED=""
+for i in $(seq 1 40); do
+  RESP="$(curl -fsS "http://127.0.0.1:8088/install/status" 2>/dev/null || true)"
+  case "$RESP" in
+    *'"configured"'*)
+      case "$RESP" in *'"configured":true'*) CONFIGURED=true;; *) CONFIGURED=false;; esac
+      break;;
+  esac
   sleep 1
 done
+[ -n "$CONFIGURED" ] || die "The agent did not respond in time. Check: journalctl -u nova-agent -n 50"
 ok "agent running"
 
 # ---- configure the panel -----------------------------------------------------
@@ -447,12 +455,28 @@ B=http://127.0.0.1:8088
 CJ="$(mktemp)"
 
 say "Setting up the panel"
-# First run only; ignore "already configured" on re-install.
-curl -fsS -c "$CJ" -X POST "$B/install/set" -H "$UA" -H 'Content-Type: application/json' \
-  -d "{\"password\":\"$ADMIN_PASS\"}" >/dev/null 2>&1 || {
-    warn "Panel already configured; keeping the existing password."
-    ADMIN_PASS="(unchanged from a previous install)"
-  }
+if [ "$CONFIGURED" = true ]; then
+  # Genuinely already configured (a re-install): keep the existing password.
+  warn "Panel already configured; keeping the existing password."
+  ADMIN_PASS="(unchanged from a previous install)"
+else
+  # Fresh panel: set the admin password, retrying a few times in case the agent
+  # is still settling right after its first start. A single failed attempt must
+  # NOT be mistaken for "already configured" (that would skip host, protocols,
+  # the panel path and the starter user, leaving the node half-set-up).
+  SET_OK=0
+  for i in $(seq 1 10); do
+    if curl -fsS -c "$CJ" -X POST "$B/install/set" -H "$UA" -H 'Content-Type: application/json' \
+      -d "{\"password\":\"$ADMIN_PASS\"}" >/dev/null 2>&1; then SET_OK=1; break; fi
+    # If a concurrent run set it in the meantime, stop and keep that password.
+    if curl -fsS "$B/install/status" 2>/dev/null | grep -q '"configured":true'; then
+      warn "Panel already configured; keeping the existing password."
+      ADMIN_PASS="(unchanged from a previous install)"; SET_OK=1; break
+    fi
+    sleep 2
+  done
+  [ "$SET_OK" = 1 ] || die "Could not set the admin password (agent not responding). Check: journalctl -u nova-agent -n 50"
+fi
 # Log in (works whether we just set it or it already existed and the caller passed NOVA_ADMIN_PASS).
 if [ "${NOVA_ADMIN_PASS:-}" != "" ]; then
   curl -fsS -c "$CJ" -X POST "$B/login" -H "$UA" -H 'Content-Type: application/json' \
@@ -593,9 +617,11 @@ ok "panel configured; xray $(systemctl is-active xray 2>/dev/null)"
 # ---- summary -----------------------------------------------------------------
 # The effective panel path/port straight from the node's DB: authoritative on
 # both fresh installs and re-runs (where the local API is path-gated).
-EFF="$(NOVA_DB="$DB_DIR/nova.db" node -e 'import("/opt/nova-node-agent/src/kv/sqlite.mjs").then(async m=>{const kv=m.openKv(process.env.NOVA_DB);try{const s=JSON.parse(await kv.get("network-settings.json")||"{}");const p=String(s.panelPath||"").replace(/^\/+|\/+$/g,"");const ok=/^[A-Za-z0-9_-]{3,64}$/.test(p)?p:"";const n=Math.floor(Number(s.panelPort||0));console.log(ok+" "+((n>=1&&n<=65535)?n:0));}catch{console.log(" 0")}kv.close&&kv.close();}).catch(()=>console.log(" 0"))' 2>/dev/null || echo " 0")"
-EFF_PATH="$(printf '%s' "$EFF" | awk '{print $1}')"
-EFF_PORT="$(printf '%s' "$EFF" | awk '{print $2}')"
+# path and port are joined with a literal '|' (never a space) so an empty path
+# does not shift the port into the path field when we split them.
+EFF="$(NOVA_DB="$DB_DIR/nova.db" node -e 'import("/opt/nova-node-agent/src/kv/sqlite.mjs").then(async m=>{const kv=m.openKv(process.env.NOVA_DB);try{const s=JSON.parse(await kv.get("network-settings.json")||"{}");const p=String(s.panelPath||"").replace(/^\/+|\/+$/g,"");const ok=/^[A-Za-z0-9_-]{3,64}$/.test(p)?p:"";const n=Math.floor(Number(s.panelPort||0));console.log(ok+"|"+((n>=1&&n<=65535)?n:0));}catch{console.log("|0")}kv.close&&kv.close();}).catch(()=>console.log("|0"))' 2>/dev/null || echo "|0")"
+EFF_PATH="${EFF%%|*}"
+EFF_PORT="${EFF##*|}"
 PANEL_URL="https://$HOST/"
 [ -n "$EFF_PATH" ] && PANEL_URL="https://$HOST/$EFF_PATH/"
 echo
