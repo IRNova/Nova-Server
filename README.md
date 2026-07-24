@@ -65,7 +65,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 
 The installer asks a few quick questions first:
 
-- **Domain**: have one? It gets a free Let's Encrypt certificate automatically.
+- **Domain**: have one? It gets a free Let's Encrypt certificate automatically. No domain is fine too: the node runs on its IP with a self-signed certificate, and the Nova app connects to it either way.
 - **Secret panel path**: press Enter to auto-generate one, type your own, or answer `none` to keep the panel at the root.
 - **Extra panel port**: optionally give the panel its own HTTPS port (for example 2053). The firewall port is opened automatically.
 
