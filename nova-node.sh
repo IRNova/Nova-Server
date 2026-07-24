@@ -18,6 +18,18 @@
 #     NOVA_DOMAIN=...       a domain that points at this server (optional). Without
 #                          one, the node uses the public IP with a self-signed cert
 #                          and the app's "no domain" switch.
+#     NOVA_PANEL_PATH=...   secret panel subpath (stealth). Unset = a random one is
+#                          generated on a fresh install; "none" = panel at the root.
+#     NOVA_PANEL_PORT=...   extra HTTPS port that serves only the panel (optional).
+#     NOVA_NO_PROMPT=1      never ask questions (use env values / defaults).
+#
+#  Managed-node (fleet) mode: install a box that is driven from a main panel,
+#  with no panel of its own. The main panel's "Add node" button prints the exact
+#  one-liner, which sets:
+#     NOVA_JOIN_URL=...     the main panel's address
+#     NOVA_JOIN_TOKEN=...   a one-time join token from that panel
+#  The node installs, registers itself with the main panel, and then locks its
+#  own panel (a stub page, no sign-in). Everything else installs the same way.
 # =============================================================================
 set -euo pipefail
 
@@ -33,6 +45,65 @@ warn() { printf '%s\n' "${c_yel}!!${c_rst}  $*"; }
 die()  { printf '%s\n' "${c_red}xx${c_rst}  $*" >&2; exit 1; }
 
 [ "$(id -u)" = 0 ] || die "Please run as root (sudo)."
+
+# ---- setup questions ---------------------------------------------------------
+# Asked up front so the rest of the install runs unattended. Reads /dev/tty so
+# both `bash <(curl ...)` and `curl ... | bash` forms work; with no terminal (or
+# NOVA_NO_PROMPT=1) the env values / defaults are used silently.
+ask() { # prompt  ->  REPLY
+  REPLY=""
+  [ "${NOVA_NO_PROMPT:-0}" = 1 ] && return 0
+  [ -r /dev/tty ] || return 0
+  printf '%s' "${c_cyn}?${c_rst} $1 " > /dev/tty 2>/dev/null || return 0
+  IFS= read -r REPLY < /dev/tty || REPLY=""
+}
+
+# Managed-node mode when the main panel handed us a join URL + token. The node
+# has no panel of its own, so the panel path/port questions do not apply; a
+# domain is still honored (a node with a real cert is nicer for the parent).
+NODE_MODE=0
+if [ -n "${NOVA_JOIN_URL:-}" ] && [ -n "${NOVA_JOIN_TOKEN:-}" ]; then
+  NODE_MODE=1
+  NOVA_NO_PROMPT=1
+  say "Managed-node install: this box will be controlled from ${NOVA_JOIN_URL}"
+fi
+
+if [ "$NODE_MODE" = 0 ] && [ -z "${NOVA_DOMAIN:-}" ]; then
+  ask "Do you have a domain pointing at this server? It gets a trusted (Let's Encrypt) certificate automatically. [y/N]"
+  case "$REPLY" in
+    [yY]*)
+      ask "Domain (e.g. node.example.com):"
+      NOVA_DOMAIN="$(printf '%s' "$REPLY" | tr -d '[:space:]')"
+      if [ -n "$NOVA_DOMAIN" ]; then
+        ask "Email for certificate expiry notices (optional, Enter to skip):"
+        NOVA_DOMAIN_EMAIL="$(printf '%s' "$REPLY" | tr -d '[:space:]')"
+      fi
+      ;;
+  esac
+fi
+
+if [ "$NODE_MODE" = 0 ] && [ -z "${NOVA_PANEL_PATH:-}" ]; then
+  ask "Secret panel path: hides the panel behind https://<server>/<path>/ so scanners see nothing. [Enter = auto-generate / type your own / \"none\" = panel at the root]"
+  case "$(printf '%s' "$REPLY" | tr -d '[:space:]')" in
+    "")     NOVA_PANEL_PATH="" ;;   # stays empty -> auto-generated below on a fresh install
+    none|no) NOVA_PANEL_PATH="none" ;;
+    *)      NOVA_PANEL_PATH="$(printf '%s' "$REPLY" | tr -d '[:space:]/')" ;;
+  esac
+fi
+if [ -n "${NOVA_PANEL_PATH:-}" ] && [ "$NOVA_PANEL_PATH" != "none" ] \
+   && ! printf '%s' "$NOVA_PANEL_PATH" | grep -qE '^[A-Za-z0-9_-]{3,64}$'; then
+  warn "Panel path must be 3-64 letters/digits/-/_ ; a random one will be generated instead."
+  NOVA_PANEL_PATH=""
+fi
+
+if [ "$NODE_MODE" = 0 ] && [ -z "${NOVA_PANEL_PORT:-}" ]; then
+  ask "Extra panel port (the panel also gets its own HTTPS port, e.g. 2053). [Enter = none, panel stays on 443]"
+  NOVA_PANEL_PORT="$(printf '%s' "$REPLY" | tr -d '[:space:]')"
+fi
+if [ -n "${NOVA_PANEL_PORT:-}" ] && ! printf '%s' "$NOVA_PANEL_PORT" | grep -qE '^[0-9]{1,5}$'; then
+  warn "Panel port must be a number; skipping the extra port."
+  NOVA_PANEL_PORT=""
+fi
 
 # ---- preflight ---------------------------------------------------------------
 say "Installing prerequisites"
@@ -359,9 +430,12 @@ systemctl enable nova-agent >/dev/null 2>&1 || true
 # updates an existing node.
 systemctl restart nova-agent >/dev/null 2>&1 || die "Could not start nova-agent."
 
-# wait for the agent's local API
+# wait for the agent's local API. Any HTTP answer counts as "up": on a re-run of
+# the installer a stealth panel path may be set, and then /install/status without
+# the path correctly answers 404 -- the agent is still clearly running.
 for i in $(seq 1 20); do
-  curl -fsS "http://127.0.0.1:8088/install/status" >/dev/null 2>&1 && break
+  code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8088/install/status" 2>/dev/null || echo 000)"
+  [ "$code" != "000" ] && break
   sleep 1
 done
 ok "agent running"
@@ -421,6 +495,87 @@ if [ -n "${NOVA_DOMAIN:-}" ]; then
 fi
 
 SUBTOKEN="$(curl -fsS -b "$CJ" "$B/admin/network-settings.json" -H "$UA" 2>/dev/null | grep -oE '"subToken":"[a-f0-9]+"' | cut -d'"' -f4 || true)"
+
+# ---- managed-node enrollment -------------------------------------------------
+# Create a local API token, register with the main panel, then lock this node
+# (nodeMode = stub page + no sign-in). The parent drives it over that API token.
+ENROLLED=0
+if [ "$NODE_MODE" = 1 ]; then
+  say "Registering this node with ${NOVA_JOIN_URL}"
+  NODE_URL="https://$HOST"
+  # Mint an owner-scoped API token on this node for the parent to use.
+  NODE_TOKEN="$(curl -fsS -b "$CJ" -X POST "$B/admin/api-tokens" -H "$UA" -H 'Content-Type: application/json' \
+    -d '{"name":"fleet-parent","role":"owner"}' 2>/dev/null | grep -oE '"token":"[^"]+"' | cut -d'"' -f4 || true)"
+  if [ -z "$NODE_TOKEN" ]; then
+    warn "Could not create an API token; this node was NOT registered. It still runs as a standalone panel."
+  else
+    NNAME="$(hostname -s 2>/dev/null || echo node)"
+    EBODY="{\"token\":\"$NOVA_JOIN_TOKEN\",\"url\":\"$NODE_URL\",\"apiToken\":\"$NODE_TOKEN\",\"name\":\"$NNAME\",\"insecure\":$INSECURE}"
+    # The parent may itself be on a self-signed cert, so allow an insecure TLS
+    # handshake for this one enrollment call (-k).
+    ERESP="$(curl -fsS -k -X POST "${NOVA_JOIN_URL%/}/nodes/enroll" -H 'Content-Type: application/json' -d "$EBODY" 2>/dev/null || true)"
+    case "$ERESP" in
+      *'"ok":true'*) ENROLLED=1; ok "node registered with the main panel" ;;
+      *) warn "The main panel did not accept the enrollment (token expired or address unreachable). Response: ${ERESP:-none}" ;;
+    esac
+  fi
+  # Lock the node regardless: a managed node should never expose a sign-in, even
+  # if enrollment needs a retry from the parent side.
+  curl -fsS -b "$CJ" -X POST "$B/admin/network-settings.json" -H "$UA" -H 'Content-Type: application/json' \
+    -d '{"nodeMode":true}' >/dev/null 2>&1 || true
+  rm -f "$CJ"
+  # Clear the temporary admin password (nodeMode already blocks sign-in; this
+  # removes the credential entirely).
+  NOVA_DB="$DB_DIR/nova.db" node -e 'import("/opt/nova-node-agent/src/kv/sqlite.mjs").then(async m=>{const kv=m.openKv(process.env.NOVA_DB);await kv.delete("admin_pass");}).catch(()=>{})' >/dev/null 2>&1 || true
+  sleep 2
+  echo
+  printf '%s\n' "${c_grn}${c_bld}Nova managed node is ready.${c_rst}"
+  echo
+  printf '  %-16s %s\n' "Node address:" "$NODE_URL"
+  if [ "$ENROLLED" = 1 ]; then
+    printf '  %-16s %s\n' "Registered to:" "$NOVA_JOIN_URL"
+    printf '  %s\n' "Manage this node from that panel's Nodes page. It has no panel of its own."
+  else
+    printf '  %s\n' "${c_yel}Not yet registered.${c_rst} In the main panel, add the node manually:"
+    printf '  %s\n' "  URL: $NODE_URL   (mark \"no domain\" if it shows a self-signed cert)"
+    printf '  %s\n' "  API token: shown once above was not captured; re-run \"Add node\" for a new one-liner."
+  fi
+  echo
+  exit 0
+fi
+
+# ---- panel access (stealth path + extra port) --------------------------------
+# Applied LAST: after this save the /admin surface only answers under the path,
+# so every root-scoped call above must already be done. Fresh installs default
+# to a random secret path (NOVA_PANEL_PATH=none opts out); re-runs never touch
+# an existing path. The agent opens the extra port in ufw by itself on save.
+PANEL_PATH=""
+if [ "$ADMIN_PASS" != "(unchanged from a previous install)" ] || [ -n "${NOVA_ADMIN_PASS:-}" ]; then
+  if [ "${NOVA_PANEL_PATH:-}" = "none" ]; then
+    PANEL_PATH=""
+  elif [ -n "${NOVA_PANEL_PATH:-}" ]; then
+    PANEL_PATH="$NOVA_PANEL_PATH"
+  elif [ "$ADMIN_PASS" != "(unchanged from a previous install)" ]; then
+    # fresh install, nothing chosen: generate a short random path
+    PANEL_PATH="p-$(openssl rand -hex 3)"
+  fi
+  PBODY=""
+  [ -n "$PANEL_PATH" ] && PBODY="\"panelPath\":\"$PANEL_PATH\""
+  if [ -n "${NOVA_PANEL_PORT:-}" ]; then
+    [ -n "$PBODY" ] && PBODY="$PBODY,"
+    PBODY="$PBODY\"panelPort\":$NOVA_PANEL_PORT"
+  fi
+  if [ -n "$PBODY" ]; then
+    say "Securing the panel (path/port)"
+    if curl -fsS -b "$CJ" -X POST "$B/admin/network-settings.json" -H "$UA" -H 'Content-Type: application/json' \
+      -d "{$PBODY}" >/dev/null 2>&1; then
+      ok "panel access configured"
+    else
+      warn "Could not set the panel path/port; the panel stays at the root."
+      PANEL_PATH=""; NOVA_PANEL_PORT=""
+    fi
+  fi
+fi
 rm -f "$CJ"
 
 # Return the panel to its first-run "create your password" screen unless the
@@ -436,6 +591,13 @@ sleep 2
 ok "panel configured; xray $(systemctl is-active xray 2>/dev/null)"
 
 # ---- summary -----------------------------------------------------------------
+# The effective panel path/port straight from the node's DB: authoritative on
+# both fresh installs and re-runs (where the local API is path-gated).
+EFF="$(NOVA_DB="$DB_DIR/nova.db" node -e 'import("/opt/nova-node-agent/src/kv/sqlite.mjs").then(async m=>{const kv=m.openKv(process.env.NOVA_DB);try{const s=JSON.parse(await kv.get("network-settings.json")||"{}");const p=String(s.panelPath||"").replace(/^\/+|\/+$/g,"");const ok=/^[A-Za-z0-9_-]{3,64}$/.test(p)?p:"";const n=Math.floor(Number(s.panelPort||0));console.log(ok+" "+((n>=1&&n<=65535)?n:0));}catch{console.log(" 0")}kv.close&&kv.close();}).catch(()=>console.log(" 0"))' 2>/dev/null || echo " 0")"
+EFF_PATH="$(printf '%s' "$EFF" | awk '{print $1}')"
+EFF_PORT="$(printf '%s' "$EFF" | awk '{print $2}')"
+PANEL_URL="https://$HOST/"
+[ -n "$EFF_PATH" ] && PANEL_URL="https://$HOST/$EFF_PATH/"
 echo
 printf '%s\n' "${c_grn}${c_bld}Nova node is ready.${c_rst}"
 echo
@@ -445,9 +607,16 @@ if [ "${FIRST_RUN:-0}" = 1 ]; then
 else
   printf '  %-16s %s\n' "Admin password:" "$ADMIN_PASS"
 fi
-printf '  %-16s %s\n' "Web panel:" "https://$HOST/"
+printf '  %-16s %s\n' "Web panel:" "$PANEL_URL"
+[ -n "${EFF_PORT:-}" ] && [ "$EFF_PORT" != 0 ] && printf '  %-16s %s\n' "Panel port:" "https://$HOST:$EFF_PORT/${EFF_PATH:+$EFF_PATH/}"
 [ -n "${SUBTOKEN:-}" ] && printf '  %-16s %s\n' "Subscription:" "https://$HOST/sub?token=$SUBTOKEN"
 echo
+if [ -n "$EFF_PATH" ]; then
+  printf '  %s\n' "${c_yel}${c_bld}Save the panel URL: the secret path is what hides your panel.${c_rst}"
+  printf '  %s\n' "  Anyone opening the bare address just sees \"404 Not Found\"."
+  printf '  %s\n' "  Forgot it? Run ${c_bld}nova-passwd 'NewPassword'${c_rst} over SSH - it prints the URL."
+  echo
+fi
 if [ "${FIRST_RUN:-0}" = 1 ]; then
   printf '  %s\n' "${c_cyn}${c_bld}Open the web panel above and create your admin password to begin.${c_rst}"
   echo
@@ -461,8 +630,9 @@ else
   printf '  %s\n' "$CERT_DIR/origin.pem + origin.key with your Cloudflare Origin Certificate."
 fi
 echo
-printf '  %s\n' "Manage it: open the Nova app -> Connect your VPS -> enter the address"
-printf '  %s\n' "and admin password above, or just open the web panel URL."
+printf '  %s\n' "Manage it: open the Nova app -> Connect your VPS -> enter the WEB PANEL"
+printf '  %s\n' "URL above (including the secret path, if set) and the admin password,"
+printf '  %s\n' "or just open the web panel URL in a browser."
 echo
 printf '  %s\n' "Uninstall anytime with:  ${c_bld}nova-uninstall${c_rst}"
 echo
