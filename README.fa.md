@@ -150,6 +150,16 @@ NOVA_JOIN_URL='https://your-panel' NOVA_JOIN_TOKEN='njt_...' bash <(curl -fsSL h
 
 ---
 
+## ☕ حمایت مالی
+
+اگه از Nova Server خوشتون اومده و براتون مفید بوده، می‌تونید از طریق لینک زیر از ما حمایت کنید.
+
+[![Donate](https://img.shields.io/badge/☕%20حمایت%20مالی-donate.novaproxy.online-8b5cf6?style=for-the-badge)](https://donate.novaproxy.online/)
+
+هر کمکی، کوچیک یا بزرگ، به ما انگیزه میده تا Nova Server رو بهتر و قوی‌تر کنیم. با حمایت شما، اینترنت آزاد‌تر می‌مونه.
+
+---
+
 <div align="center">
 
 ساخته‌شده با دقت برای اینترنتی آزاد.
