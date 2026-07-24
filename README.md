@@ -46,7 +46,8 @@ Nova Server turns a plain Linux VPS into your own private, censorship-resistant 
 - 🇮🇷 **Iran bridge tunnels**: front a foreign exit with a clean-IP server inside Iran (Backhaul, BackPack, rathole, wstunnel). The Iran side installs with **one lightweight command** the panel generates for you, no full stack needed there
 - 🔐 **One-click SSL**: Let's Encrypt or full-auto Cloudflare (auto-DNS + wildcard), no manual port 80
 - 👥 **Per-user everything**: quota, expiry, device limit, data reset, and per-user protocol access
-- 🛰️ **Multi-node fleet**: manage many servers from one panel
+- 🛰️ **Multi-node fleet**: manage many servers from one panel; add a new node by running one panel-generated command on a fresh VPS
+- 🔒 **Hidden panel**: fresh installs put the panel behind a random secret path (with an optional dedicated port); every other path returns a plain 404, so scanners see nothing
 - 🤖 **Telegram bot + Mini App**: run the whole panel inside Telegram
 - 🛡️ **Anti-censorship egress**: WARP (with your own WARP+ license), Tor, and Psiphon, built in
 - ⚙️ **Automated**: backups, health alerts, auto-update, clean-IP refresh, and a first-run setup wizard
@@ -62,13 +63,25 @@ On a fresh Ubuntu 20.04+ or Debian 11+ server (x86_64 or arm64), run:
 bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
 ```
 
-The installer sets up the proxy cores, the panel, and the tunnel backends, then prints your panel URL. Open it, set an admin password, and use the **Setup Wizard** to add a domain, a recommended protocol, and your first user.
+The installer asks a few quick questions first:
 
-Forgot your password? Reset it from the server:
+- **Domain**: have one? It gets a free Let's Encrypt certificate automatically.
+- **Secret panel path**: press Enter to auto-generate one, type your own, or answer `none` to keep the panel at the root.
+- **Extra panel port**: optionally give the panel its own HTTPS port (for example 2053). The firewall port is opened automatically.
+
+It then sets up the proxy cores, the panel, and the tunnel backends, and prints your panel URL (including the secret path, so save it). Open it, set an admin password, and use the **Setup Wizard** to add a domain, a recommended protocol, and your first user.
+
+For scripted (non-interactive) installs, set everything with environment variables instead: `NOVA_DOMAIN`, `NOVA_DOMAIN_EMAIL`, `NOVA_PANEL_PATH` (or `none`), `NOVA_PANEL_PORT`, `NOVA_ADMIN_PASS`, and `NOVA_NO_PROMPT=1` to skip all questions.
+
+Forgot your password, or the secret panel path? Reset the password from the server; the same command also prints the current panel URL:
 
 ```bash
 nova-passwd 'YourNewPassword' --clear-2fa
 ```
+
+### 🔒 Panel behind a secret path
+
+The panel used to answer at the bare root (`https://server/`). Now a fresh install hides it behind a random secret subpath such as `https://server/p-a1b2c3/`, and every other path returns a plain 404 decoy, so scanners that probe your bare IP or domain see nothing (the same idea as the web base path in 3x-ui and Marzban). You can change the path, clear it back to root, or give the panel its own extra HTTPS port any time in **Settings > General > Panel access**; the firewall port is opened for you.
 
 ---
 
@@ -86,6 +99,21 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 The server installs Nova by itself on first boot (about 3 to 5 minutes). Then open `https://YOUR_SERVER_IP` in your phone browser and set your admin password.
 
 **Telegram installer bot:** a guided bot can walk you through creating the VPS and tell you when your node is online, or install it for you over SSH. Find it via our [Telegram channel](https://t.me/irnova_proxy).
+
+---
+
+## 🛰️ Add nodes with one command
+
+You no longer need a full panel on every server. Install the panel once on your main server, then grow your fleet from there:
+
+1. In the main panel, open the **Nodes** page and click **Add a node with one command**.
+2. Copy the single line it gives you and run it on a fresh VPS:
+
+```bash
+NOVA_JOIN_URL='https://your-panel' NOVA_JOIN_TOKEN='njt_...' bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
+```
+
+The new server installs in **managed node** mode: it has no panel of its own (just a stub page, no sign-in), it registers itself with your main panel automatically, and from then on you control it entirely from the main panel (users, traffic, everything) over the node API. The join token is one-time and expires in 24 hours.
 
 ---
 
@@ -128,7 +156,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 |------|--------------|
 | **Protocols** | VLESS, VMess, Trojan, Shadowsocks-2022, VLESS-Reality (XTLS-Vision), Hysteria2, native WireGuard, AmneziaWG, all managed on one Inbounds page |
 | **Transports** | TCP, WebSocket, gRPC, XHTTP, HTTPUpgrade, over TLS or Reality |
-| **Deploy** | One-line VPS installer with every feature; `nova-uninstall` to remove it all |
+| **Deploy** | One-line VPS installer with quick setup questions (domain with free SSL, secret panel path, extra panel port), or fully scripted via env vars; `nova-uninstall` to remove it all |
 | **Users** | Data quota (total or up/down split), expiry (fixed or first-use), device/IP limit, daily/weekly/monthly reset, per-user protocol and inbound access |
 | **Subscriptions** | One auto-updating link per user, live usage page + native usage/expiry header, QR codes, Clash/Mihomo and sing-box formats, multi-profile inbounds (one inbound, many CDN domains), optional per-operator configs (one tuned config per Iranian carrier, works in normal clients) |
 | **Per-country exits** | Let users pick their exit country in their app; per-country Tor/Psiphon instances, one config per country in the subscription |
@@ -137,7 +165,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 | **Diagnostics** | Config/port health check (is each config actually listening and reachable), firewall and reserved-ports view, one-click fixes |
 | **Iran tunnels** | Bridge-to-exit with Backhaul, BackPack, rathole, or wstunnel; carries TCP and UDP so Hysteria2 keeps working. The Iran bridge sets up from one panel-generated command (slim installer, no full stack on the Iran box) |
 | **Domain and SSL** | One-click Let's Encrypt, full-auto Cloudflare (auto-DNS + wildcard), or a pasted Origin cert, all auto-renewing |
-| **Fleet** | Register and manage multiple Nova nodes from one panel, aggregate users and usage, provision remotely |
+| **Panel access** | Random secret panel path with a plain 404 decoy on every other path, plus an optional dedicated panel HTTPS port; both editable under Settings > General; `nova-passwd` prints the current panel URL |
+| **Fleet** | Register and manage multiple Nova nodes from one panel, aggregate users and usage, provision remotely; join a fresh VPS as a managed node with one panel-generated command (one-time token, no local panel) |
 | **API and bot** | Token-authed REST API (`/api/v1`) and a full Telegram bot with a Mini App that opens the whole panel in Telegram |
 | **Resellers** | Owner, managers, and resellers with custom per-capability permissions; resellers see only their own users and build them on your inbounds; two-factor auth per admin; server-side password reset |
 | **Automation** | Nightly backups (disk and Telegram), proactive alerts, opt-in auto-update, clean-IP refresh, health check |
