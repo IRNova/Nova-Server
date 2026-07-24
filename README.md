@@ -223,6 +223,16 @@ The panel checks for new versions and updates in one click, or turn on **automat
 
 ---
 
+## ☕ Support
+
+If you find Nova Server useful and it has served you well, consider supporting us through the link below.
+
+[![Donate](https://img.shields.io/badge/☕%20Donate-donate.novaproxy.online-8b5cf6?style=for-the-badge)](https://donate.novaproxy.online/)
+
+Every contribution, big or small, keeps us motivated to build and improve Nova Server. With your support, we can keep the internet free for everyone.
+
+---
+
 <div align="center">
 
 Made with care for a free and open internet.
