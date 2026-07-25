@@ -10,12 +10,12 @@
 
 **Your own censorship-resistant proxy server and full admin panel on any VPS.**
 
-VLESS, VMess, Trojan, Shadowsocks, Reality, Hysteria2 and WireGuard, with a modern
+VLESS, VMess, Trojan, Shadowsocks, Reality, Hysteria2, TUIC, NaiveProxy and WireGuard, with a modern
 trilingual (English, فارسی, Русский) panel, per-user accounts, multi-node fleet, Iran
 bridge tunnels, one-click SSL, a Telegram bot with a Mini App, and two-factor auth.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.3.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server/releases)
+[![Version](https://img.shields.io/badge/version-1.4.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server/releases)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>

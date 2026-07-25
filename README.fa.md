@@ -10,12 +10,12 @@
 
 **سرور پروکسی اختصاصی و مقاوم در برابر فیلترینگ شما، همراه با یک پنل مدیریت کامل، روی هر VPS.**
 
-VLESS · VMess · Trojan · Shadowsocks · Reality · Hysteria2 · WireGuard، همراه با یک پنل مدرن
+VLESS · VMess · Trojan · Shadowsocks · Reality · Hysteria2 · TUIC · NaiveProxy · WireGuard، همراه با یک پنل مدرن
 سه‌زبانه (English · فارسی · Русский)، حساب‌های چندکاربره، ناوگان چندنودی، تونل‌های پل ایران،
 SSL یک‌کلیکی، ربات تلگرام با Mini App و احراز هویت دومرحله‌ای.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.3.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
+[![Version](https://img.shields.io/badge/version-1.4.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
