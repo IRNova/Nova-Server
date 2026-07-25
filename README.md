@@ -171,11 +171,16 @@ Two operator tools live under **Settings > Security**.
 
 ## 🕳️ DNS Tunnel (last resort)
 
-Nova has an optional built-in **MasterDnsVPN** server that carries traffic inside DNS queries. Because it rides on DNS, it keeps working when everything else is blocked but DNS still resolves, so it's the last-resort transport when nothing else gets through.
+Nova has an optional built-in DNS tunnel that carries traffic inside DNS queries. Because it rides on DNS, it keeps working when everything else is blocked but DNS still resolves, so it's the last-resort transport when nothing else gets through.
 
-Turn it on in the panel under **Settings**. It needs a subdomain delegated to your node with an NS record. If your domain is on Cloudflare, the panel can create the delegation for you automatically; otherwise the in-panel guide walks you through the manual A and NS records.
+You pick the engine in the DNS Tunnel card:
 
-It's a separate protocol: users connect with the [MasterDnsVPN client](https://github.com/masterking32/MasterDnsVPN), not the Nova app. The panel generates and exports the client config for them.
+- **MasterDnsVPN** is the simple default.
+- **CottenDns** is the more capable engine, built for very lossy or heavily probed networks: it adds DNS-over-TLS and DNS-over-HTTPS resolver transport, balances across several resolvers, and recovers from packet loss. It never binds :443, so it coexists with the panel.
+
+Both bind port 53, so only one runs at a time; switching engines takes the port from the other. Turn it on in the panel under **Settings**. It needs a subdomain delegated to your node with an NS record. If your domain is on Cloudflare, the panel can create the delegation for you automatically; otherwise the in-panel guide walks you through the manual A and NS records.
+
+It's a separate protocol: users connect with the engine's own client ([MasterDnsVPN](https://github.com/masterking32/MasterDnsVPN) or [CottenDns](https://github.com/TaJirax/CottenDns)), not the Nova app. The panel generates and exports the client config for them.
 
 ---
 
@@ -210,7 +215,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 | **Monitoring** | Dashboard traffic charts, plus a per-inbound daily traffic chart on the Inbounds page so you can see which entry points carry the load |
 | **Diagnostics** | Config/port health check (is each config actually listening and reachable), firewall and reserved-ports view, one-click fixes |
 | **Iran tunnels** | Bridge-to-exit with Backhaul, BackPack, rathole, or wstunnel; carries TCP and UDP so Hysteria2 keeps working. The Iran bridge sets up from one panel-generated command (slim installer, no full stack on the Iran box) |
-| **DNS tunnel** | Optional built-in MasterDnsVPN server that tunnels traffic inside DNS queries, the last-resort transport for when only DNS still resolves; auto NS delegation on Cloudflare or a guided manual setup, with the client config exported from the panel |
+| **DNS tunnel** | Optional built-in DNS tunnel that carries traffic inside DNS queries, the last-resort transport for when only DNS still resolves, with a choice of engine: MasterDnsVPN (simple default) or CottenDns (DoT/DoH resolvers, multi-resolver balancing, loss recovery, for very hostile networks); auto NS delegation on Cloudflare or a guided manual setup, with the client config exported from the panel |
 | **Domain and SSL** | One-click Let's Encrypt, full-auto Cloudflare (auto-DNS + wildcard), or a pasted Origin cert, all auto-renewing |
 | **Panel access** | Random secret panel path with a plain 404 decoy on every other path, plus an optional dedicated panel HTTPS port; both editable under Settings > General; `nova-passwd` prints the current panel URL |
 | **Fleet** | Register and manage multiple Nova nodes from one panel, aggregate users and usage, provision remotely; join a fresh VPS as a managed node with one panel-generated command (one-time token, no local panel) |

@@ -1,16 +1,15 @@
-# Nova Server v1.5.0
+# Nova Server v1.6.0
 
-Operator tools: a login shield, outbound webhooks, and per-inbound traffic.
+A second DNS-tunnel engine, and a security pass on the tunnel install path.
 
 ## New
 
-- **Login guard (fail2ban-style).** After too many failed sign-ins from one IP within a window, that address is blocked for a set time, so panel password guessing gets nowhere. On by default. Tune the attempt count, the window, and the ban length, and see every active ban with one-click **Unban** (or **Clear all**) under **Settings > Security**. The block survives restarts.
+- **CottenDns DNS-tunnel engine.** The DNS Tunnel now has a choice of engine. **MasterDnsVPN** stays the simple default; **CottenDns** is the more capable engine for very lossy or heavily probed networks: it adds DNS-over-TLS and DNS-over-HTTPS resolver transport, balances across several resolvers, and recovers from packet loss. It never binds :443, so it coexists with the panel. Pick the engine in the DNS Tunnel card (Settings). Both bind port 53, so only one runs at a time; switching takes the port from the other. Users connect with the engine's own client ([CottenDns](https://github.com/TaJirax/CottenDns) or [MasterDnsVPN](https://github.com/masterking32/MasterDnsVPN)), and the panel exports the client config. Trilingual and owner-only.
 
-- **Webhooks.** Send a small signed JSON POST to your own URL when something happens on the node: a user is created, updated, deleted, expires, or hits quota; a node enrolls; or an IP is banned. Add any number of endpoints, pick which events each one wants (or leave it on all), and set an optional secret. With a secret, Nova signs the body with HMAC-SHA256 in the `X-Nova-Signature` header so your receiver can verify it. A **Test** button fires a sample delivery. Managed under **Settings > Security**.
+## Hardened
 
-- **Per-inbound traffic chart.** The Inbounds page now shows a daily traffic chart per inbound over the last 14 days, so you can see which entry points carry the load.
-
-All three are trilingual (English, Persian, Russian) and owner-only.
+- **Pinned + checksummed tunnel binaries.** Both DNS-tunnel engines now download a **pinned release** (not a floating "latest") and verify the archive against a hardcoded SHA-256 before running it as root. A mismatch, or an architecture with no pinned checksum, fails closed.
+- **Trustworthy client IP behind a proxy.** With `TRUST_PROXY` set, the panel now reads the proxy-observed (rightmost) `X-Forwarded-For` hop instead of the client-supplied leftmost one, so the login guard and rate limiter can't be bypassed or turned into a lockout with a forged header.
 
 ## Install
 
