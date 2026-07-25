@@ -88,6 +88,29 @@ The panel used to answer at the bare root (`https://server/`). Now a fresh insta
 
 ---
 
+## 🧭 New here? A step-by-step walkthrough
+
+Never set up a server before? This is the whole journey in plain steps. Every technical word is explained the first time it appears.
+
+1. **Get a VPS.** A VPS is a small computer you rent on the internet that stays on all the time, so people can connect to it day and night. Any provider works; a basic Ubuntu 20.04+ or Debian 11+ box (about 4 to 6 dollars a month) is plenty. You do **not** need a domain name to start.
+
+2. **Install Nova (pick one way).**
+   - **One command:** open your server's terminal (most providers have a **Console** button in your browser if you have never used SSH, which is just a way to type commands on your server), paste the [Quick Install](#-quick-install) command, and press Enter. It asks a couple of easy questions; pressing Enter to accept the defaults is fine.
+   - **No computer:** paste the same command into your provider's **cloud-init** or **user data** box when you create the server. See [Install from your phone](#-no-computer-install-from-your-phone).
+   - **Telegram:** the installer bot can do the whole thing for you.
+
+3. **Open your panel and set a password.** The installer prints your panel address, including a secret path (so scanners cannot find it), so save that link. Open it and set an admin password. Lost the link later? Run `nova-passwd` on the server and it prints the current address.
+
+4. **(Optional) Add a domain and free HTTPS.** A domain (a web address like `vpn.example.com`) and an SSL certificate (the padlock that makes a connection trusted) are optional. Without one, your node runs on its IP and the Nova app still connects. With one, the panel gets a free certificate for you. You can skip this and add it later.
+
+5. **Create your first user and connect.** In **Users**, add a user and copy their **subscription link** (one link that carries all their connection settings and keeps itself updated). Open it in the Nova app, scan the QR code on a phone, or paste it into a normal client like v2rayNG, sing-box, or Clash. You are online.
+
+6. **Go further when you need to.** Add more users and set data or time limits, add more entry points on the Inbounds page, stay online under heavy blocking with the [Iran bridge](#-iran-bridge-lightweight) or the [DNS tunnel](#-dns-tunnel-last-resort), and grow to [more servers](#-add-nodes-with-one-command) from one panel.
+
+The panel itself has an even more detailed **Step-by-step setup** guide built in (at the top of the in-panel manual), in English, Persian, and Russian.
+
+---
+
 ## 🐳 Install with Docker
 
 Prefer containers? Nova ships a Docker option as an alternative to the native one-line installer. It's reproducible, easy to stop, move, or upgrade, and your data lives on named volumes so it survives a rebuild.
