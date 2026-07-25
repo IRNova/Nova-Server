@@ -1,12 +1,10 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/iiviirv/irnova-site/main/brand/nova-logo-badge-round.png" width="70" alt="Nova">
-
 <div align="right">
   <a href="README.fa.md"><img src="https://raw.githubusercontent.com/IRNova/Nova-Proxy/main/flag-iran.svg" height="16" alt="Iran (Lion and Sun)" /> فارسی</a>
 </div>
 
-# Nova Server
+<img src="./assets/readme/hero-en.svg" width="100%" alt="Nova Server: your own censorship-resistant proxy server and full admin panel on any VPS. Clients connect over port 443 to a node running Xray-core, sing-box and AmneziaWG.">
 
 **Your own censorship-resistant proxy server and full admin panel on any VPS.**
 
@@ -37,7 +35,10 @@ bridge tunnels, one-click SSL, a Telegram bot with a Mini App, and two-factor au
 
 ---
 
-## 📖 What is Nova Server?
+<a id="-what-is-nova-server"></a>
+
+<img src="./assets/readme/section-overview.svg" width="100%" alt="What is Nova Server?">
+
 
 Nova Server turns a plain Linux VPS into your own private, censorship-resistant proxy node with a **full admin panel**. It runs `Xray-core`, `sing-box` (Hysteria2), and `AmneziaWG` behind a single port, all driven by one self-hosted agent. Where Nova Proxy runs on Cloudflare's free tier, Nova Server is the **self-hosted big brother**: a real proxy core with everything a serious node operator needs.
 
@@ -58,7 +59,10 @@ Nova Server turns a plain Linux VPS into your own private, censorship-resistant 
 
 ---
 
-## ⚡ Quick Install
+<a id="-quick-install"></a>
+
+<img src="./assets/readme/section-install.svg" width="100%" alt="Get started: Quick Install">
+
 
 On a fresh Ubuntu 20.04+ or Debian 11+ server (x86_64 or arm64), run:
 
@@ -150,7 +154,10 @@ The server installs Nova by itself on first boot (about 3 to 5 minutes). Then op
 
 ---
 
-## 🛰️ Add nodes with one command
+<a id="-add-nodes-with-one-command"></a>
+
+<img src="./assets/readme/section-fleet.svg" width="100%" alt="Scale out: Add nodes with one command">
+
 
 You no longer need a full panel on every server. Install the panel once on your main server, then grow your fleet from there:
 
@@ -165,7 +172,10 @@ The new server installs in **managed node** mode: it has no panel of its own (ju
 
 ---
 
-## 🌉 Iran bridge (lightweight)
+<a id="-iran-bridge-lightweight"></a>
+
+<img src="./assets/readme/section-bridge.svg" width="100%" alt="Stay online: Iran bridge">
+
 
 Want a clean Iran IP fronting your foreign exit, without installing the whole stack on the Iran box? You don't have to.
 
@@ -223,7 +233,10 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 
 ---
 
-## 🧩 Features
+<a id="-features"></a>
+
+<img src="./assets/readme/section-features.svg" width="100%" alt="Capabilities: Features">
+
 
 | Area | What you get |
 |------|--------------|
@@ -251,7 +264,10 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 
 ---
 
-## 🆚 How it compares
+<a id="-how-it-compares"></a>
+
+<img src="./assets/readme/section-compare.svg" width="100%" alt="Comparison: How it compares">
+
 
 | | Nova Server | 3x-ui | Marzban |
 |---|:--:|:--:|:--:|
@@ -274,16 +290,12 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 
 ---
 
-## 🏗️ Architecture
+<a id="-architecture"></a>
 
-```
-                         :443 (TCP/UDP)
-  clients  ───────────────────────────────►  Nova node
-                                              ├─ Xray-core   VLESS / VMess / Trojan / Reality / SS
-                                              ├─ sing-box    Hysteria2 / TUIC / NaiveProxy
-                                              ├─ AmneziaWG   obfuscated WireGuard
-                                              └─ Nova agent  panel, REST API, Telegram, automations
-```
+<img src="./assets/readme/section-architecture.svg" width="100%" alt="Under the hood: Architecture">
+
+
+<img src="./assets/readme/architecture.svg" width="100%" alt="Clients connect over a single port 443 (TCP and UDP) to one Nova node. Inside the node, one self-hosted agent drives four lanes: Xray-core (VLESS, VMess, Trojan, Reality, Shadowsocks), sing-box (Hysteria2, TUIC, NaiveProxy), AmneziaWG (obfuscated WireGuard), and the Nova agent (panel, REST API, Telegram bot, automations).">
 
 The agent is a single Node.js process backed by a local SQLite store. The panel, the REST API, and the Telegram bot all drive the same internal service functions.
 
@@ -308,5 +320,9 @@ The panel checks for new versions and updates in one click, or turn on **automat
 Made with care for a free and open internet.
 
 **Nova Server. All rights reserved.**
+
+<br>
+
+<a href="https://github.com/oil-oil/beautify-github-readme"><img src="./assets/readme/made-with-beautify.svg" width="260" alt="README made with beautify-github-readme"></a>
 
 </div>

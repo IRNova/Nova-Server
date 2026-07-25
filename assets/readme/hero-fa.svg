@@ -1,0 +1,155 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="384" viewBox="0 0 1200 384" role="img" aria-labelledby="t d" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+  <title id="t">Nova Server</title>
+  <desc id="d">Nova Server: سرور پروکسی خودمیزبان و مقاوم در برابر فیلترینگ همراه با پنل مدیریت کامل روی هر VPS. کلاینت‌ها از طریق پورت 443 به نودی که Xray-core، sing-box و AmneziaWG را اجرا می‌کند وصل می‌شوند.</desc>
+
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#9d4efb"/>
+    </linearGradient>
+    <linearGradient id="brandH" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#9d4efb"/>
+    </linearGradient>
+    <linearGradient id="flow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22d3ee" stop-opacity="0.15"/>
+      <stop offset="0.5" stop-color="#5ad7f0"/>
+      <stop offset="1" stop-color="#9d4efb"/>
+    </linearGradient>
+    <radialGradient id="glowC" cx="0.2" cy="0.15" r="0.7">
+      <stop offset="0" stop-color="#22d3ee" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowV" cx="0.9" cy="0.95" r="0.8">
+      <stop offset="0" stop-color="#9d4efb" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#9d4efb" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- backdrop -->
+  <rect x="1" y="1" width="1198" height="382" rx="26" fill="#0a0b0f"/>
+  <rect x="1" y="1" width="1198" height="382" rx="26" fill="url(#glowC)"/>
+  <rect x="1" y="1" width="1198" height="382" rx="26" fill="url(#glowV)"/>
+  <rect x="1.5" y="1.5" width="1197" height="381" rx="25.5" fill="none" stroke="#1b1e27" stroke-width="1.5"/>
+
+  <!-- ============ LEFT: identity ============ -->
+  <g transform="translate(64 0)">
+    <text x="2" y="70" font-size="21" font-weight="600" fill="#8590a6">نود پروکسی خودمیزبان و پنل مدیریت کامل</text>
+
+    <!-- mark -->
+    <g transform="translate(0 92)">
+      <rect x="0" y="0" width="76" height="76" rx="20" fill="url(#brand)"/>
+      <rect x="0.75" y="0.75" width="74.5" height="74.5" rx="19.25" fill="#0a0b0f" opacity="0.0"/>
+      <path d="M22 56 V22 L54 56 V22" fill="none" stroke="#0a0b0f" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+
+    <!-- wordmark -->
+    <text x="94" y="150" font-size="66" font-weight="800" letter-spacing="-1">
+      <tspan fill="url(#brandH)">Nova</tspan><tspan fill="#f4f6fb"> Server</tspan>
+    </text>
+
+    <!-- value -->
+    <text x="2" y="212" font-size="26" font-weight="500" fill="#c4cad8">سرور پروکسی اختصاصی و مقاوم در برابر فیلترینگ،</text>
+    <text x="2" y="246" font-size="26" font-weight="500" fill="#c4cad8">همراه با پنل مدیریت کامل، روی هر ⁦VPS⁩</text>
+
+    <!-- protocol chips -->
+    <g transform="translate(2 280)" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" font-weight="600">
+      <g fill="#0a0b0f">
+        <rect x="0"   y="0" width="86"  height="34" rx="10" fill="#12202a"/><rect x="0"   y="0" width="86"  height="34" rx="10" fill="none" stroke="#22d3ee" stroke-opacity="0.4"/>
+        <rect x="96"  y="0" width="98"  height="34" rx="10" fill="#131c2c"/><rect x="96"  y="0" width="98"  height="34" rx="10" fill="none" stroke="#4bb6ec" stroke-opacity="0.4"/>
+        <rect x="204" y="0" width="86"  height="34" rx="10" fill="#151a2e"/><rect x="204" y="0" width="86"  height="34" rx="10" fill="none" stroke="#6f8bf0" stroke-opacity="0.4"/>
+        <rect x="300" y="0" width="92"  height="34" rx="10" fill="#171830"/><rect x="300" y="0" width="92"  height="34" rx="10" fill="none" stroke="#8b6ff4" stroke-opacity="0.4"/>
+        <rect x="402" y="0" width="122" height="34" rx="10" fill="#1a1731"/><rect x="402" y="0" width="122" height="34" rx="10" fill="none" stroke="#9d4efb" stroke-opacity="0.4"/>
+      </g>
+      <g fill="#dbe0ee">
+        <text x="43"  y="23" text-anchor="middle">VLESS</text>
+        <text x="145" y="23" text-anchor="middle">Reality</text>
+        <text x="247" y="23" text-anchor="middle">Trojan</text>
+        <text x="346" y="23" text-anchor="middle">TUIC v5</text>
+        <text x="463" y="23" text-anchor="middle">Hysteria2</text>
+      </g>
+      <g transform="translate(0 44)" fill="#dbe0ee">
+        <rect x="0"   y="0" width="128" height="34" rx="10" fill="#12202a"/><rect x="0"   y="0" width="128" height="34" rx="10" fill="none" stroke="#22d3ee" stroke-opacity="0.35"/>
+        <rect x="138" y="0" width="86"  height="34" rx="10" fill="#131c2c"/><rect x="138" y="0" width="86"  height="34" rx="10" fill="none" stroke="#4bb6ec" stroke-opacity="0.35"/>
+        <rect x="234" y="0" width="140" height="34" rx="10" fill="#171830"/><rect x="234" y="0" width="140" height="34" rx="10" fill="none" stroke="#8b6ff4" stroke-opacity="0.35"/>
+        <rect x="384" y="0" width="140" height="34" rx="10" fill="#1a1731"/><rect x="384" y="0" width="140" height="34" rx="10" fill="none" stroke="#9d4efb" stroke-opacity="0.35"/>
+        <text x="64"  y="23" text-anchor="middle">Shadowsocks</text>
+        <text x="181" y="23" text-anchor="middle">VMess</text>
+        <text x="304" y="23" text-anchor="middle">NaiveProxy</text>
+        <text x="454" y="23" text-anchor="middle">WireGuard</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- ============ RIGHT: :443 doorway + node ============ -->
+  <g transform="translate(712 60)">
+    <!-- clients -->
+    <g stroke="#2b3040" stroke-width="1.5" fill="#11141c">
+      <rect x="0"  y="40"  width="52" height="34" rx="7"/>
+      <rect x="0"  y="98"  width="44" height="66" rx="8"/>
+      <rect x="0"  y="188" width="52" height="34" rx="7"/>
+    </g>
+    <g fill="none" stroke="#3a4354" stroke-width="1.5">
+      <rect x="8"  y="47" width="36" height="20" rx="2"/>
+      <rect x="10" y="106" width="24" height="44" rx="3"/>
+      <rect x="8"  y="195" width="36" height="20" rx="2"/>
+    </g>
+    <text x="26" y="248" text-anchor="middle" font-size="15" fill="#7f8aa1">کلاینت‌ها</text>
+
+    <!-- flow lines clients -> gate -->
+    <g fill="none" stroke="url(#flow)" stroke-width="2.5" stroke-linecap="round">
+      <path d="M54 57 C 96 57, 104 118, 150 118"/>
+      <path d="M52 131 L 150 131"/>
+      <path d="M54 205 C 96 205, 104 144, 150 144"/>
+    </g>
+
+    <!-- :443 gate (recurring motif) -->
+    <g transform="translate(150 22)">
+      <rect x="0" y="0" width="58" height="220" rx="20" fill="#0c0f16"/>
+      <rect x="0" y="0" width="58" height="220" rx="20" fill="none" stroke="url(#brand)" stroke-width="2.5"/>
+      <line x1="29" y1="18" x2="29" y2="202" stroke="#22d3ee" stroke-opacity="0.25" stroke-width="1.5" stroke-dasharray="3 6"/>
+      <text x="29" y="104" text-anchor="middle" font-size="30" font-weight="800" fill="#eaf7ff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">443</text>
+      <text x="29" y="132" text-anchor="middle" font-size="15" fill="#8bd7ee" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">TCP/UDP</text>
+      <circle cx="29" cy="20" r="4" fill="#22d3ee"/>
+      <circle cx="29" cy="200" r="4" fill="#9d4efb"/>
+    </g>
+
+    <!-- flow gate -> node -->
+    <g fill="none" stroke="url(#flow)" stroke-width="2.5" stroke-linecap="round">
+      <path d="M208 131 L 244 131"/>
+    </g>
+
+    <!-- node card -->
+    <g transform="translate(236 4)">
+      <rect x="0" y="0" width="232" height="256" rx="18" fill="#0e1119"/>
+      <rect x="0.75" y="0.75" width="230.5" height="254.5" rx="17.25" fill="none" stroke="#242938" stroke-width="1.5"/>
+      <rect x="0" y="0" width="232" height="46" rx="18" fill="#121622"/>
+      <rect x="0" y="28" width="232" height="18" fill="#121622"/>
+      <circle cx="24" cy="23" r="9" fill="url(#brand)"/>
+      <path d="M20 30 V16 L28 30 V16" fill="none" stroke="#0e1119" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="42" y="29" font-size="17" font-weight="700" fill="#eef2fb" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">NOVA NODE</text>
+
+      <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+        <!-- lane 1 -->
+        <rect x="14" y="62"  width="204" height="42" rx="10" fill="#0b0e15"/>
+        <rect x="14" y="62"  width="4"  height="42" rx="2" fill="#22d3ee"/>
+        <text x="28" y="80"  font-size="16" font-weight="700" fill="#e7ecf7">Xray-core</text>
+        <text x="28" y="97"  font-size="11.5" fill="#7f8aa1">VLESS / Reality / Trojan</text>
+        <!-- lane 2 -->
+        <rect x="14" y="110" width="204" height="42" rx="10" fill="#0b0e15"/>
+        <rect x="14" y="110" width="4"  height="42" rx="2" fill="#5ac6e8"/>
+        <text x="28" y="128" font-size="16" font-weight="700" fill="#e7ecf7">sing-box</text>
+        <text x="28" y="145" font-size="11.5" fill="#7f8aa1">Hysteria2 / TUIC / Naive</text>
+        <!-- lane 3 -->
+        <rect x="14" y="158" width="204" height="42" rx="10" fill="#0b0e15"/>
+        <rect x="14" y="158" width="4"  height="42" rx="2" fill="#8b6ff4"/>
+        <text x="28" y="176" font-size="16" font-weight="700" fill="#e7ecf7">AmneziaWG</text>
+        <text x="28" y="193" font-size="11.5" fill="#7f8aa1">obfuscated WireGuard</text>
+        <!-- lane 4 -->
+        <rect x="14" y="206" width="204" height="36" rx="10" fill="#0b0e15"/>
+        <rect x="14" y="206" width="4"  height="36" rx="2" fill="#9d4efb"/>
+        <text x="28" y="229" font-size="16" font-weight="700" fill="#e7ecf7">Nova agent</text>
+      </g>
+    </g>
+  </g>
+</svg>

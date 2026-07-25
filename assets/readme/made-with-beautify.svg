@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="64" viewBox="0 0 420 64" role="img" aria-labelledby="t d" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+  <title id="t">README made with beautify-github-readme</title>
+  <desc id="d">A small credit badge linking to the beautify-github-readme skill.</desc>
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#9d4efb"/></linearGradient>
+    <linearGradient id="brandH" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#9d4efb"/></linearGradient>
+  </defs>
+  <rect x="1" y="1" width="418" height="62" rx="16" fill="#0c0d12"/>
+  <rect x="1.5" y="1.5" width="417" height="61" rx="15.5" fill="none" stroke="#1c1f28" stroke-width="1.5"/>
+  <!-- :443 gate motif mark -->
+  <g transform="translate(20 16)">
+    <rect x="0" y="0" width="32" height="32" rx="10" fill="#0b0e15"/>
+    <rect x="0" y="0" width="32" height="32" rx="10" fill="none" stroke="url(#brand)" stroke-width="1.8"/>
+    <line x1="16" y1="7" x2="16" y2="25" stroke="#22d3ee" stroke-opacity="0.25" stroke-width="1.2" stroke-dasharray="2 4"/>
+    <text x="16" y="21" text-anchor="middle" font-size="12" font-weight="800" fill="#9fd9ec" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">443</text>
+  </g>
+  <text x="66" y="27" font-size="11" font-weight="600" letter-spacing="2" fill="#7f8aa1" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">README MADE WITH</text>
+  <text x="66" y="46" font-size="17" font-weight="800" fill="url(#brandH)">beautify-github-readme</text>
+  <!-- outbound arrow -->
+  <g transform="translate(388 26)" fill="none" stroke="#8590a6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M0 12 L12 0"/>
+    <path d="M3 0 L12 0 L12 9"/>
+  </g>
+</svg>

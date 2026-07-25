@@ -1,12 +1,10 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/iiviirv/irnova-site/main/brand/nova-logo-badge-round.png" width="70" alt="Nova">
-
 <div align="right">
   <a href="README.md">🇬🇧 English</a>
 </div>
 
-# Nova Server
+<img src="./assets/readme/hero-fa.svg" width="100%" alt="Nova Server: سرور پروکسی خودمیزبان و مقاوم در برابر فیلترینگ همراه با پنل مدیریت کامل روی هر VPS.">
 
 **سرور پروکسی اختصاصی و مقاوم در برابر فیلترینگ شما، همراه با یک پنل مدیریت کامل، روی هر VPS.**
 
@@ -37,7 +35,8 @@ SSL یک‌کلیکی، ربات تلگرام با Mini App و احراز هوی
 
 ---
 
-## 📖 Nova Server چیست؟
+<img src="./assets/readme/section-overview-fa.svg" width="100%" alt="مرور کلی: Nova Server چیست؟">
+
 
 Nova Server یک VPS ساده لینوکسی را به یک نود پروکسی خصوصی و مقاوم در برابر فیلترینگ همراه با یک **پنل مدیریت کامل** تبدیل می‌کند. این ابزار `Xray-core`، `sing-box` (برای Hysteria2) و `AmneziaWG` را پشت یک پورت اجرا می‌کند و همه را با یک ایجنت خودمیزبان مدیریت می‌کند. جایی که Nova Proxy روی لایه رایگان کلادفلر اجرا می‌شود، Nova Server **نسخه خودمیزبان و قدرتمندتر** است: یک هسته پروکسی واقعی با هر آنچه یک اپراتور جدی نیاز دارد.
 
@@ -58,7 +57,8 @@ Nova Server یک VPS ساده لینوکسی را به یک نود پروکسی 
 
 ---
 
-## ⚡ نصب سریع
+<img src="./assets/readme/section-install-fa.svg" width="100%" alt="راه‌اندازی: نصب سریع">
+
 
 روی یک سرور تازه اوبونتو ۲۰.۰۴ به بالا یا دبیان ۱۱ به بالا (x86_64 یا arm64) این دستور را اجرا کنید:
 
@@ -133,7 +133,8 @@ cd /opt/nova-docker && docker compose logs -f nova-node
 
 ---
 
-## 🛰️ افزودن نود با یک دستور
+<img src="./assets/readme/section-fleet-fa.svg" width="100%" alt="ناوگان چندنودی: افزودن نود با یک دستور">
+
 
 دیگر لازم نیست روی هر سرور یک پنل کامل نصب کنید. پنل را یک بار روی سرور اصلی نصب کنید و ناوگان را از همان‌جا گسترش دهید:
 
@@ -173,7 +174,8 @@ Nova یک تونل DNS داخلی و اختیاری دارد که ترافیک �
 
 ---
 
-## 🧩 امکانات
+<img src="./assets/readme/section-features-fa.svg" width="100%" alt="همه‌چیز در یک نگاه: امکانات">
+
 
 | بخش | چه چیزی دریافت می‌کنید |
 |------|--------------|
@@ -198,16 +200,10 @@ Nova یک تونل DNS داخلی و اختیاری دارد که ترافیک �
 
 ---
 
-## 🏗️ معماری
+<img src="./assets/readme/section-architecture-fa.svg" width="100%" alt="زیرساخت: معماری">
 
-```
-                         :443 (TCP/UDP)
-  کلاینت‌ها ───────────────────────────────►  نود Nova
-                                              ├─ Xray-core   VLESS / VMess / Trojan / Reality / SS
-                                              ├─ sing-box    Hysteria2 / TUIC / NaiveProxy
-                                              ├─ AmneziaWG   وایرگارد مبهم‌شده
-                                              └─ Nova agent  پنل · REST API · تلگرام · خودکارسازی
-```
+
+<img src="./assets/readme/architecture-fa.svg" width="100%" alt="کلاینت‌ها از طریق یک پورت 443 (TCP و UDP) به یک نود Nova وصل می‌شوند. داخل نود، یک ایجنت خودمیزبان چهار مسیر را اجرا می‌کند: Xray-core، sing-box، AmneziaWG و ایجنت Nova.">
 
 ایجنت یک پروسه Node.js با یک ذخیره‌ساز محلی SQLite است. پنل، REST API و ربات تلگرام همگی از توابع سرویس داخلی یکسانی استفاده می‌کنند.
 
@@ -232,5 +228,9 @@ Nova یک تونل DNS داخلی و اختیاری دارد که ترافیک �
 ساخته‌شده با دقت برای اینترنتی آزاد.
 
 **Nova Server. تمام حقوق محفوظ است.**
+
+<br>
+
+<a href="https://github.com/oil-oil/beautify-github-readme"><img src="./assets/readme/made-with-beautify.svg" width="260" alt="README made with beautify-github-readme"></a>
 
 </div>

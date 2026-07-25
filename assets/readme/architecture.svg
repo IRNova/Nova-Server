@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430" role="img" aria-labelledby="t d" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+  <title id="t">Nova Server architecture</title>
+  <desc id="d">Clients connect over a single port 443 (TCP and UDP) to one Nova node. Inside the node, one self-hosted agent drives four lanes: Xray-core (VLESS, VMess, Trojan, Reality, Shadowsocks), sing-box (Hysteria2, TUIC, NaiveProxy), AmneziaWG (obfuscated WireGuard), and the Nova agent (panel, REST API, Telegram bot, automations).</desc>
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#9d4efb"/></linearGradient>
+    <linearGradient id="flow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22d3ee" stop-opacity="0.25"/>
+      <stop offset="0.5" stop-color="#5ad7f0"/>
+      <stop offset="1" stop-color="#9d4efb"/>
+    </linearGradient>
+    <radialGradient id="gl" cx="0.5" cy="0.4" r="0.6"><stop offset="0" stop-color="#22d3ee" stop-opacity="0.07"/><stop offset="1" stop-color="#22d3ee" stop-opacity="0"/></radialGradient>
+    <marker id="arw" markerWidth="10" markerHeight="10" refX="6" refY="5" orient="auto"><path d="M0 1 L7 5 L0 9" fill="none" stroke="#9d4efb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></marker>
+  </defs>
+
+  <rect x="1" y="1" width="1198" height="428" rx="22" fill="#0c0d12"/>
+  <rect x="1" y="1" width="1198" height="428" rx="22" fill="url(#gl)"/>
+  <rect x="1.5" y="1.5" width="1197" height="427" rx="21.5" fill="none" stroke="#1c1f28" stroke-width="1.5"/>
+
+  <!-- ===== clients ===== -->
+  <g transform="translate(66 150)">
+    <g fill="#11141c" stroke="#2c3242" stroke-width="1.6">
+      <rect x="8"  y="0"   width="86" height="56" rx="9"/>
+      <rect x="20" y="74"  width="62" height="96" rx="11"/>
+      <rect x="8"  y="188" width="86" height="56" rx="9"/>
+    </g>
+    <g fill="none" stroke="#404a5e" stroke-width="1.6">
+      <rect x="20" y="10"  width="62" height="34" rx="3"/>
+      <rect x="28" y="86"  width="46" height="66" rx="4"/>
+      <rect x="20" y="198" width="62" height="34" rx="3"/>
+    </g>
+    <circle cx="51" cy="161" r="2.6" fill="#5ac6e8"/>
+    <text x="51" y="272" text-anchor="middle" font-size="20" fill="#aeb6c6" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">clients</text>
+  </g>
+
+  <!-- ===== flow label ===== -->
+  <text x="330" y="150" text-anchor="middle" font-size="20" font-weight="700" fill="#cfe9f4" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">:443 (TCP/UDP)</text>
+  <!-- flow clients -> gate -->
+  <path d="M170 240 L 452 240" fill="none" stroke="url(#flow)" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M170 215 C 300 215, 300 175, 452 210" fill="none" stroke="url(#flow)" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+  <path d="M170 265 C 300 265, 300 305, 452 270" fill="none" stroke="url(#flow)" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- ===== :443 gate ===== -->
+  <g transform="translate(452 150)">
+    <rect x="0" y="0" width="66" height="180" rx="20" fill="#0b0e15"/>
+    <rect x="0" y="0" width="66" height="180" rx="20" fill="none" stroke="url(#brand)" stroke-width="2.6"/>
+    <line x1="33" y1="18" x2="33" y2="162" stroke="#22d3ee" stroke-opacity="0.28" stroke-width="1.6" stroke-dasharray="3 6"/>
+    <text x="33" y="86"  text-anchor="middle" font-size="34" font-weight="800" fill="#eaf7ff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">443</text>
+    <text x="33" y="112" text-anchor="middle" font-size="16" fill="#8bd7ee" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">TCP/UDP</text>
+    <circle cx="33" cy="16" r="4.5" fill="#22d3ee"/>
+    <circle cx="33" cy="164" r="4.5" fill="#9d4efb"/>
+  </g>
+  <!-- gate -> node -->
+  <path d="M518 240 L 566 240" fill="none" stroke="url(#flow)" stroke-width="3.5" stroke-linecap="round" marker-end="url(#arw)"/>
+
+  <!-- ===== Nova node ===== -->
+  <g transform="translate(584 40)">
+    <rect x="0" y="0" width="560" height="350" rx="20" fill="#0e1119"/>
+    <rect x="0.9" y="0.9" width="558.2" height="348.2" rx="19.1" fill="none" stroke="#252a3a" stroke-width="1.6"/>
+    <!-- header -->
+    <rect x="0" y="0" width="560" height="66" rx="20" fill="#121622"/>
+    <rect x="0" y="40" width="560" height="26" fill="#121622"/>
+    <g transform="translate(26 20)">
+      <rect x="0" y="0" width="30" height="30" rx="9" fill="url(#brand)"/>
+      <path d="M8 24 V8 L22 24 V8" fill="none" stroke="#121622" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <text x="70" y="34" font-size="21" font-weight="800" fill="#eef2fb" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">Nova node</text>
+    <text x="70" y="52" font-size="14.5" fill="#8a93a6">one self-hosted agent, backed by local SQLite</text>
+
+    <!-- lanes -->
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+      <!-- 1 Xray-core -->
+      <rect x="20" y="82"  width="520" height="58" rx="12" fill="#0b0e15"/>
+      <rect x="20" y="82"  width="5" height="58" rx="2.5" fill="#22d3ee"/>
+      <text x="42" y="108" font-size="19" font-weight="700" fill="#e7ecf7">Xray-core</text>
+      <text x="42" y="130" font-size="15" fill="#8a93a6">VLESS / VMess / Trojan / Reality / Shadowsocks</text>
+      <!-- 2 sing-box -->
+      <rect x="20" y="150" width="520" height="58" rx="12" fill="#0b0e15"/>
+      <rect x="20" y="150" width="5" height="58" rx="2.5" fill="#5ac6e8"/>
+      <text x="42" y="176" font-size="19" font-weight="700" fill="#e7ecf7">sing-box</text>
+      <text x="42" y="198" font-size="15" fill="#8a93a6">Hysteria2 / TUIC / NaiveProxy</text>
+      <!-- 3 AmneziaWG -->
+      <rect x="20" y="218" width="520" height="58" rx="12" fill="#0b0e15"/>
+      <rect x="20" y="218" width="5" height="58" rx="2.5" fill="#8b6ff4"/>
+      <text x="42" y="244" font-size="19" font-weight="700" fill="#e7ecf7">AmneziaWG</text>
+      <text x="42" y="266" font-size="15" fill="#8a93a6">obfuscated WireGuard</text>
+      <!-- 4 Nova agent -->
+      <rect x="20" y="286" width="520" height="46" rx="12" fill="#0b0e15"/>
+      <rect x="20" y="286" width="5" height="46" rx="2.5" fill="#9d4efb"/>
+      <text x="42" y="308" font-size="19" font-weight="700" fill="#e7ecf7">Nova agent</text>
+      <text x="185" y="308" font-size="15" fill="#8a93a6">panel, REST API, Telegram bot, automations</text>
+    </g>
+  </g>
+</svg>
