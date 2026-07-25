@@ -15,7 +15,7 @@ trilingual (English, فارسی, Русский) panel, per-user accounts, multi
 bridge tunnels, one-click SSL, a Telegram bot with a Mini App, and two-factor auth.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.4.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server/releases)
+[![Version](https://img.shields.io/badge/version-1.5.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server/releases)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
@@ -42,12 +42,15 @@ bridge tunnels, one-click SSL, a Telegram bot with a Mini App, and two-factor au
 Nova Server turns a plain Linux VPS into your own private, censorship-resistant proxy node with a **full admin panel**. It runs `Xray-core`, `sing-box` (Hysteria2), and `AmneziaWG` behind a single port, all driven by one self-hosted agent. Where Nova Proxy runs on Cloudflare's free tier, Nova Server is the **self-hosted big brother**: a real proxy core with everything a serious node operator needs.
 
 **What makes Nova Server different:**
-- 🧩 **Every protocol that matters**: VLESS, VMess, Trojan, Shadowsocks, Reality, Hysteria2, and native WireGuard
+- 🧩 **Every protocol that matters**: VLESS, VMess, Trojan, Shadowsocks, Reality, Hysteria2, TUIC, NaiveProxy, and native WireGuard
 - 🇮🇷 **Iran bridge tunnels**: front a foreign exit with a clean-IP server inside Iran (Backhaul, BackPack, rathole, wstunnel). The Iran side installs with **one lightweight command** the panel generates for you, no full stack needed there
 - 🔐 **One-click SSL**: Let's Encrypt or full-auto Cloudflare (auto-DNS + wildcard), no manual port 80
 - 👥 **Per-user everything**: quota, expiry, device limit, data reset, and per-user protocol access
 - 🛰️ **Multi-node fleet**: manage many servers from one panel; add a new node by running one panel-generated command on a fresh VPS
 - 🔒 **Hidden panel**: fresh installs put the panel behind a random secret path (with an optional dedicated port); every other path returns a plain 404, so scanners see nothing
+- 🛡️ **Login guard**: a fail2ban-style shield that blocks an IP after too many failed sign-ins, on by default, with a live view of active bans you can lift any time
+- 🔔 **Webhooks**: get a signed POST to your own URL when a user is created, expires, or hits quota, when a node joins, or when an IP is banned
+- 📊 **Per-inbound traffic**: a daily traffic chart per inbound on the Inbounds page, so you can see which entry points carry the load
 - 🤖 **Telegram bot + Mini App**: run the whole panel inside Telegram
 - 🛡️ **Anti-censorship egress**: WARP (with your own WARP+ license), Tor, and Psiphon, built in
 - ⚙️ **Automated**: backups, health alerts, auto-update, clean-IP refresh, and a first-run setup wizard
@@ -156,6 +159,16 @@ Turn on **Per-operator configs in subscription** in Settings, and each user's su
 
 ---
 
+## 🛡️ Login guard and webhooks
+
+Two operator tools live under **Settings > Security**.
+
+**Login guard** is a fail2ban-style shield for the panel sign-in. After too many failed attempts from one IP within a window, that IP is blocked for a set time, so password guessing gets nowhere. It is on by default; you can tune the attempt count, the window, and the ban length, and the same page lists every active ban with a one-click **Unban** (and a **Clear all**).
+
+**Webhooks** send a small signed JSON POST to your own URL when something happens on the node: a user is created, updated, deleted, expires, or hits quota; a node enrolls; or an IP is banned. Add as many endpoints as you like, pick which events each one wants (or leave it on all), and set an optional secret. When a secret is set, Nova signs the body with HMAC-SHA256 and sends it in the `X-Nova-Signature: sha256=...` header, so your receiver can confirm the call really came from your node. A **Test** button fires a sample delivery so you can check the wiring. The payload is `{ event, timestamp, node, data }`.
+
+---
+
 ## 🕳️ DNS Tunnel (last resort)
 
 Nova has an optional built-in **MasterDnsVPN** server that carries traffic inside DNS queries. Because it rides on DNS, it keeps working when everything else is blocked but DNS still resolves, so it's the last-resort transport when nothing else gets through.
@@ -186,7 +199,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 
 | Area | What you get |
 |------|--------------|
-| **Protocols** | VLESS, VMess, Trojan, Shadowsocks-2022, VLESS-Reality (XTLS-Vision), Hysteria2, native WireGuard, AmneziaWG, all managed on one Inbounds page |
+| **Protocols** | VLESS, VMess, Trojan, Shadowsocks-2022, VLESS-Reality (XTLS-Vision), Hysteria2, TUIC v5, NaiveProxy, native WireGuard, AmneziaWG, all managed on one Inbounds page |
 | **Transports** | TCP, WebSocket, gRPC, XHTTP, HTTPUpgrade, over TLS or Reality |
 | **Deploy** | One-line VPS installer with quick setup questions (domain with free SSL, secret panel path, extra panel port), or fully scripted via env vars; a Docker install too (host networking, data on named volumes); `nova-uninstall` to remove it all |
 | **Users** | Data quota (total or up/down split), expiry (fixed or first-use), device/IP limit, daily/weekly/monthly reset, per-user protocol and inbound access; saved plans (reusable limit sets applied to one user or many), bulk actions (enable, disable, extend, reset, apply a plan, or delete across selected users), and CSV import/export (idempotent upsert by name) |
@@ -194,6 +207,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 | **Per-country exits** | Let users pick their exit country in their app; per-country Tor/Psiphon instances, one config per country in the subscription |
 | **Routing** | Point-and-click geosite/geoip/CIDR/domain/protocol rules, Direct-Iran and domestic bypass, ad/porn/BitTorrent/QUIC blocking, secure and anti-sanction DNS |
 | **Egress** | Direct, block, WARP (with WARP+ license), Tor, Psiphon, custom SOCKS/HTTP outbounds, and per-inbound egress assignment |
+| **Monitoring** | Dashboard traffic charts, plus a per-inbound daily traffic chart on the Inbounds page so you can see which entry points carry the load |
 | **Diagnostics** | Config/port health check (is each config actually listening and reachable), firewall and reserved-ports view, one-click fixes |
 | **Iran tunnels** | Bridge-to-exit with Backhaul, BackPack, rathole, or wstunnel; carries TCP and UDP so Hysteria2 keeps working. The Iran bridge sets up from one panel-generated command (slim installer, no full stack on the Iran box) |
 | **DNS tunnel** | Optional built-in MasterDnsVPN server that tunnels traffic inside DNS queries, the last-resort transport for when only DNS still resolves; auto NS delegation on Cloudflare or a guided manual setup, with the client config exported from the panel |
@@ -201,6 +215,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 | **Panel access** | Random secret panel path with a plain 404 decoy on every other path, plus an optional dedicated panel HTTPS port; both editable under Settings > General; `nova-passwd` prints the current panel URL |
 | **Fleet** | Register and manage multiple Nova nodes from one panel, aggregate users and usage, provision remotely; join a fresh VPS as a managed node with one panel-generated command (one-time token, no local panel) |
 | **API and bot** | Token-authed REST API (`/api/v1`) and a full Telegram bot with a Mini App that opens the whole panel in Telegram |
+| **Webhooks** | Outbound webhooks to your own URL on user create/update/delete, expiry, quota, node enroll, and login-ban events; each call is optionally HMAC-signed (`X-Nova-Signature`) so your endpoint can verify it |
+| **Login guard** | Fail2ban-style per-IP lockout after repeated failed sign-ins (thresholds and ban length configurable), a live list of active bans, and one-click unban; on by default |
 | **Resellers** | Owner, managers, and resellers with custom per-capability permissions; resellers see only their own users and build them on your inbounds; two-factor auth per admin; server-side password reset |
 | **Automation** | Nightly backups (disk and Telegram), proactive alerts, opt-in auto-update, clean-IP refresh, health check |
 | **Panel** | English, Persian (RTL), Russian; global search, setup wizard, per-section guides, and a full in-panel manual; light and dark |
@@ -211,9 +227,12 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 
 | | Nova Server | 3x-ui | Marzban |
 |---|:--:|:--:|:--:|
-| Xray + sing-box (Hysteria2) | ✅ | Xray only | Xray only |
+| Xray + sing-box (Hysteria2, TUIC, NaiveProxy) | ✅ | Xray only | Xray only |
 | Native WireGuard inbound | ✅ | plain |  ✗ |
 | Reality | ✅ | ✅ | ✅ |
+| Login IP ban (fail2ban-style) | ✅ |  ✗ |  ✗ |
+| Outbound webhooks | ✅ |  ✗ |  ✗ |
+| Per-inbound traffic charts | ✅ | ✅ |  ✗ |
 | Iran bridge tunnels (built in) | ✅ |  ✗ |  ✗ |
 | WARP / Tor / Psiphon egress | ✅ all three | WARP | raw config |
 | One-click Cloudflare auto-DNS + SSL | ✅ |  ✗ |  ✗ |
@@ -233,7 +252,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
                          :443 (TCP/UDP)
   clients  ───────────────────────────────►  Nova node
                                               ├─ Xray-core   VLESS / VMess / Trojan / Reality / SS
-                                              ├─ sing-box    Hysteria2 (UDP)
+                                              ├─ sing-box    Hysteria2 / TUIC / NaiveProxy
                                               ├─ AmneziaWG   obfuscated WireGuard
                                               └─ Nova agent  panel, REST API, Telegram, automations
 ```
