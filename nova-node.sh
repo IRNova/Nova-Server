@@ -362,6 +362,22 @@ mkdir -p "$AGENT_DIR" "$DB_DIR" "$CERT_DIR"
 mkdir -p /var/log/nova && chown nobody:nogroup /var/log/nova 2>/dev/null || true
 tmp="$(mktemp -d)"
 curl -fsSL "$TARBALL_URL" -o "$tmp/agent.tar.gz" || die "Could not download the agent."
+# Integrity check: verify the downloaded agent against the published SHA256SUMS
+# (same directory as the tarball) before extracting. A mismatch aborts the
+# install, fail-closed. If a custom NOVA_TARBALL_URL mirror ships no SHA256SUMS we
+# warn and continue, since that source was chosen deliberately; set
+# NOVA_REQUIRE_CHECKSUM=1 to make a missing checksum fatal too.
+SUMS_URL="${NOVA_TARBALL_SUMS_URL:-${TARBALL_URL%/*}/SHA256SUMS}"
+_expected="$(curl -fsSL "$SUMS_URL" 2>/dev/null | awk '$2 ~ /^\*?nova-node-agent\.tar\.gz$/ {print $1; exit}')"
+_got="$(sha256sum "$tmp/agent.tar.gz" 2>/dev/null | awk '{print $1}')"
+if [ -n "$_expected" ]; then
+  [ "$_expected" = "$_got" ] || { rm -rf "$tmp"; die "Agent checksum mismatch (expected $_expected, got $_got). Refusing to install."; }
+  ok "agent checksum verified"
+elif [ "${NOVA_REQUIRE_CHECKSUM:-0}" = "1" ]; then
+  rm -rf "$tmp"; die "Could not fetch agent checksum from $SUMS_URL and NOVA_REQUIRE_CHECKSUM=1 is set."
+else
+  warn "Could not fetch agent checksum from $SUMS_URL; continuing without verification."
+fi
 # --warning=no-unknown-keyword: hide the harmless "Ignoring unknown extended
 # header keyword" lines GNU tar prints when a release tarball was built on macOS
 # (Apple provenance xattrs). Extraction succeeds either way; the flag keeps the

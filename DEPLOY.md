@@ -23,6 +23,15 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 
 The server installs Nova by itself on first boot (about 3 to 5 minutes), then you open `https://YOUR_SERVER_IP` and set a password.
 
+## Verify your download
+
+The installer and setup scripts in this repo are plain shell you can read before running. The node agent ships as `nova-node-agent.tar.gz` with a published `SHA256SUMS` next to it; the installer verifies the agent against that checksum automatically and aborts on a mismatch. To check a copy by hand:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node-agent.tar.gz
+curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/SHA256SUMS | sha256sum -c
+```
+
 ## Update
 
 The panel checks for new versions and updates in one click (Settings, General, self-update), or turn on automatic updates. Re-running the install command also updates an existing node. Your users, inbounds, and settings are preserved.
