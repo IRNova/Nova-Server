@@ -13,7 +13,7 @@ VLESS · VMess · Trojan · Shadowsocks · Reality · Hysteria2 · TUIC · Naive
 SSL یک‌کلیکی، ربات تلگرام با Mini App و احراز هویت دومرحله‌ای.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.5.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
+[![Version](https://img.shields.io/badge/version-1.7.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>

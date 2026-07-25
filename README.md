@@ -13,7 +13,7 @@ trilingual (English, فارسی, Русский) panel, per-user accounts, multi
 bridge tunnels, one-click SSL, a Telegram bot with a Mini App, and two-factor auth.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.5.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server/releases)
+[![Version](https://img.shields.io/badge/version-1.7.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server/releases)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
