@@ -1,0 +1,51 @@
+# Nova node via Docker Compose.
+#
+#   1. Put your settings in a .env file next to this one (see the keys below).
+#   2. docker compose up -d --build
+#   3. Open the panel URL it prints:  docker compose logs -f nova-node
+#
+# Why host networking + privileged: a Nova node is a VPN appliance, not a plain
+# web app. It binds :443 (TCP + UDP) and, depending on what you enable, port 53
+# (DNS tunnel) and a WireGuard/AmneziaWG UDP port, and it runs systemd-managed
+# services. Host networking gives it the real ports; privileged + the kernel
+# module mount let the optional AmneziaWG server load its module from the host.
+#
+# All state lives on named volumes, so `docker compose down` then `up` keeps your
+# users, settings, and certificate.
+services:
+  nova-node:
+    build: .
+    image: nova-node:local
+    container_name: nova-node
+    restart: unless-stopped
+    # A VPN node needs the host's real ports (443 tcp/udp, and 53/udp etc. when
+    # you enable them). Bridge networking cannot carry all of these cleanly.
+    network_mode: host
+    # Required to run systemd as PID 1 and (optionally) load the AmneziaWG kernel
+    # module from the host. If you do not need AmneziaWG you can try dropping
+    # privileged for cap_add [NET_ADMIN, SYS_ADMIN] instead.
+    privileged: true
+    cgroup: host
+    tmpfs:
+      - /run
+      - /run/lock
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - nova-data:/var/lib/nova      # users, settings, sqlite db
+      - nova-cert:/etc/nova          # TLS cert + agent env
+      - nova-xray:/usr/local/etc/xray
+      - /lib/modules:/lib/modules:ro # for the optional AmneziaWG server
+    environment:
+      # Same options as the native installer. Leave blank to accept the defaults
+      # (a random secret panel path is generated; no domain uses a self-signed
+      # cert on the node's IP). See the .env.example file.
+      - NOVA_ADMIN_PASS=${NOVA_ADMIN_PASS:-}
+      - NOVA_DOMAIN=${NOVA_DOMAIN:-}
+      - NOVA_DOMAIN_EMAIL=${NOVA_DOMAIN_EMAIL:-}
+      - NOVA_PANEL_PATH=${NOVA_PANEL_PATH:-}
+      - NOVA_PANEL_PORT=${NOVA_PANEL_PORT:-}
+
+volumes:
+  nova-data:
+  nova-cert:
+  nova-xray:

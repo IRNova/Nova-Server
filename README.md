@@ -15,7 +15,7 @@ trilingual (English, فارسی, Русский) panel, per-user accounts, multi
 bridge tunnels, one-click SSL, a Telegram bot with a Mini App, and two-factor auth.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.6-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server/releases)
+[![Version](https://img.shields.io/badge/version-1.3.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server/releases)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
@@ -85,6 +85,28 @@ The panel used to answer at the bare root (`https://server/`). Now a fresh insta
 
 ---
 
+## 🐳 Install with Docker
+
+Prefer containers? Nova ships a Docker option as an alternative to the native one-line installer. It's reproducible, easy to stop, move, or upgrade, and your data lives on named volumes so it survives a rebuild.
+
+Run this on a real Linux VPS as root. It installs Docker if it's missing, builds the image, and starts the node:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/docker/nova-docker.sh)
+```
+
+You get the same options as the native installer, passed as environment variables: `NOVA_ADMIN_PASS`, `NOVA_DOMAIN`, `NOVA_PANEL_PATH`, and `NOVA_PANEL_PORT`.
+
+After it starts, watch the first-boot install and find your panel URL with:
+
+```bash
+cd /opt/nova-docker && docker compose logs -f nova-node
+```
+
+**Important:** this needs a real Linux host with host networking. It does **not** work on Docker Desktop for Mac or Windows, which can't bind the host's `:443` the way a node needs. The container runs systemd and uses host networking plus privileged mode because a Nova node is a VPN appliance: it binds `:443` (TCP and UDP), optionally `:53/udp` and a WireGuard UDP port, and manages systemd services. Full details are in `docker/README.md`.
+
+---
+
 ## 📱 No computer? Install from your phone
 
 You can set up a node entirely from your phone, no terminal needed.
@@ -130,7 +152,17 @@ Your users then connect to the clean Iran IP and the traffic tunnels to your for
 
 ## 📶 Per-operator configs (optional)
 
-Turn on **Per-operator configs in subscription** in Settings, and each user's subscription gains one extra config per Iranian carrier (Irancell, MCI, Rightel, Shatel, MobinNet), each tuned with that carrier's TLS fingerprint and labeled by carrier. Users on normal clients (v2rayNG, sing-box, Clash) just pick the one matching their SIM, no custom app needed. Off by default, and it applies to the plain, Clash, and sing-box subscription formats.
+Turn on **Per-operator configs in subscription** in Settings, and each user's subscription gains one extra config per Iranian carrier (Irancell, MCI, Rightel, Shatel, MobinNet), each tuned with that carrier's TLS fingerprint and labeled by carrier. Users on normal clients (v2rayNG, sing-box, Clash) just pick the one matching their SIM, no custom app needed. Off by default, and it applies to the plain, Clash, and sing-box subscription formats. The per-operator subscription toggle and the per-ISP client optimization now sit together in Settings.
+
+---
+
+## 🕳️ DNS Tunnel (last resort)
+
+Nova has an optional built-in **MasterDnsVPN** server that carries traffic inside DNS queries. Because it rides on DNS, it keeps working when everything else is blocked but DNS still resolves, so it's the last-resort transport when nothing else gets through.
+
+Turn it on in the panel under **Settings**. It needs a subdomain delegated to your node with an NS record. If your domain is on Cloudflare, the panel can create the delegation for you automatically; otherwise the in-panel guide walks you through the manual A and NS records.
+
+It's a separate protocol: users connect with the [MasterDnsVPN client](https://github.com/masterking32/MasterDnsVPN), not the Nova app. The panel generates and exports the client config for them.
 
 ---
 
@@ -156,14 +188,15 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 |------|--------------|
 | **Protocols** | VLESS, VMess, Trojan, Shadowsocks-2022, VLESS-Reality (XTLS-Vision), Hysteria2, native WireGuard, AmneziaWG, all managed on one Inbounds page |
 | **Transports** | TCP, WebSocket, gRPC, XHTTP, HTTPUpgrade, over TLS or Reality |
-| **Deploy** | One-line VPS installer with quick setup questions (domain with free SSL, secret panel path, extra panel port), or fully scripted via env vars; `nova-uninstall` to remove it all |
-| **Users** | Data quota (total or up/down split), expiry (fixed or first-use), device/IP limit, daily/weekly/monthly reset, per-user protocol and inbound access |
+| **Deploy** | One-line VPS installer with quick setup questions (domain with free SSL, secret panel path, extra panel port), or fully scripted via env vars; a Docker install too (host networking, data on named volumes); `nova-uninstall` to remove it all |
+| **Users** | Data quota (total or up/down split), expiry (fixed or first-use), device/IP limit, daily/weekly/monthly reset, per-user protocol and inbound access; saved plans (reusable limit sets applied to one user or many), bulk actions (enable, disable, extend, reset, apply a plan, or delete across selected users), and CSV import/export (idempotent upsert by name) |
 | **Subscriptions** | One auto-updating link per user, live usage page + native usage/expiry header, QR codes, Clash/Mihomo and sing-box formats, multi-profile inbounds (one inbound, many CDN domains), optional per-operator configs (one tuned config per Iranian carrier, works in normal clients) |
 | **Per-country exits** | Let users pick their exit country in their app; per-country Tor/Psiphon instances, one config per country in the subscription |
 | **Routing** | Point-and-click geosite/geoip/CIDR/domain/protocol rules, Direct-Iran and domestic bypass, ad/porn/BitTorrent/QUIC blocking, secure and anti-sanction DNS |
 | **Egress** | Direct, block, WARP (with WARP+ license), Tor, Psiphon, custom SOCKS/HTTP outbounds, and per-inbound egress assignment |
 | **Diagnostics** | Config/port health check (is each config actually listening and reachable), firewall and reserved-ports view, one-click fixes |
 | **Iran tunnels** | Bridge-to-exit with Backhaul, BackPack, rathole, or wstunnel; carries TCP and UDP so Hysteria2 keeps working. The Iran bridge sets up from one panel-generated command (slim installer, no full stack on the Iran box) |
+| **DNS tunnel** | Optional built-in MasterDnsVPN server that tunnels traffic inside DNS queries, the last-resort transport for when only DNS still resolves; auto NS delegation on Cloudflare or a guided manual setup, with the client config exported from the panel |
 | **Domain and SSL** | One-click Let's Encrypt, full-auto Cloudflare (auto-DNS + wildcard), or a pasted Origin cert, all auto-renewing |
 | **Panel access** | Random secret panel path with a plain 404 decoy on every other path, plus an optional dedicated panel HTTPS port; both editable under Settings > General; `nova-passwd` prints the current panel URL |
 | **Fleet** | Register and manage multiple Nova nodes from one panel, aggregate users and usage, provision remotely; join a fresh VPS as a managed node with one panel-generated command (one-time token, no local panel) |
@@ -220,16 +253,6 @@ The agent is a single Node.js process backed by a local SQLite store. The panel,
 ## 🔄 Updating
 
 The panel checks for new versions and updates in one click, or turn on **automatic updates**. Your users, inbounds, and settings are preserved.
-
----
-
-## ☕ Support
-
-If you find Nova Server useful and it has served you well, consider supporting us through the link below.
-
-[![Donate](https://img.shields.io/badge/☕%20Donate-donate.novaproxy.online-8b5cf6?style=for-the-badge)](https://donate.novaproxy.online/)
-
-Every contribution, big or small, keeps us motivated to build and improve Nova Server. With your support, we can keep the internet free for everyone.
 
 ---
 
