@@ -1,10 +1,10 @@
-# Nova Server v1.7.0
+# Nova Server v1.7.1
 
-A from-zero setup walkthrough for first-timers.
+A user-experience fix for the Users page.
 
-## New
+## Fixed
 
-- **Step-by-step setup guide.** The in-panel manual opens with a new plain-language walkthrough that takes a complete beginner from nothing to a working connection: what a VPS is and how to get one, installing Nova three ways (one command over SSH, a paste-and-go cloud-init box, or the Telegram bot), setting your password, the optional domain and free HTTPS, creating your first user and connecting, and then the bigger features (more entry points, the Iran bridge, the DNS tunnel and its two engines, adding more servers, and the owner safety tools) explained in everyday words with every technical term spelled out. English, Persian, and Russian.
+- **"Could not access the node" after a user action.** Enable, Disable, Extend, and Reset (and the bulk versions) succeeded, but on a multi-protocol node the panel showed a "Could not access the node" error until you refreshed. The panel is served through xray on port 443, so applying the change restarted xray and dropped the very request that triggered it before its response arrived. The node now sends the response first and restarts xray a moment later, so the action completes cleanly with no false error. Enforcement of quota and expiry from the background loop is unchanged.
 
 ## Install
 
