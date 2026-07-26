@@ -581,9 +581,14 @@ if [ "$NODE_MODE" = 1 ]; then
     # fails, so nothing leaked) do we retry with -k and say so. We capture the HTTP
     # status + body (no `-f`, which would hide both) so a failure says WHY.
     ETLS=""   # secure by default; becomes "-k" only for a self-signed panel
+    # If the panel is self-signed it also hands us a public-key pin, so even the -k
+    # connection rejects a MITM's forged cert (different key -> pin fails). curl
+    # enforces --pinnedpubkey even under -k.
+    EPIN=""
+    [ -n "${NOVA_JOIN_PIN:-}" ] && EPIN="--pinnedpubkey ${NOVA_JOIN_PIN}"
     etmp="$(mktemp)"
     for _i in 1 2 3; do
-      EHTTP="$(curl -sS $ETLS -m 15 -o "$etmp" -w '%{http_code}' -X POST "${NOVA_JOIN_URL%/}/nodes/enroll" -H 'Content-Type: application/json' -d "$EBODY" 2>/dev/null || true)"
+      EHTTP="$(curl -sS $ETLS $EPIN -m 15 -o "$etmp" -w '%{http_code}' -X POST "${NOVA_JOIN_URL%/}/nodes/enroll" -H 'Content-Type: application/json' -d "$EBODY" 2>/dev/null || true)"
       ERESP="$(cat "$etmp" 2>/dev/null)"
       case "$ERESP" in *'"ok":true'*) ENROLLED=1; break ;; esac
       # We only ever drop TLS verification when the OWNER explicitly opted in via
