@@ -576,16 +576,27 @@ if [ "$NODE_MODE" = 1 ]; then
     NNAME="$(hostname -s 2>/dev/null || echo node)"
     EBODY="{\"token\":\"$NOVA_JOIN_TOKEN\",\"url\":\"$NODE_URL\",\"apiToken\":\"$NODE_TOKEN\",\"name\":\"$NNAME\",\"insecure\":$INSECURE}"
     # The parent may itself be on a self-signed cert, so allow an insecure TLS
-    # handshake for this one enrollment call (-k). Retry a few times.
+    # handshake for this one enrollment call (-k). Retry a few times. We capture
+    # the HTTP status and body (no `-f`, which would hide both) so a failure says
+    # WHY instead of a blank "Response: none".
+    etmp="$(mktemp)"
     for _i in 1 2 3; do
-      ERESP="$(curl -fsS -k -m 15 -X POST "${NOVA_JOIN_URL%/}/nodes/enroll" -H 'Content-Type: application/json' -d "$EBODY" 2>/dev/null || true)"
+      EHTTP="$(curl -sS -k -m 15 -o "$etmp" -w '%{http_code}' -X POST "${NOVA_JOIN_URL%/}/nodes/enroll" -H 'Content-Type: application/json' -d "$EBODY" 2>/dev/null || true)"
+      ERESP="$(cat "$etmp" 2>/dev/null)"
       case "$ERESP" in *'"ok":true'*) ENROLLED=1; break ;; esac
       sleep 3
     done
+    rm -f "$etmp"
     if [ "$ENROLLED" = 1 ]; then
       ok "node registered with the main panel"
     else
-      warn "The main panel did not accept the enrollment. Response: ${ERESP:-none}"
+      warn "The main panel did not accept the enrollment (HTTP ${EHTTP:-000}). Response: ${ERESP:-none}"
+      case "${EHTTP:-000}" in
+        401) warn "  -> the join token is invalid or expired (they last 24h). Generate a fresh \"Add a node\" command and re-run it." ;;
+        502) warn "  -> the main panel could not reach this node back at ${NODE_URL}. Make sure :443 is open to the internet here, then add the node by hand from the panel." ;;
+        000) warn "  -> could not reach the main panel at ${NOVA_JOIN_URL}. Check that address is correct and reachable from this server (DNS, firewall, or it may be down)." ;;
+        429) warn "  -> the main panel is rate-limiting enrollment. Wait a minute and re-run the command." ;;
+      esac
     fi
   fi
 
