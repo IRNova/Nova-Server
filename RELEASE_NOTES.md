@@ -1,15 +1,23 @@
-# Nova Server v1.9.2
+# Nova Server v1.10.0
 
-Documentation only, no behavior change.
+Central fleet management: run your nodes' users and protocols from the main panel.
 
-## Docs
+## Added
 
-- The README, DEPLOY guide, and the in-panel **Nodes** guide now explain that node
-  enrollment sends the node's access token to the panel over a verified,
-  key-pinned connection (so it can't be intercepted), and note to generate a fresh
-  "Add a node" command if you rotate or change the panel's certificate.
+- **Manage a node from the main panel.** The **Nodes** page now has a **Manage**
+  button on every reachable node. It opens that node right there, so you can:
+  - **Users:** create, edit, enable/disable and delete users on the node (data
+    quota, expiry, device/IP limit), and see their usage.
+  - **Protocols:** list the node's inbounds, enable/disable or remove them, and add
+    a new one (including VLESS-Reality, which needs no domain, the node generates
+    its own keys).
 
-Everything else is unchanged from v1.9.1.
+  A managed node has no panel of its own, so this is how you run it: the main panel
+  drives it over the node's REST API using the access token created at enrollment.
+  No signing in to the node, no SSH.
+
+The read-only fleet users list is still there for an at-a-glance view across every
+node. Docs and the in-panel Nodes guide are updated.
 
 ## Install
 

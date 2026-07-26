@@ -172,6 +172,8 @@ The new server installs in **managed node** mode: it has no panel of its own (ju
 
 **If enrollment can't complete**, nothing is lost. If your main panel can't reach the new node back (usually because port 443 isn't open to the internet on it yet), the node appears on the **Nodes** page as **Pending** with the reason, and the attempt is written to the activity log. Open 443 on that server and press **Test**, or add it by hand. And a node that fails to register is never locked: it stays a normal standalone panel you can retry or manage, never a stranded box.
 
+**Managing a node's users and protocols from here.** On the **Nodes** page, click **Manage** on any reachable node to drive it without leaving the main panel: create and edit its users (quota, expiry, device limit), enable or disable them, and toggle, add or remove its protocols (inbounds). The main panel talks to the node over its REST API using the access token minted at enrollment, so a managed node with no panel of its own is still fully controllable from one place.
+
 **Removing or reclaiming a node.** On the **Nodes** page, click **Remove** to take a node out of the fleet. Tick **also uninstall Nova from that server** to have the node tear itself down completely (xray, panel, all data). To turn a managed node back into a normal standalone panel (for example if its main panel is gone), run `nova-unlock 'NewPassword'` on that server over SSH. `nova-uninstall` removes Nova from any server at any time.
 
 ---
