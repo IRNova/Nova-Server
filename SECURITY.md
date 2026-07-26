@@ -13,12 +13,31 @@ you can inspect, how downloads are verified, and how to report a problem.
 - The proxy cores it installs (xray-core, sing-box) come from their own published
   releases over HTTPS.
 
+## The agent is a closed, obfuscated build (on purpose)
+
+The node agent and panel are distributed as an **obfuscated build**
+(`nova-node-agent.tar.gz`); their source is not public. This is deliberate: the
+agent and panel are the product, and keeping them closed limits cloning and abuse
+of the network. We are not claiming the agent is open source, and you should not
+treat it as auditable line by line.
+
+What we make verifiable instead is **integrity** and **containment**:
+
+- **Integrity** — the build you install is exactly the one we published (see
+  below), not something swapped in transit.
+- **Containment** — the node runs entirely on your own machine, so you can watch
+  what it actually does: its processes, files, open ports, and outbound traffic.
+
+If line-by-line source review matters to you, Nova Proxy (the Cloudflare Worker)
+is fully open and unminified in [`IRNova/Nova-Proxy`](https://github.com/IRNova/Nova-Proxy);
+the node agent is not.
+
 ## Verifying the agent download
 
-The node agent is distributed as a built artifact, `nova-node-agent.tar.gz`, with
-a published [`SHA256SUMS`](SHA256SUMS) next to it. The installer verifies the
-downloaded agent against that checksum **before extracting** and aborts on a
-mismatch (fail-closed). You can check any copy yourself:
+The agent ships with a published [`SHA256SUMS`](SHA256SUMS) next to the tarball.
+The installer verifies the downloaded agent against that checksum **before
+extracting** and aborts on a mismatch (fail-closed). You can check any copy
+yourself:
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node-agent.tar.gz
