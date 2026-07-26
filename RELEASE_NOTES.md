@@ -1,21 +1,15 @@
-# Nova Server v1.9.1
+# Nova Server v1.9.2
 
-Hardening for fleet enrollment, on top of v1.9.0.
+Documentation only, no behavior change.
 
-## Security
+## Docs
 
-- **The enrollment to a self-signed panel is now pinned.** When your panel runs on
-  a bare IP (self-signed certificate), the "Add a node" command already opts into
-  an unverified connection so the node can reach the panel. It now also pins the
-  panel's exact public key, so even that connection rejects a man-in-the-middle
-  presenting a forged certificate. A panel with a real domain was already fully
-  verified; this closes the last gap for the no-domain case.
-- **Enrollment is race-safe.** A join token is bound to the first node address it
-  is used with; concurrent attempts are now re-checked under the lock, so a token
-  can never be raced into reaching more than the one node it was minted for.
+- The README, DEPLOY guide, and the in-panel **Nodes** guide now explain that node
+  enrollment sends the node's access token to the panel over a verified,
+  key-pinned connection (so it can't be intercepted), and note to generate a fresh
+  "Add a node" command if you rotate or change the panel's certificate.
 
-Everything from v1.9.0 (no-domain nodes auto-enroll, Pending-node visibility, safe
-token exchange) is included.
+Everything else is unchanged from v1.9.1.
 
 ## Install
 
