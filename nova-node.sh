@@ -338,6 +338,16 @@ exec node /opt/nova-node-agent/bin/reset-password.mjs "$@"
 NPW
 chmod +x /usr/local/bin/nova-passwd 2>/dev/null || true
 
+# Reclaim a managed (fleet) node back into a standalone panel:
+#   nova-unlock 'NewPassword'
+# Turns managed mode off and sets a fresh owner password, for a node whose parent
+# is gone or that never enrolled. Users and traffic are untouched.
+cat > /usr/local/bin/nova-unlock <<'NUL'
+#!/bin/bash
+exec node /opt/nova-node-agent/bin/unlock-node.mjs "$@"
+NUL
+chmod +x /usr/local/bin/nova-unlock 2>/dev/null || true
+
 # Shortcut to configure + enable the built-in Telegram control bot, e.g.
 #   nova-tgbot '123456789:AA...' '<admin-chat-id>'
 cat > /usr/local/bin/nova-tgbot <<'NTB'
@@ -368,8 +378,11 @@ curl -fsSL "$TARBALL_URL" -o "$tmp/agent.tar.gz" || die "Could not download the 
 # warn and continue, since that source was chosen deliberately; set
 # NOVA_REQUIRE_CHECKSUM=1 to make a missing checksum fatal too.
 SUMS_URL="${NOVA_TARBALL_SUMS_URL:-${TARBALL_URL%/*}/SHA256SUMS}"
-_expected="$(curl -fsSL "$SUMS_URL" 2>/dev/null | awk '$2 ~ /^\*?nova-node-agent\.tar\.gz$/ {print $1; exit}')"
-_got="$(sha256sum "$tmp/agent.tar.gz" 2>/dev/null | awk '{print $1}')"
+# `|| true`: under `set -euo pipefail` a failed SHA256SUMS fetch (missing file,
+# CDN hiccup) makes the pipe non-zero and would abort the whole install here. We
+# want the opposite: no checksum available just means "warn and continue" below.
+_expected="$(curl -fsSL "$SUMS_URL" 2>/dev/null | awk '$2 ~ /^\*?nova-node-agent\.tar\.gz$/ {print $1; exit}')" || true
+_got="$(sha256sum "$tmp/agent.tar.gz" 2>/dev/null | awk '{print $1}')" || true
 if [ -n "$_expected" ]; then
   [ "$_expected" = "$_got" ] || { rm -rf "$tmp"; die "Agent checksum mismatch (expected $_expected, got $_got). Refusing to install."; }
   ok "agent checksum verified"
@@ -537,8 +550,10 @@ fi
 SUBTOKEN="$(curl -fsS -b "$CJ" "$B/admin/network-settings.json" -H "$UA" 2>/dev/null | grep -oE '"subToken":"[a-f0-9]+"' | cut -d'"' -f4 || true)"
 
 # ---- managed-node enrollment -------------------------------------------------
-# Create a local API token, register with the main panel, then lock this node
-# (nodeMode = stub page + no sign-in). The parent drives it over that API token.
+# Mint a local API token, wait until this node actually answers on :443, then
+# register with the main panel. Only lock the node into managed mode (stub page +
+# no sign-in) if enrollment SUCCEEDS. A failed enrollment leaves a normal
+# standalone panel, so the box is never stranded and can be retried or removed.
 ENROLLED=0
 if [ "$NODE_MODE" = 1 ]; then
   say "Registering this node with ${NOVA_JOIN_URL}"
@@ -549,39 +564,64 @@ if [ "$NODE_MODE" = 1 ]; then
   if [ -z "$NODE_TOKEN" ]; then
     warn "Could not create an API token; this node was NOT registered. It still runs as a standalone panel."
   else
+    # Wait until this node answers its own public API on :443 before asking the
+    # parent to reach back. xray may still be reloading right after the config
+    # changes above, and enrolling into that window is the usual cause of a
+    # spurious "address unreachable". Up to ~30s.
+    say "Waiting for this node's API on :443..."
+    for _i in $(seq 1 15); do
+      curl -fsS -k -m 5 -H "Authorization: Bearer $NODE_TOKEN" "$NODE_URL/api/v1/health" 2>/dev/null | grep -q '"ok":true' && break
+      sleep 2
+    done
     NNAME="$(hostname -s 2>/dev/null || echo node)"
     EBODY="{\"token\":\"$NOVA_JOIN_TOKEN\",\"url\":\"$NODE_URL\",\"apiToken\":\"$NODE_TOKEN\",\"name\":\"$NNAME\",\"insecure\":$INSECURE}"
     # The parent may itself be on a self-signed cert, so allow an insecure TLS
-    # handshake for this one enrollment call (-k).
-    ERESP="$(curl -fsS -k -X POST "${NOVA_JOIN_URL%/}/nodes/enroll" -H 'Content-Type: application/json' -d "$EBODY" 2>/dev/null || true)"
-    case "$ERESP" in
-      *'"ok":true'*) ENROLLED=1; ok "node registered with the main panel" ;;
-      *) warn "The main panel did not accept the enrollment (token expired or address unreachable). Response: ${ERESP:-none}" ;;
-    esac
+    # handshake for this one enrollment call (-k). Retry a few times.
+    for _i in 1 2 3; do
+      ERESP="$(curl -fsS -k -m 15 -X POST "${NOVA_JOIN_URL%/}/nodes/enroll" -H 'Content-Type: application/json' -d "$EBODY" 2>/dev/null || true)"
+      case "$ERESP" in *'"ok":true'*) ENROLLED=1; break ;; esac
+      sleep 3
+    done
+    if [ "$ENROLLED" = 1 ]; then
+      ok "node registered with the main panel"
+    else
+      warn "The main panel did not accept the enrollment. Response: ${ERESP:-none}"
+    fi
   fi
-  # Lock the node regardless: a managed node should never expose a sign-in, even
-  # if enrollment needs a retry from the parent side.
-  curl -fsS -b "$CJ" -X POST "$B/admin/network-settings.json" -H "$UA" -H 'Content-Type: application/json' \
-    -d '{"nodeMode":true}' >/dev/null 2>&1 || true
-  rm -f "$CJ"
-  # Clear the temporary admin password (nodeMode already blocks sign-in; this
-  # removes the credential entirely).
-  NOVA_DB="$DB_DIR/nova.db" node -e 'import("/opt/nova-node-agent/src/kv/sqlite.mjs").then(async m=>{const kv=m.openKv(process.env.NOVA_DB);await kv.delete("admin_pass");}).catch(()=>{})' >/dev/null 2>&1 || true
-  sleep 2
-  echo
-  printf '%s\n' "${c_grn}${c_bld}Nova managed node is ready.${c_rst}"
-  echo
-  printf '  %-16s %s\n' "Node address:" "$NODE_URL"
+
   if [ "$ENROLLED" = 1 ]; then
+    # Enrolled: lock the node (no sign-in of its own) and clear the temp password;
+    # the parent drives it over the API token from here on.
+    curl -fsS -b "$CJ" -X POST "$B/admin/network-settings.json" -H "$UA" -H 'Content-Type: application/json' \
+      -d '{"nodeMode":true}' >/dev/null 2>&1 || true
+    NOVA_DB="$DB_DIR/nova.db" node -e 'import("/opt/nova-node-agent/src/kv/sqlite.mjs").then(async m=>{const kv=m.openKv(process.env.NOVA_DB);await kv.delete("admin_pass");}).catch(()=>{})' >/dev/null 2>&1 || true
+    rm -f "$CJ"
+    sleep 2
+    echo
+    printf '%s\n' "${c_grn}${c_bld}Nova managed node is ready.${c_rst}"
+    echo
+    printf '  %-16s %s\n' "Node address:" "$NODE_URL"
     printf '  %-16s %s\n' "Registered to:" "$NOVA_JOIN_URL"
-    printf '  %s\n' "Manage this node from that panel's Nodes page. It has no panel of its own."
+    printf '  %s\n' "Manage it from that panel's Nodes page. It has no panel of its own."
+    printf '  %s\n' "Remove it from that Nodes page (\"Remove\" can also uninstall it), or run ${c_bld}nova-uninstall${c_rst} here."
+    echo
+    exit 0
   else
-    printf '  %s\n' "${c_yel}Not yet registered.${c_rst} In the main panel, add the node manually:"
-    printf '  %s\n' "  URL: $NODE_URL   (mark \"no domain\" if it shows a self-signed cert)"
-    printf '  %s\n' "  API token: shown once above was not captured; re-run \"Add node\" for a new one-liner."
+    # NOT enrolled: leave a normal standalone panel so the box is never stranded.
+    rm -f "$CJ"
+    sleep 2
+    echo
+    printf '%s\n' "${c_yel}${c_bld}Node installed, but NOT registered with the main panel.${c_rst}"
+    echo
+    printf '  %s\n' "It is running as a normal standalone panel, nothing is locked."
+    printf '  %-16s %s\n' "Node address:" "$NODE_URL"
+    printf '  %s\n' "Retry: generate a fresh \"Add a node\" command in the main panel and re-run it."
+    printf '  %s\n' "Add by hand there: URL ${c_bld}$NODE_URL${c_rst}, tick \"this node has no domain\", paste an API token from Settings > API."
+    printf '  %s\n' "Set a password to sign in here:  ${c_bld}nova-passwd 'NewPassword'${c_rst}"
+    printf '  %s\n' "Remove Nova from this server:     ${c_bld}nova-uninstall${c_rst}"
+    echo
+    exit 0
   fi
-  echo
-  exit 0
 fi
 
 # ---- panel access (stealth path + extra port) --------------------------------
