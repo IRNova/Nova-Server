@@ -168,7 +168,9 @@ You no longer need a full panel on every server. Install the panel once on your 
 NOVA_JOIN_URL='https://your-panel' NOVA_JOIN_TOKEN='njt_...' bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
 ```
 
-The new server installs in **managed node** mode: it has no panel of its own (just a stub page, no sign-in), it registers itself with your main panel automatically, and from then on you control it entirely from the main panel (users, traffic, everything) over the node API. The join token is one-time and expires in 24 hours. If a node ever fails to register, it does **not** get locked: it stays a normal standalone panel so you can retry or manage it, never a stranded box.
+The new server installs in **managed node** mode: it has no panel of its own (just a stub page, no sign-in), it registers itself with your main panel automatically, and from then on you control it entirely from the main panel (users, traffic, everything) over the node API. The join token is one-time and expires in 24 hours. This works whether the node has a domain or runs on a bare IP with a self-signed certificate.
+
+**If enrollment can't complete**, nothing is lost. If your main panel can't reach the new node back (usually because port 443 isn't open to the internet on it yet), the node appears on the **Nodes** page as **Pending** with the reason, and the attempt is written to the activity log. Open 443 on that server and press **Test**, or add it by hand. And a node that fails to register is never locked: it stays a normal standalone panel you can retry or manage, never a stranded box.
 
 **Removing or reclaiming a node.** On the **Nodes** page, click **Remove** to take a node out of the fleet. Tick **also uninstall Nova from that server** to have the node tear itself down completely (xray, panel, all data). To turn a managed node back into a normal standalone panel (for example if its main panel is gone), run `nova-unlock 'NewPassword'` on that server over SSH. `nova-uninstall` removes Nova from any server at any time.
 

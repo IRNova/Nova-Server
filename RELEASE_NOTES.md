@@ -1,35 +1,31 @@
-# Nova Server v1.8.0
+# Nova Server v1.9.0
 
-Node lifecycle: enrollment that never strands a box, plus clean ways to remove or
-reclaim a node.
+Fleet enrollment that actually works for no-domain nodes, and visibility when it
+doesn't.
 
 ## Fixed
 
-- **A failed managed-node enrollment no longer strands the server.** If a node
-  could not register with its main panel, the installer used to lock it into
-  managed mode anyway (no sign-in, password cleared), leaving an orphaned box you
-  could neither manage nor easily remove. Now the node only locks when enrollment
-  succeeds; a failed enrollment leaves a normal standalone panel with clear next
-  steps.
-- **Enrollment race fixed.** The installer now waits for the node's own API on
-  :443 to answer and retries enrollment, instead of calling back during the brief
-  xray reload right after setup (the usual cause of a spurious "address
-  unreachable").
-- **Manual add-node is clearer.** Adding a self-signed (no-domain) node without
-  ticking "this node has no domain" now says exactly that, instead of a generic
-  "unreachable".
-- **Installer no longer aborts on a missing checksum.** A transient failure to
-  fetch `SHA256SUMS` now warns and continues, as intended, rather than silently
-  stopping the install.
+- **No-domain (self-signed) nodes could never auto-enroll.** The parent panel
+  reached child nodes through an import that isn't available at runtime, so every
+  attempt to verify a self-signed node failed with "could not reach the node
+  back", and the node fell back to standalone. This was the real reason
+  one-command enrollment kept failing on bare-IP servers. The parent now reaches
+  nodes with the built-in HTTPS client, so **running the "Add a node" command on a
+  fresh server registers it automatically**, no manual step, domain or not.
 
 ## Added
 
-- **Remove a node with an optional full uninstall.** On the Nodes page, "Remove"
-  can now also tell the node to tear itself down completely (xray, panel, all
-  data). It stays best-effort: an unreachable node is still removed from the fleet.
-- **`nova-unlock`** reclaims a managed node back into a standalone panel:
-  `nova-unlock 'NewPassword'` on the server turns managed mode off and sets a new
-  owner password. Users and traffic are untouched.
+- **Failed enrollments are visible on the panel.** When a node runs the join
+  command but the panel can't reach it back (for example port 443 isn't open yet),
+  it now shows up on the Nodes page as **Pending** with the reason and how to fix
+  it, and the attempt is written to the activity log. Open 443 and press **Test**,
+  or add it by hand, no more silent failures the owner never sees.
+- **The enrollment sends the node's API token over a verified TLS connection** to a
+  panel that has a real certificate, falling back to an unverified connection only
+  for a self-signed panel (with a clear warning). Keeps the token safe in transit.
+- **Clearer install output** when enrollment fails: the real HTTP status and a
+  targeted hint (expired token, panel unreachable, node unreachable, rate-limited)
+  instead of a blank "Response: none".
 
 ## Install
 

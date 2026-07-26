@@ -53,8 +53,9 @@ nova-passwd 'YourNewPassword' --clear-2fa
 
 ## Managed nodes: remove or reclaim
 
-A node added to a fleet with the one-command install runs in managed mode (no panel of its own). To manage its lifecycle:
+A node added to a fleet with the one-command install runs in managed mode (no panel of its own). It self-registers automatically whether it has a domain or runs on a bare IP with a self-signed certificate. To manage its lifecycle:
 
+- **Enrollment that can't complete shows up, it isn't lost.** If the main panel can't reach the new node back (usually because port 443 isn't open to the internet on it yet), the node appears on the **Nodes** page as **Pending** with the reason, and the attempt is logged. Open 443 on that server and press **Test**, or add the node by hand.
 - **Remove a node from the fleet.** On the main panel's **Nodes** page, click **Remove**. Tick **also uninstall Nova from that server** to have the node tear itself down completely; otherwise it is only detached from the fleet.
 - **Reclaim a managed node** as a normal standalone panel (for example if its main panel is gone, or it never finished registering). On that server, over SSH:
 

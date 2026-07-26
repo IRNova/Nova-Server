@@ -575,15 +575,27 @@ if [ "$NODE_MODE" = 1 ]; then
     done
     NNAME="$(hostname -s 2>/dev/null || echo node)"
     EBODY="{\"token\":\"$NOVA_JOIN_TOKEN\",\"url\":\"$NODE_URL\",\"apiToken\":\"$NODE_TOKEN\",\"name\":\"$NNAME\",\"insecure\":$INSECURE}"
-    # The parent may itself be on a self-signed cert, so allow an insecure TLS
-    # handshake for this one enrollment call (-k). Retry a few times. We capture
-    # the HTTP status and body (no `-f`, which would hide both) so a failure says
-    # WHY instead of a blank "Response: none".
+    # This POST carries the node's API token to the main panel, so prefer a
+    # VERIFIED TLS connection (no -k) to keep the token safe from a man-in-the-
+    # middle. Only if the panel itself uses a self-signed cert (the secure handshake
+    # fails, so nothing leaked) do we retry with -k and say so. We capture the HTTP
+    # status + body (no `-f`, which would hide both) so a failure says WHY.
+    ETLS=""   # secure by default; becomes "-k" only for a self-signed panel
     etmp="$(mktemp)"
     for _i in 1 2 3; do
-      EHTTP="$(curl -sS -k -m 15 -o "$etmp" -w '%{http_code}' -X POST "${NOVA_JOIN_URL%/}/nodes/enroll" -H 'Content-Type: application/json' -d "$EBODY" 2>/dev/null || true)"
+      EHTTP="$(curl -sS $ETLS -m 15 -o "$etmp" -w '%{http_code}' -X POST "${NOVA_JOIN_URL%/}/nodes/enroll" -H 'Content-Type: application/json' -d "$EBODY" 2>/dev/null || true)"
       ERESP="$(cat "$etmp" 2>/dev/null)"
       case "$ERESP" in *'"ok":true'*) ENROLLED=1; break ;; esac
+      # We only ever drop TLS verification when the OWNER explicitly opted in via
+      # NOVA_JOIN_INSECURE=1 (the panel adds it to the one-liner only when the panel
+      # itself is self-signed). We do NOT infer "self-signed" from a failed
+      # handshake: a 000 can equally be a man-in-the-middle forging a cert, and
+      # downgrading then would hand the node's API token to the attacker. So by
+      # default this fails closed: a domain (valid-cert) panel is always verified.
+      if [ -z "$ETLS" ] && [ "${EHTTP:-000}" = "000" ] && [ "${NOVA_JOIN_INSECURE:-0}" = "1" ] \
+         && printf '%s' "$NOVA_JOIN_URL" | grep -qiE '^https:'; then
+        ETLS="-k"; warn "NOVA_JOIN_INSECURE=1: the panel is self-signed, sending enrollment over an unverified TLS connection."
+      fi
       sleep 3
     done
     rm -f "$etmp"
