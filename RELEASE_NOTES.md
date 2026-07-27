@@ -1,23 +1,35 @@
-# Nova Server v1.10.0
+# Nova Server v1.11.0
 
-Central fleet management: run your nodes' users and protocols from the main panel.
+One panel, many servers. Create everything on the main panel and place it on your nodes; each node just serves the traffic.
 
 ## Added
 
-- **Manage a node from the main panel.** The **Nodes** page now has a **Manage**
-  button on every reachable node. It opens that node right there, so you can:
-  - **Users:** create, edit, enable/disable and delete users on the node (data
-    quota, expiry, device/IP limit), and see their usage.
-  - **Protocols:** list the node's inbounds, enable/disable or remove them, and add
-    a new one (including VLESS-Reality, which needs no domain, the node generates
-    its own keys).
+- **Central fleet, done right.** You manage everything from the main panel. Create
+  users on the **Users** page and protocols on the **Inbounds** page as usual. A
+  node is a full Nova server that only serves traffic, it has no users or inbounds
+  of its own to manage, and no panel to sign in to.
+- **Place a protocol on a node.** Adding an inbound now has a **Run on** choice:
+  this main server, one node, or **all nodes**. The panel pushes that protocol and
+  the users who should have it to the chosen node(s), and each user's subscription
+  config uses **that node's address**, so they connect through it.
+- **Choose each user's nodes.** On the **Users** page you pick which nodes a user
+  gets: tick specific nodes under **Nodes for this user**, or turn on **Access all
+  nodes** to include every node in their subscription (one config per location).
+- **Nodes keep working on their own.** Config is pushed to each node, so a node
+  keeps serving traffic even when the main panel is offline. Node management stays
+  add / remove only.
 
-  A managed node has no panel of its own, so this is how you run it: the main panel
-  drives it over the node's REST API using the access token created at enrollment.
-  No signing in to the node, no SSH.
+## Changed
 
-The read-only fleet users list is still there for an at-a-glance view across every
-node. Docs and the in-panel Nodes guide are updated.
+- The v1.10.0 "Manage a node" screen is retired. Users and protocols are always
+  created centrally now, never on a node, which is simpler and safer.
+- Docs and the in-panel **Nodes** guide (English, Farsi, Russian) are rewritten to
+  the central model.
+
+## Fixed
+
+- A node-placed inbound whose node has been removed (or an empty fleet) no longer
+  falls back to the main server's address in a subscription, it is left out.
 
 ## Install
 
