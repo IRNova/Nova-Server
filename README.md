@@ -78,7 +78,8 @@ nova-passwd 'YourNewPassword' --clear-2fa
 - **Automation**: nightly backups (to disk and Telegram), proactive alerts, opt-in auto-update, and clean-IP refresh
 - **Preview-first user migration** from Marzban, Marzneshin, 3x-ui/x-ui, s-ui, Hiddify, Remnawave, and Nova JSON exports; Nova also provides portable JSON and CSV exports
 - **Diagnostics**: a config/port health check that verifies each config is actually listening and reachable, plus a firewall and reserved-ports view with one-click fixes, so a dead config is caught before a user pastes it into their app
-- **Health check** and one-click self-update
+- **Health check**, one-click self-update, and a **factory reset** (wipe back to a clean install, keeping your admin login)
+- **In-panel log viewer**: read the last lines of the agent, Xray, or sing-box journal from the panel, no SSH needed
 - Backup and restore, per-ISP client auto-tuning, and an in-panel manual in three languages
 
 ---
