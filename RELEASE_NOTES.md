@@ -1,26 +1,20 @@
-# Nova Server v1.13.3
+# Nova Server v1.13.4
 
-Fixes "apply tunnel to all user links" so client subscriptions actually move to
-the Iran bridge, and stops rerouting inbounds the bridge does not carry.
+Documents the corrected Iran-bridge behavior from 1.13.3 in the in-panel guide and
+the README.
 
-## Fixed
+## Changed
 
-- **Clash and sing-box subscriptions now follow the bridge.** The Clash / sing-box
-  renderer ignored the published bridge address, so users on v2rayNG, mihomo,
-  sing-box and Streisand kept getting links pointed at the foreign exit even after
-  "apply tunnel to all user links". It now reroutes the front proxy to the bridge
-  IP while keeping the real SNI and Host, exactly like the plain (base64) list.
-- **Only forwarded ports are rerouted.** A link is pointed at the bridge only for a
-  port the tunnel actually forwards (443 and 8443/udp by default). An inbound on a
-  port the bridge does not carry now stays on the real host instead of being pointed
-  at a bridge port with nothing listening, which is why "changed inbounds did not
-  work". Add a port to the tunnel's Forwards list to carry that inbound too.
+- The tunnel guide and the Forwards / "apply to all links" hints now explain, in all
+  three languages, that pointing client links at the bridge applies across every app
+  format (raw, Clash, sing-box), and that only the ports you forward travel through
+  the bridge. To route another inbound through Iran, add its port to Forwards.
+- README (English and Persian) Iran-bridge section updated with the same two points.
 
 ## Notes
 
-- No config change is needed: re-open the panel, and both link formats are correct
-  on the next subscription refresh. Disabling the tunnel still reverts every link.
+- No behavior change from 1.13.3: this release only updates the guide and docs.
 - Nova Server ships as an obfuscated build by design; Nova Proxy and the verified
   tools stay open.
-- The Iran bridge is domain-oriented and needs an Iran VPS with a direct public IP
-  (not behind NAT) to reliably carry traffic.
+- The Iran bridge needs an Iran VPS with a direct public IP (not behind NAT) to
+  reliably carry traffic.

@@ -62,6 +62,8 @@ nova-passwd 'YourNewPassword' --clear-2fa
 - Front your foreign exit with a clean-IP server inside Iran
 - Selectable backends: **Backhaul** and **BackPack** (recommended), **rathole**, **wstunnel**
 - Carries TCP and UDP, so Hysteria2 keeps working through the tunnel
+- **One-click "point all client links at the bridge"**, applied across every app format (raw, Clash, sing-box) so every client type follows the bridge
+- Only the ports you forward travel through the bridge (443 and 8443/udp by default); a link on any other inbound stays direct, so add an inbound's port to Forwards to route it through Iran too
 - Step-by-step setup wizard right in the panel
 
 ### Domain and free SSL
