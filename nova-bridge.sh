@@ -50,6 +50,7 @@ case "${1:-}" in -h|--help|"") usage; exit 0;; esac
 [ "$(id -u)" = 0 ] || die "Please run as root (sudo)."
 
 BACKEND=""; EXEC_B64=""; CONFIG_B64=""; CONFIG_PATH=""; WANT_CERT=0; PORT=""
+FORWARDS=""; REPORT_URL=""; REPORT_TOKEN=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --backend)     BACKEND="$2"; shift 2;;
@@ -58,6 +59,13 @@ while [ $# -gt 0 ]; do
     --config-path) CONFIG_PATH="$2"; shift 2;;
     --cert)        WANT_CERT=1; shift;;
     --port)        PORT="$2"; shift 2;;
+    # Ports this bridge forwards to end-users, e.g. "443,8443/udp". Used to open
+    # the firewall for exactly what the tunnel carries.
+    --forwards)    FORWARDS="$2"; shift 2;;
+    # Optional phone-home: after the bridge is up, tell the foreign exit this
+    # server's IP so the panel auto-fills the bridge address. Token-gated.
+    --report-url)  REPORT_URL="$2"; shift 2;;
+    --report-token) REPORT_TOKEN="$2"; shift 2;;
     *) die "unknown argument: $1";;
   esac
 done
@@ -161,8 +169,92 @@ LimitNOFILE=1048576
 WantedBy=multi-user.target
 UNITEOF
 
+# ---- firewall: open exactly what the tunnel carries -------------------------
+# The tunnel control port (TCP) plus each forwarded port, protocol-aware. Opened
+# before the service starts so the very first client can connect.
+fw_specs() {
+  [ -n "$PORT" ] && printf '%s\n' "$PORT/tcp"
+  local f num
+  IFS=',' read -ra _fw <<< "${FORWARDS:-443,8443/udp}"
+  for f in "${_fw[@]}"; do
+    f="$(printf '%s' "$f" | tr -d '[:space:]')"; [ -n "$f" ] || continue
+    num="${f%%/*}"
+    case "$f" in *['/']udp) printf '%s\n' "$num/udp";; *) printf '%s\n' "$num/tcp";; esac
+  done
+}
+open_firewall() {
+  local specs; specs="$(fw_specs | sort -u)"
+  [ -n "$specs" ] || return 0
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi active; then
+    while read -r s; do [ -n "$s" ] && ufw allow "$s" >/dev/null 2>&1 || true; done <<< "$specs"
+    ok "Opened firewall (ufw): $(echo $specs)"
+  elif command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+    while read -r s; do [ -n "$s" ] && firewall-cmd --permanent --add-port="$s" >/dev/null 2>&1 || true; done <<< "$specs"
+    firewall-cmd --reload >/dev/null 2>&1 || true
+    ok "Opened firewall (firewalld): $(echo $specs)"
+  elif command -v iptables >/dev/null 2>&1; then
+    while read -r s; do
+      [ -n "$s" ] || continue
+      local n="${s%/*}" p="${s#*/}"
+      iptables -C INPUT -p "$p" --dport "$n" -j ACCEPT 2>/dev/null || iptables -I INPUT -p "$p" --dport "$n" -j ACCEPT 2>/dev/null || true
+    done <<< "$specs"
+    ok "Opened firewall (iptables): $(echo $specs)"
+  else
+    warn "No firewall manager found. If these ports are filtered, open them: $(echo $specs)"
+  fi
+}
+
+# ---- diagnose a failed start -------------------------------------------------
+diagnose_failure() {
+  printf '%s\n' "${c_red}${c_bld}The tunnel did not start.${c_rst}"
+  local logs badport holder
+  logs="$(journalctl -u ${UNIT} -n 25 --no-pager 2>/dev/null || true)"
+  if printf '%s' "$logs" | grep -qi 'address already in use'; then
+    badport="$(printf '%s' "$logs" | grep -i 'address already in use' | grep -oE ':[0-9]+' | tr -d ':' | head -1)"
+    printf '  %s\n' "Reason: port ${badport:-(the tunnel port)} on THIS server is already used by"
+    printf '  %s\n' "another program, so the tunnel could not bind it."
+    if [ -n "$badport" ] && command -v ss >/dev/null 2>&1; then
+      holder="$(ss -tlnpH "sport = :${badport}" 2>/dev/null | grep -oE '"[^"]+"' | head -1 | tr -d '"')"
+      [ -n "$holder" ] && printf '  %s\n' "Currently held by: ${holder}"
+    fi
+    printf '%s\n' "  ${c_bld}Fix:${c_rst} on your FOREIGN panel, change the tunnel port to a free one and"
+    printf '  %s\n' "regenerate this command. The tunnel port must differ from 443 and 8443."
+  else
+    printf '  %s\n' "Last log lines:"
+    printf '%s\n' "$logs" | tail -8 | sed 's/^/    /'
+    printf '  %s\n' "Full log:  journalctl -u ${UNIT} -n 40 --no-pager"
+  fi
+}
+
+# ---- best-effort phone-home --------------------------------------------------
+# Tell the foreign exit this server's IP so the panel auto-fills the bridge
+# address. Iran->foreign can be throttled, so keep it short and never fail the
+# install if it does not get through; the manual bridge-address entry still works.
+phone_home() {
+  [ -n "$REPORT_URL" ] && [ -n "$REPORT_TOKEN" ] || return 0
+  # The exit sees only 127.0.0.1 for requests through its front, so this server
+  # detects and reports its own public IP. Try a few echo services (some may be
+  # filtered from Iran); give up quietly if none answer.
+  local ip
+  ip="$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null \
+        || curl -fsS --max-time 5 https://ifconfig.me 2>/dev/null \
+        || curl -fsS --max-time 5 https://icanhazip.com 2>/dev/null)"
+  ip="$(printf '%s' "$ip" | tr -d '[:space:]')"
+  if [ -z "$ip" ]; then
+    warn "Could not detect this server's public IP to auto-report; set the Bridge address by hand: this-server-ip:${PORT}"
+    return 0
+  fi
+  if curl -fsS --max-time 8 -X POST "$REPORT_URL" -H 'content-type: application/json' \
+       -d "{\"token\":\"${REPORT_TOKEN}\",\"ip\":\"${ip}\",\"port\":\"${PORT}\"}" >/dev/null 2>&1; then
+    ok "Reported this server (${ip}:${PORT}) to the foreign panel; bridge address auto-filled."
+  else
+    warn "Could not reach the panel to auto-report; set the Bridge address by hand: ${ip}:${PORT}"
+  fi
+}
+
 systemctl daemon-reload
 systemctl enable ${UNIT} >/dev/null 2>&1 || true
+open_firewall
 systemctl restart ${UNIT} || die "Could not start the tunnel."
 sleep 2
 
@@ -170,9 +262,9 @@ sleep 2
 echo
 if systemctl is-active --quiet ${UNIT}; then
   printf '%s\n' "${c_grn}${c_bld}Nova bridge is up.${c_rst}"
+  phone_home
 else
-  printf '%s\n' "${c_yel}${c_bld}Bridge installed, but the service is not active yet.${c_rst}"
-  printf '  %s\n' "Check it with:  journalctl -u ${UNIT} -n 40 --no-pager"
+  diagnose_failure
 fi
 echo
 printf '  %-14s %s\n' "Backend:" "$BACKEND"

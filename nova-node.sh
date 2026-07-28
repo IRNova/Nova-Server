@@ -105,6 +105,22 @@ if [ -n "${NOVA_PANEL_PORT:-}" ] && ! printf '%s' "$NOVA_PANEL_PORT" | grep -qE 
   NOVA_PANEL_PORT=""
 fi
 
+# Front port: Nova's panel + proxy front normally binds :443. If :443 is already
+# taken by another service on this box, offer an alternate so the WHOLE front (and
+# every generated panel/subscription link) uses that port instead. Only relevant
+# for a full panel install; a managed node keeps :443.
+FRONT_PORT="${NOVA_FRONT_PORT:-443}"
+if [ "$NODE_MODE" = 0 ] && [ "$FRONT_PORT" = 443 ] && command -v ss >/dev/null 2>&1; then
+  if ss -tlnH "sport = :443" 2>/dev/null | grep -q . && ! ss -tlnpH "sport = :443" 2>/dev/null | grep -qi xray; then
+    ask ":443 is already used by another service on this server. Enter an alternate HTTPS port for the Nova panel + proxy (e.g. 4430) so the whole front and its links use it. [Enter = keep 443]"
+    ALT="$(printf '%s' "$REPLY" | tr -d '[:space:]')"
+    if printf '%s' "$ALT" | grep -qE '^[0-9]{1,5}$' && [ "$ALT" -ge 1 ] && [ "$ALT" -le 65535 ] && [ "$ALT" != 443 ]; then
+      FRONT_PORT="$ALT"
+      warn "Nova will serve its front on :$FRONT_PORT. Make sure that port is open to the internet."
+    fi
+  fi
+fi
+
 # ---- preflight ---------------------------------------------------------------
 say "Installing prerequisites"
 export DEBIAN_FRONTEND=noninteractive
@@ -338,16 +354,6 @@ exec node /opt/nova-node-agent/bin/reset-password.mjs "$@"
 NPW
 chmod +x /usr/local/bin/nova-passwd 2>/dev/null || true
 
-# Reclaim a managed (fleet) node back into a standalone panel:
-#   nova-unlock 'NewPassword'
-# Turns managed mode off and sets a fresh owner password, for a node whose parent
-# is gone or that never enrolled. Users and traffic are untouched.
-cat > /usr/local/bin/nova-unlock <<'NUL'
-#!/bin/bash
-exec node /opt/nova-node-agent/bin/unlock-node.mjs "$@"
-NUL
-chmod +x /usr/local/bin/nova-unlock 2>/dev/null || true
-
 # Shortcut to configure + enable the built-in Telegram control bot, e.g.
 #   nova-tgbot '123456789:AA...' '<admin-chat-id>'
 cat > /usr/local/bin/nova-tgbot <<'NTB'
@@ -372,24 +378,19 @@ mkdir -p "$AGENT_DIR" "$DB_DIR" "$CERT_DIR"
 mkdir -p /var/log/nova && chown nobody:nogroup /var/log/nova 2>/dev/null || true
 tmp="$(mktemp -d)"
 curl -fsSL "$TARBALL_URL" -o "$tmp/agent.tar.gz" || die "Could not download the agent."
-# Integrity check: verify the downloaded agent against the published SHA256SUMS
-# (same directory as the tarball) before extracting. A mismatch aborts the
-# install, fail-closed. If a custom NOVA_TARBALL_URL mirror ships no SHA256SUMS we
-# warn and continue, since that source was chosen deliberately; set
-# NOVA_REQUIRE_CHECKSUM=1 to make a missing checksum fatal too.
-SUMS_URL="${NOVA_TARBALL_SUMS_URL:-${TARBALL_URL%/*}/SHA256SUMS}"
-# `|| true`: under `set -euo pipefail` a failed SHA256SUMS fetch (missing file,
-# CDN hiccup) makes the pipe non-zero and would abort the whole install here. We
-# want the opposite: no checksum available just means "warn and continue" below.
-_expected="$(curl -fsSL "$SUMS_URL" 2>/dev/null | awk '$2 ~ /^\*?nova-node-agent\.tar\.gz$/ {print $1; exit}')" || true
-_got="$(sha256sum "$tmp/agent.tar.gz" 2>/dev/null | awk '{print $1}')" || true
-if [ -n "$_expected" ]; then
-  [ "$_expected" = "$_got" ] || { rm -rf "$tmp"; die "Agent checksum mismatch (expected $_expected, got $_got). Refusing to install."; }
-  ok "agent checksum verified"
-elif [ "${NOVA_REQUIRE_CHECKSUM:-0}" = "1" ]; then
-  rm -rf "$tmp"; die "Could not fetch agent checksum from $SUMS_URL and NOVA_REQUIRE_CHECKSUM=1 is set."
-else
-  warn "Could not fetch agent checksum from $SUMS_URL; continuing without verification."
+# Verify a release checksum when the publisher provides one. Operators may also
+# pin it explicitly with NOVA_TARBALL_SHA256 for an out-of-band trust anchor.
+expected="${NOVA_TARBALL_SHA256:-}"
+if [ -z "$expected" ] && curl -fsSL "${TARBALL_URL}.sha256" -o "$tmp/agent.sha256" 2>/dev/null; then
+  expected="$(awk 'NR==1 {print $1}' "$tmp/agent.sha256")"
+fi
+if [ -n "$expected" ]; then
+  case "$expected" in (*[!0-9A-Fa-f]*|"") die "Published agent checksum is invalid.";; esac
+  got="$(sha256sum "$tmp/agent.tar.gz" | awk '{print $1}')"
+  [ "$got" = "$expected" ] || die "Agent checksum verification failed."
+fi
+if tar -tzf "$tmp/agent.tar.gz" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+  die "Agent archive contains an unsafe path."
 fi
 # --warning=no-unknown-keyword: hide the harmless "Ignoring unknown extended
 # header keyword" lines GNU tar prints when a release tarball was built on macOS
@@ -429,6 +430,8 @@ NOVA_POLL_MS=30000
 NOVA_XRAY_API=127.0.0.1:10085
 NOVA_XRAY_BIN=$XRAY_BIN
 ENV
+# Custom front port (443 was taken): the agent fronts xray here and every link uses it.
+[ "${FRONT_PORT:-443}" != 443 ] && printf 'NOVA_FRONT_PORT=%s\n' "$FRONT_PORT" >> "$CERT_DIR/agent.env"
 
 NODE_BIN="$(command -v node)"
 cat > /etc/systemd/system/nova-agent.service <<UNIT
@@ -550,10 +553,8 @@ fi
 SUBTOKEN="$(curl -fsS -b "$CJ" "$B/admin/network-settings.json" -H "$UA" 2>/dev/null | grep -oE '"subToken":"[a-f0-9]+"' | cut -d'"' -f4 || true)"
 
 # ---- managed-node enrollment -------------------------------------------------
-# Mint a local API token, wait until this node actually answers on :443, then
-# register with the main panel. Only lock the node into managed mode (stub page +
-# no sign-in) if enrollment SUCCEEDS. A failed enrollment leaves a normal
-# standalone panel, so the box is never stranded and can be retried or removed.
+# Create a local API token, register with the main panel, then lock this node
+# (nodeMode = stub page + no sign-in). The parent drives it over that API token.
 ENROLLED=0
 if [ "$NODE_MODE" = 1 ]; then
   say "Registering this node with ${NOVA_JOIN_URL}"
@@ -564,92 +565,39 @@ if [ "$NODE_MODE" = 1 ]; then
   if [ -z "$NODE_TOKEN" ]; then
     warn "Could not create an API token; this node was NOT registered. It still runs as a standalone panel."
   else
-    # Wait until this node answers its own public API on :443 before asking the
-    # parent to reach back. xray may still be reloading right after the config
-    # changes above, and enrolling into that window is the usual cause of a
-    # spurious "address unreachable". Up to ~30s.
-    say "Waiting for this node's API on :443..."
-    for _i in $(seq 1 15); do
-      curl -fsS -k -m 5 -H "Authorization: Bearer $NODE_TOKEN" "$NODE_URL/api/v1/health" 2>/dev/null | grep -q '"ok":true' && break
-      sleep 2
-    done
     NNAME="$(hostname -s 2>/dev/null || echo node)"
     EBODY="{\"token\":\"$NOVA_JOIN_TOKEN\",\"url\":\"$NODE_URL\",\"apiToken\":\"$NODE_TOKEN\",\"name\":\"$NNAME\",\"insecure\":$INSECURE}"
-    # This POST carries the node's API token to the main panel, so prefer a
-    # VERIFIED TLS connection (no -k) to keep the token safe from a man-in-the-
-    # middle. Only if the panel itself uses a self-signed cert (the secure handshake
-    # fails, so nothing leaked) do we retry with -k and say so. We capture the HTTP
-    # status + body (no `-f`, which would hide both) so a failure says WHY.
-    ETLS=""   # secure by default; becomes "-k" only for a self-signed panel
-    # If the panel is self-signed it also hands us a public-key pin, so even the -k
-    # connection rejects a MITM's forged cert (different key -> pin fails). curl
-    # enforces --pinnedpubkey even under -k.
-    EPIN=""
-    [ -n "${NOVA_JOIN_PIN:-}" ] && EPIN="--pinnedpubkey ${NOVA_JOIN_PIN}"
-    etmp="$(mktemp)"
-    for _i in 1 2 3; do
-      EHTTP="$(curl -sS $ETLS $EPIN -m 15 -o "$etmp" -w '%{http_code}' -X POST "${NOVA_JOIN_URL%/}/nodes/enroll" -H 'Content-Type: application/json' -d "$EBODY" 2>/dev/null || true)"
-      ERESP="$(cat "$etmp" 2>/dev/null)"
-      case "$ERESP" in *'"ok":true'*) ENROLLED=1; break ;; esac
-      # We only ever drop TLS verification when the OWNER explicitly opted in via
-      # NOVA_JOIN_INSECURE=1 (the panel adds it to the one-liner only when the panel
-      # itself is self-signed). We do NOT infer "self-signed" from a failed
-      # handshake: a 000 can equally be a man-in-the-middle forging a cert, and
-      # downgrading then would hand the node's API token to the attacker. So by
-      # default this fails closed: a domain (valid-cert) panel is always verified.
-      if [ -z "$ETLS" ] && [ "${EHTTP:-000}" = "000" ] && [ "${NOVA_JOIN_INSECURE:-0}" = "1" ] \
-         && printf '%s' "$NOVA_JOIN_URL" | grep -qiE '^https:'; then
-        ETLS="-k"; warn "NOVA_JOIN_INSECURE=1: the panel is self-signed, sending enrollment over an unverified TLS connection."
-      fi
-      sleep 3
-    done
-    rm -f "$etmp"
-    if [ "$ENROLLED" = 1 ]; then
-      ok "node registered with the main panel"
-    else
-      warn "The main panel did not accept the enrollment (HTTP ${EHTTP:-000}). Response: ${ERESP:-none}"
-      case "${EHTTP:-000}" in
-        401) warn "  -> the join token is invalid or expired (they last 24h). Generate a fresh \"Add a node\" command and re-run it." ;;
-        502) warn "  -> the main panel could not reach this node back at ${NODE_URL}. Make sure :443 is open to the internet here, then add the node by hand from the panel." ;;
-        000) warn "  -> could not reach the main panel at ${NOVA_JOIN_URL}. Check that address is correct and reachable from this server (DNS, firewall, or it may be down)." ;;
-        429) warn "  -> the main panel is rate-limiting enrollment. Wait a minute and re-run the command." ;;
-      esac
-    fi
+    # The parent may itself be on a self-signed cert, so allow an insecure TLS
+    # handshake for this one enrollment call (-k).
+    ERESP="$(curl -fsS -k -X POST "${NOVA_JOIN_URL%/}/nodes/enroll" -H 'Content-Type: application/json' -d "$EBODY" 2>/dev/null || true)"
+    case "$ERESP" in
+      *'"ok":true'*) ENROLLED=1; ok "node registered with the main panel" ;;
+      *) warn "The main panel did not accept the enrollment (token expired or address unreachable). Response: ${ERESP:-none}" ;;
+    esac
   fi
-
+  # Lock the node regardless: a managed node should never expose a sign-in, even
+  # if enrollment needs a retry from the parent side.
+  curl -fsS -b "$CJ" -X POST "$B/admin/network-settings.json" -H "$UA" -H 'Content-Type: application/json' \
+    -d '{"nodeMode":true}' >/dev/null 2>&1 || true
+  rm -f "$CJ"
+  # Clear the temporary admin password (nodeMode already blocks sign-in; this
+  # removes the credential entirely).
+  NOVA_DB="$DB_DIR/nova.db" node -e 'import("/opt/nova-node-agent/src/kv/sqlite.mjs").then(async m=>{const kv=m.openKv(process.env.NOVA_DB);await kv.delete("admin_pass");}).catch(()=>{})' >/dev/null 2>&1 || true
+  sleep 2
+  echo
+  printf '%s\n' "${c_grn}${c_bld}Nova managed node is ready.${c_rst}"
+  echo
+  printf '  %-16s %s\n' "Node address:" "$NODE_URL"
   if [ "$ENROLLED" = 1 ]; then
-    # Enrolled: lock the node (no sign-in of its own) and clear the temp password;
-    # the parent drives it over the API token from here on.
-    curl -fsS -b "$CJ" -X POST "$B/admin/network-settings.json" -H "$UA" -H 'Content-Type: application/json' \
-      -d '{"nodeMode":true}' >/dev/null 2>&1 || true
-    NOVA_DB="$DB_DIR/nova.db" node -e 'import("/opt/nova-node-agent/src/kv/sqlite.mjs").then(async m=>{const kv=m.openKv(process.env.NOVA_DB);await kv.delete("admin_pass");}).catch(()=>{})' >/dev/null 2>&1 || true
-    rm -f "$CJ"
-    sleep 2
-    echo
-    printf '%s\n' "${c_grn}${c_bld}Nova managed node is ready.${c_rst}"
-    echo
-    printf '  %-16s %s\n' "Node address:" "$NODE_URL"
     printf '  %-16s %s\n' "Registered to:" "$NOVA_JOIN_URL"
-    printf '  %s\n' "Manage it from that panel's Nodes page. It has no panel of its own."
-    printf '  %s\n' "Remove it from that Nodes page (\"Remove\" can also uninstall it), or run ${c_bld}nova-uninstall${c_rst} here."
-    echo
-    exit 0
+    printf '  %s\n' "Manage this node from that panel's Nodes page. It has no panel of its own."
   else
-    # NOT enrolled: leave a normal standalone panel so the box is never stranded.
-    rm -f "$CJ"
-    sleep 2
-    echo
-    printf '%s\n' "${c_yel}${c_bld}Node installed, but NOT registered with the main panel.${c_rst}"
-    echo
-    printf '  %s\n' "It is running as a normal standalone panel, nothing is locked."
-    printf '  %-16s %s\n' "Node address:" "$NODE_URL"
-    printf '  %s\n' "Retry: generate a fresh \"Add a node\" command in the main panel and re-run it."
-    printf '  %s\n' "Add by hand there: URL ${c_bld}$NODE_URL${c_rst}, tick \"this node has no domain\", paste an API token from Settings > API."
-    printf '  %s\n' "Set a password to sign in here:  ${c_bld}nova-passwd 'NewPassword'${c_rst}"
-    printf '  %s\n' "Remove Nova from this server:     ${c_bld}nova-uninstall${c_rst}"
-    echo
-    exit 0
+    printf '  %s\n' "${c_yel}Not yet registered.${c_rst} In the main panel, add the node manually:"
+    printf '  %s\n' "  URL: $NODE_URL   (mark \"no domain\" if it shows a self-signed cert)"
+    printf '  %s\n' "  API token: shown once above was not captured; re-run \"Add node\" for a new one-liner."
   fi
+  echo
+  exit 0
 fi
 
 # ---- panel access (stealth path + extra port) --------------------------------
@@ -706,8 +654,11 @@ ok "panel configured; xray $(systemctl is-active xray 2>/dev/null)"
 EFF="$(NOVA_DB="$DB_DIR/nova.db" node -e 'import("/opt/nova-node-agent/src/kv/sqlite.mjs").then(async m=>{const kv=m.openKv(process.env.NOVA_DB);try{const s=JSON.parse(await kv.get("network-settings.json")||"{}");const p=String(s.panelPath||"").replace(/^\/+|\/+$/g,"");const ok=/^[A-Za-z0-9_-]{3,64}$/.test(p)?p:"";const n=Math.floor(Number(s.panelPort||0));console.log(ok+"|"+((n>=1&&n<=65535)?n:0));}catch{console.log("|0")}kv.close&&kv.close();}).catch(()=>console.log("|0"))' 2>/dev/null || echo "|0")"
 EFF_PATH="${EFF%%|*}"
 EFF_PORT="${EFF##*|}"
-PANEL_URL="https://$HOST/"
-[ -n "$EFF_PATH" ] && PANEL_URL="https://$HOST/$EFF_PATH/"
+# Carry the custom front port into every printed link so they point where the
+# node actually serves (not the default 443 the box could not use).
+PORT_SFX=""; [ "${FRONT_PORT:-443}" != 443 ] && PORT_SFX=":$FRONT_PORT"
+PANEL_URL="https://$HOST$PORT_SFX/"
+[ -n "$EFF_PATH" ] && PANEL_URL="https://$HOST$PORT_SFX/$EFF_PATH/"
 echo
 printf '%s\n' "${c_grn}${c_bld}Nova node is ready.${c_rst}"
 echo
@@ -719,7 +670,7 @@ else
 fi
 printf '  %-16s %s\n' "Web panel:" "$PANEL_URL"
 [ -n "${EFF_PORT:-}" ] && [ "$EFF_PORT" != 0 ] && printf '  %-16s %s\n' "Panel port:" "https://$HOST:$EFF_PORT/${EFF_PATH:+$EFF_PATH/}"
-[ -n "${SUBTOKEN:-}" ] && printf '  %-16s %s\n' "Subscription:" "https://$HOST/sub?token=$SUBTOKEN"
+[ -n "${SUBTOKEN:-}" ] && printf '  %-16s %s\n' "Subscription:" "https://$HOST$PORT_SFX/sub?token=$SUBTOKEN"
 echo
 if [ -n "$EFF_PATH" ]; then
   printf '  %s\n' "${c_yel}${c_bld}Save the panel URL: the secret path is what hides your panel.${c_rst}"
