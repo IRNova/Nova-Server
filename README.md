@@ -31,6 +31,7 @@ bot with a Mini App, and two-factor auth.
 [![YouTube](https://img.shields.io/badge/▶️%20YouTube-@novaproxyir-ff0000?style=for-the-badge&logo=youtube)](https://www.youtube.com/@novaproxyir)
 [![X (Twitter)](https://img.shields.io/badge/𝕏%20X-@irNovaProxy-000000?style=for-the-badge&logo=x)](https://x.com/irNovaProxy)
 [![Instagram](https://img.shields.io/badge/📸%20Instagram-@irnova__proxy-E4405F?style=for-the-badge&logo=instagram)](https://www.instagram.com/irnova_proxy)
+[![Donate](https://img.shields.io/badge/💜%20Donate-donate.novaproxy.online-8b5cf6?style=for-the-badge)](https://donate.novaproxy.online)
 
 </div>
 
@@ -274,9 +275,5 @@ Crafted with care for a free and open internet.
 **Nova Server. All rights reserved.**
 
 <a href="https://star-history.com/#IRNova/Nova-Server&Date">Star history</a>
-
-<br>
-
-<a href="https://github.com/oil-oil/beautify-github-readme"><img src="./assets/readme/made-with-beautify.svg" width="260" alt="README made with beautify-github-readme"></a>
 
 </div>
