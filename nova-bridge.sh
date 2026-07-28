@@ -42,6 +42,11 @@ Flags (filled in by the panel command):
   --cert                                      (mint a self-signed TLS cert)
   --port <n>                                  (informational)
 
+Check first, without installing anything:
+  bash nova-bridge.sh --check [--forwards 443,8443/udp] [--port <control-port>]
+  Reports whether this server can be a bridge: a direct public IP (not NAT) and
+  the tunnel/forward ports free. Iran-reachable IP echoes only (no ifconfig.me).
+
 Remove the bridge later with:  systemctl disable --now nova-tunnel
 USAGE
 }
@@ -50,7 +55,7 @@ case "${1:-}" in -h|--help|"") usage; exit 0;; esac
 [ "$(id -u)" = 0 ] || die "Please run as root (sudo)."
 
 BACKEND=""; EXEC_B64=""; CONFIG_B64=""; CONFIG_PATH=""; WANT_CERT=0; PORT=""
-FORWARDS=""; REPORT_URL=""; REPORT_TOKEN=""
+FORWARDS=""; REPORT_URL=""; REPORT_TOKEN=""; CHECK_ONLY=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --backend)     BACKEND="$2"; shift 2;;
@@ -62,6 +67,9 @@ while [ $# -gt 0 ]; do
     # Ports this bridge forwards to end-users, e.g. "443,8443/udp". Used to open
     # the firewall for exactly what the tunnel carries.
     --forwards)    FORWARDS="$2"; shift 2;;
+    # Dry run: only check whether this server can be a bridge (NAT, free ports),
+    # print a verdict, and exit without installing anything.
+    --check)       CHECK_ONLY=1; shift;;
     # Optional phone-home: after the bridge is up, tell the foreign exit this
     # server's IP so the panel auto-fills the bridge address. Token-gated.
     --report-url)  REPORT_URL="$2"; shift 2;;
@@ -69,8 +77,10 @@ while [ $# -gt 0 ]; do
     *) die "unknown argument: $1";;
   esac
 done
-[ -n "$BACKEND" ] || die "missing --backend"
-[ -n "$EXEC_B64" ] || die "missing --exec-b64"
+if [ "$CHECK_ONLY" != 1 ]; then
+  [ -n "$BACKEND" ] || die "missing --backend"
+  [ -n "$EXEC_B64" ] || die "missing --exec-b64"
+fi
 
 CONF_DIR=/etc/nova/tunnel
 UNIT=nova-tunnel
@@ -80,7 +90,160 @@ say "Installing prerequisites"
 export DEBIAN_FRONTEND=noninteractive
 if command -v apt-get >/dev/null 2>&1; then
   apt-get update -y >/dev/null 2>&1 || true
-  apt-get install -y curl tar unzip ca-certificates openssl >/dev/null 2>&1 || true
+  apt-get install -y curl tar unzip ca-certificates openssl iproute2 >/dev/null 2>&1 || true
+fi
+
+# ---- capability check: can THIS box actually be a bridge? --------------------
+# Two things silently kill a bridge: (1) the box is behind NAT, so its public IP
+# is not bound here and inbound may never arrive (control connects but no data);
+# (2) a forwarded port (or the control port) is already in use, so the tunnel
+# server cannot bind it. Detect both and report a clear verdict. IP echoes are
+# Iran-reachable only: ifconfig.me is sanction-blocked from Iran (HTTP 403).
+CAP_NAT="unknown"; CAP_PUBIP=""; CAP_PORTS_FREE=1; CAP_PORTS_BUSY=""
+
+detect_public_ip() {
+  local u ip
+  for u in https://api.ipify.org https://icanhazip.com https://ipinfo.io/ip https://ident.me; do
+    ip="$(curl -fsS --max-time 6 "$u" 2>/dev/null | tr -d '[:space:]')"
+    if printf '%s' "$ip" | grep -qE '^([0-9]{1,3}\.){3}[0-9]{1,3}$|^[0-9a-fA-F:]+:[0-9a-fA-F:]+$'; then
+      printf '%s' "$ip"; return 0
+    fi
+  done
+  return 1
+}
+
+# Program holding a given proto/port, or empty if the port is free.
+port_holder() {
+  local proto="$1" port="$2" opt
+  command -v ss >/dev/null 2>&1 || return 0
+  [ "$proto" = udp ] && opt="lunp" || opt="ltnp"
+  ss -H -"$opt" "sport = :$port" 2>/dev/null | grep -oE 'users:\(\("[^"]+"' | grep -oE '"[^"]+"' | head -1 | tr -d '"'
+}
+
+bridge_check() {
+  local hardfail=0
+  say "Checking whether this server can be a bridge"
+
+  # 1) NAT vs direct public IP.
+  local pub locals
+  pub="$(detect_public_ip || true)"; CAP_PUBIP="$pub"
+  locals="$(ip -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1)"
+  if [ -z "$pub" ]; then
+    warn "Could not detect this server's public IP (IP echoes unreachable)."; CAP_NAT="unknown"
+  elif printf '%s\n' "$locals" | grep -qxF "$pub"; then
+    ok "Direct public IP: ${pub} is bound on this server (no NAT)."; CAP_NAT="direct"
+  else
+    CAP_NAT="nat"
+    warn "Public IP ${pub} is NOT bound on a local interface (this server is behind NAT)."
+    printf '  %s\n' "On most cloud VPS a 1:1 NAT still forwards inbound and the tunnel works."
+    printf '  %s\n' "But carrier-grade NAT (common on cheap Iran boxes) never accepts inbound: the"
+    printf '  %s\n' "control channel connects yet carries NO traffic. If so, use a VPS with a direct IP."
+  fi
+
+  # 2) The control port and every forwarded port must be free on this server.
+  local specs="" f num proto holder busy=""
+  [ -n "$PORT" ] && specs="tcp ${PORT}"$'\n'
+  IFS=',' read -ra _fw <<< "${FORWARDS:-443,8443/udp}"
+  for f in "${_fw[@]}"; do
+    f="$(printf '%s' "$f" | tr -d '[:space:]')"; [ -n "$f" ] || continue
+    num="${f%%/*}"; case "$f" in *[/]udp) proto=udp;; *) proto=tcp;; esac
+    specs+="${proto} ${num}"$'\n'
+  done
+  while read -r proto num; do
+    [ -n "$num" ] || continue
+    holder="$(port_holder "$proto" "$num" || true)"
+    if [ -n "$holder" ]; then
+      warn "Port ${num}/${proto} is already in use by: ${holder}"
+      busy="${busy}${num} "; hardfail=1
+    fi
+  done <<< "$specs"
+  if [ -n "$busy" ]; then
+    CAP_PORTS_FREE=0; CAP_PORTS_BUSY="$(printf '%s' "$busy" | sed 's/ $//' | tr ' ' ',')"
+    printf '  %s\n' "The tunnel forwards these ports, so they must be free here. Do NOT run a full"
+    printf '  %s\n' "Nova node (its own xray on 443) on the same box you use as a bridge."
+  else
+    ok "All tunnel ports are free on this server (control + forwards)."; CAP_PORTS_FREE=1
+  fi
+
+  return $hardfail
+}
+
+CAP_PORT_RESULTS=""; CAP_BEST_PORT=""
+# Port-viability sweep: ask the exit to open temp listeners on the candidate ports,
+# then probe them from HERE (the Iran side) to see which survive the international
+# link. Iran blocks/throttles some ports, so this finds a live control port before
+# one is committed. No-op without report creds (exit host + token). Dependency-free
+# on this box: probes use bash /dev/tcp, no nc/socat/python needed.
+port_sweep() {
+  [ -n "$REPORT_URL" ] && [ -n "$REPORT_TOKEN" ] || return 0
+  command -v curl >/dev/null 2>&1 || return 0
+  local base exit_host sweep_url pool resp opened
+  base="${REPORT_URL#http://}"; base="${base#https://}"; exit_host="${base%%/*}"; exit_host="${exit_host%%:*}"
+  sweep_url="${REPORT_URL%/api/tunnel/hello}/api/tunnel/sweep"
+  pool="2053,2083,2087,2096,2052,2082,2086,2095,8443,2091,443,8080"
+  say "Testing which ports survive to the exit (${exit_host})"
+  resp="$(curl -fsS --max-time 20 -X POST "$sweep_url" -H 'content-type: application/json' \
+          -d "{\"token\":\"${REPORT_TOKEN}\",\"ports\":[${pool}],\"seconds\":25}" 2>/dev/null || true)"
+  opened="$(printf '%s' "$resp" | grep -oE '"opened":\[[0-9,]*\]' | grep -oE '[0-9]+' | tr '\n' ' ')"
+  if [ -z "$opened" ]; then
+    warn "Port sweep skipped (exit unreachable, or it had no free candidate ports)."
+    return 0
+  fi
+  local tmp p; tmp="$(mktemp -d)"
+  for p in $opened; do
+    ( local t0 t1 rtt
+      t0="$(date +%s%3N 2>/dev/null || echo 0)"
+      if timeout 3 bash -c "exec 3<>/dev/tcp/${exit_host}/${p}" 2>/dev/null; then
+        t1="$(date +%s%3N 2>/dev/null || echo 0)"; rtt=$(( t1 - t0 )); [ "$rtt" -lt 0 ] && rtt=0
+        printf '%s 1 %s\n' "$p" "$rtt" > "$tmp/$p"
+      else
+        printf '%s 0 0\n' "$p" > "$tmp/$p"
+      fi ) &
+  done
+  wait
+  local results="" best="" bestrtt=999999 ok rtt
+  for p in $opened; do
+    [ -f "$tmp/$p" ] || continue
+    read -r p ok rtt < "$tmp/$p"
+    if [ "$ok" = 1 ]; then
+      ok "port ${p}: reachable (${rtt} ms)"
+      [ "$rtt" -lt "$bestrtt" ] && { bestrtt="$rtt"; best="$p"; }
+      results="${results}{\"port\":${p},\"ok\":true,\"rttMs\":${rtt}},"
+    else
+      warn "port ${p}: blocked or unreachable from Iran right now"
+      results="${results}{\"port\":${p},\"ok\":false,\"rttMs\":0},"
+    fi
+  done
+  rm -rf "$tmp"
+  CAP_PORT_RESULTS="[${results%,}]"; CAP_BEST_PORT="$best"
+  if [ -n "$best" ]; then
+    ok "Recommended tunnel control port: ${best} (${bestrtt} ms). Set this on the foreign panel."
+  else
+    warn "No candidate port reached the exit. Iran may be blocking them now; try again later or pick a port by hand."
+  fi
+}
+
+CHECK_HARDFAIL=0
+bridge_check || CHECK_HARDFAIL=1
+port_sweep
+if [ "$CHECK_ONLY" = 1 ]; then
+  echo
+  if [ "$CHECK_HARDFAIL" = 1 ]; then
+    printf '%s\n' "${c_red}${c_bld}This server is NOT ready to be a bridge.${c_rst} Fix the items above, then re-run."
+    exit 1
+  elif [ "$CAP_NAT" = nat ]; then
+    printf '%s\n' "${c_yel}${c_bld}This server may work but is behind NAT.${c_rst} See the note above; a direct-IP VPS is safer."
+    exit 0
+  else
+    printf '%s\n' "${c_grn}${c_bld}This server can be a bridge.${c_rst}"
+    [ -n "$CAP_BEST_PORT" ] && printf '%s\n' "Best control port right now: ${c_bld}${CAP_BEST_PORT}${c_rst}."
+    exit 0
+  fi
+fi
+# A real install: a port conflict guarantees the tunnel cannot bind, so stop now
+# with a clear reason instead of leaving a dead service behind.
+if [ "$CHECK_HARDFAIL" = 1 ]; then
+  die "A required tunnel port is already in use on this server (see above). Free it, or set a different tunnel port on the foreign panel and regenerate this command, then re-run."
 fi
 
 arch="$(uname -m)"
@@ -235,17 +398,20 @@ phone_home() {
   # The exit sees only 127.0.0.1 for requests through its front, so this server
   # detects and reports its own public IP. Try a few echo services (some may be
   # filtered from Iran); give up quietly if none answer.
-  local ip
-  ip="$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null \
-        || curl -fsS --max-time 5 https://ifconfig.me 2>/dev/null \
-        || curl -fsS --max-time 5 https://icanhazip.com 2>/dev/null)"
+  # Reuse the capability check's detection (Iran-reachable echoes; NO ifconfig.me,
+  # which is sanction-blocked from Iran and returns 403).
+  local ip="${CAP_PUBIP:-}"
+  [ -n "$ip" ] || ip="$(detect_public_ip || true)"
   ip="$(printf '%s' "$ip" | tr -d '[:space:]')"
   if [ -z "$ip" ]; then
     warn "Could not detect this server's public IP to auto-report; set the Bridge address by hand: this-server-ip:${PORT}"
     return 0
   fi
+  # Carry the capability report so the panel can show a bridge health card
+  # (direct-IP vs NAT, whether the forwarded ports were free at install time).
+  local caps="{\"nat\":\"${CAP_NAT}\",\"publicIp\":\"${CAP_PUBIP}\",\"portsFree\":${CAP_PORTS_FREE},\"portsBusy\":\"${CAP_PORTS_BUSY}\"}"
   if curl -fsS --max-time 8 -X POST "$REPORT_URL" -H 'content-type: application/json' \
-       -d "{\"token\":\"${REPORT_TOKEN}\",\"ip\":\"${ip}\",\"port\":\"${PORT}\"}" >/dev/null 2>&1; then
+       -d "{\"token\":\"${REPORT_TOKEN}\",\"ip\":\"${ip}\",\"port\":\"${PORT}\",\"caps\":${caps},\"portResults\":${CAP_PORT_RESULTS:-[]}}" >/dev/null 2>&1; then
     ok "Reported this server (${ip}:${PORT}) to the foreign panel; bridge address auto-filled."
   else
     warn "Could not reach the panel to auto-report; set the Bridge address by hand: ${ip}:${PORT}"

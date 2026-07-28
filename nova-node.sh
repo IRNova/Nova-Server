@@ -401,7 +401,8 @@ rm -rf "$tmp"
 ok "agent installed at $AGENT_DIR"
 
 # ---- host + TLS cert ---------------------------------------------------------
-PUBIP="$(curl -fsSL https://api.ipify.org 2>/dev/null || curl -fsSL https://ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
+# Iran-reachable IP echoes only: ifconfig.me is sanction-blocked from Iran (403).
+PUBIP="$(curl -fsSL --max-time 6 https://api.ipify.org 2>/dev/null || curl -fsSL --max-time 6 https://icanhazip.com 2>/dev/null || curl -fsSL --max-time 6 https://ipinfo.io/ip 2>/dev/null || hostname -I | awk '{print $1}')"
 # The node always comes up self-signed on its public IP. If NOVA_DOMAIN is set we
 # switch it to a trusted Let's Encrypt cert further down, once the agent is live
 # (same code path the app/panel "add a domain" button uses).

@@ -64,6 +64,7 @@ nova-passwd 'YourNewPassword' --clear-2fa
 - Carries TCP and UDP, so Hysteria2 keeps working through the tunnel
 - **One-click "point all client links at the bridge"**, applied across every app format (raw, Clash, sing-box) so every client type follows the bridge
 - Only the ports you forward travel through the bridge (443 and 8443/udp by default); a link on any other inbound stays direct, so add an inbound's port to Forwards to route it through Iran too
+- **Bridge readiness check** (`nova-bridge.sh --check`): confirms a direct public IP (not NAT) and free ports before installing, and a **port-viability sweep** finds a live control port when Iran blocks the default, all surfaced on a bridge health card in the panel
 - Step-by-step setup wizard right in the panel
 
 ### Domain and free SSL
