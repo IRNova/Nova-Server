@@ -1,22 +1,30 @@
-# Nova Server v1.18.0
+# Nova Server v1.19.0
 
-Hysteria2 ECH, plus port-hopping interval.
+A server-side recovery command, and per-config domains.
 
 ## Added
 
-- **ECH (Encrypted Client Hello) for Hysteria2.** Turn on ECH on a Hysteria2 inbound
-  and Nova hides the TLS server name inside the handshake, so a censor cannot see
-  which domain a client connects to. Nova generates the keypair on the node and
-  delivers the public config through the sing-box subscription (the plain link cannot
-  carry it, so ECH needs a sing-box or Hiddify client). Combine it with port hopping
-  and obfs for a strong anti-filtering setup.
-- **Hop interval.** A third box on the port-hopping field pins how often the client
-  rotates ports, in seconds.
-- Standalone Hysteria2 now also appears in the Clash and sing-box subscription
-  formats (with its port range, interval, and obfs), not just the raw link.
+- **`nova-access` recovery command.** When the panel is unreachable after a domain,
+  Cloudflare, or SSL change, recover it from the server over SSH without the web UI.
+  Run `nova-access` to print the current panel URL and TLS mode, or `nova-access --reset`
+  to revert to a self-signed no-domain node (everything falls back to the server IP).
+  It can also set or clear the stealth path (`--path`), the dedicated panel port
+  (`--port`), or point the panel at a new host (`--host`), then restarts the agent.
+- **Per-inbound public address.** A new optional field on any inbound puts that one
+  config on its own domain or subdomain: its subscription links dial that address
+  instead of the panel's main host, so different configs can live on different
+  subdomains. Point the DNS at the same server; the SNI stays the field above, so
+  set it too when a domain needs its own certificate. It bypasses the Iran-bridge
+  reroute, and it is carried across the raw, Clash, and sing-box formats.
+
+## Fixed
+
+- The Iran-bridge installer now always puts the bridge's public IP in the
+  certificate's SubjectAltName, so a wssmux/TLS client no longer rejects it with
+  "bad certificate" and the tunnel establishes on the first try.
 
 ## Notes
 
-- ECH is opt-in per inbound and needs a sing-box-family client to take effect.
+- Both features are opt-in and change nothing for existing setups until you use them.
 - Existing nodes pick this up through the panel's version-gated update. Nova Server
   ships as an obfuscated build by design; the installer and verified tools stay open.

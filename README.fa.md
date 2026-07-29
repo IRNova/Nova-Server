@@ -13,7 +13,7 @@ VLESS · VMess · Trojan · Shadowsocks · Reality · Hysteria2 · TUIC · Naive
 SSL یک‌کلیکی، ربات تلگرام با Mini App و احراز هویت دومرحله‌ای.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.18.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
+[![Version](https://img.shields.io/badge/version-1.19.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
@@ -84,6 +84,13 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 
 ```bash
 nova-passwd 'YourNewPassword' --clear-2fa
+```
+
+پنل بعد از تغییر دامنه، Cloudflare یا SSL جواب نمی‌دهد؟ دسترسی را از روی سرور و بدون پنل بازیابی کنید. این دستور آدرس فعلی پنل را چاپ می‌کند و `--reset` نود را به حالت self-signed بدون دامنه برمی‌گرداند (همه‌چیز به آی‌پی سرور برمی‌گردد):
+
+```bash
+nova-access            # نمایش آدرس فعلی پنل و حالت TLS
+nova-access --reset    # بازگشت به نود self-signed بدون دامنه
 ```
 
 ### 🔒 پنل پشت مسیر مخفی

@@ -310,8 +310,22 @@ mkdir -p "$CONF_DIR" && chmod 700 "$CONF_DIR"
 if [ "$WANT_CERT" = 1 ]; then
   if [ ! -s "$CONF_DIR/cert.pem" ] || [ ! -s "$CONF_DIR/key.pem" ]; then
     say "Generating a self-signed tunnel certificate"
+    # The exit dials the bridge by IP, and a wssmux/TLS client verifies the host
+    # against the certificate. A CN-only cert with no SubjectAltName is rejected
+    # by modern TLS ("bad certificate"), so the tunnel never establishes. Always
+    # put the bridge's public IP (and loopback) in the SAN.
+    _san_ip="${CAP_PUBIP:-}"
+    [ -n "$_san_ip" ] || _san_ip="$(detect_public_ip 2>/dev/null || true)"
+    _san_ip="$(printf '%s' "$_san_ip" | tr -d '[:space:]')"
+    _san="DNS:nova-tunnel,DNS:localhost,IP:127.0.0.1"
+    case "$_san_ip" in
+      *[0-9].[0-9]*|*:*) _san="$_san,IP:$_san_ip" ;;
+    esac
     openssl req -x509 -newkey rsa:2048 -nodes -keyout "$CONF_DIR/key.pem" -out "$CONF_DIR/cert.pem" \
-      -days 3650 -subj '/CN=nova-tunnel' >/dev/null 2>&1 || warn "could not mint a cert; a TLS transport may fail."
+      -days 3650 -subj '/CN=nova-tunnel' -addext "subjectAltName=$_san" >/dev/null 2>&1 \
+      || openssl req -x509 -newkey rsa:2048 -nodes -keyout "$CONF_DIR/key.pem" -out "$CONF_DIR/cert.pem" \
+        -days 3650 -subj '/CN=nova-tunnel' >/dev/null 2>&1 \
+      || warn "could not mint a cert; a TLS transport may fail."
   fi
 fi
 if [ -n "$CONFIG_B64" ] && [ -n "$CONFIG_PATH" ]; then

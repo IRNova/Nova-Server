@@ -354,6 +354,16 @@ exec node /opt/nova-node-agent/bin/reset-password.mjs "$@"
 NPW
 chmod +x /usr/local/bin/nova-passwd 2>/dev/null || true
 
+# A convenience shortcut to recover or change panel + subscription access from the
+# server when the panel is unreachable (bad domain / Cloudflare / SSL change):
+#   nova-access            show the current panel URL
+#   nova-access --reset    revert to a self-signed no-domain node (server IP)
+cat > /usr/local/bin/nova-access <<'NAC'
+#!/bin/bash
+exec node /opt/nova-node-agent/bin/reset-access.mjs "$@"
+NAC
+chmod +x /usr/local/bin/nova-access 2>/dev/null || true
+
 # Shortcut to configure + enable the built-in Telegram control bot, e.g.
 #   nova-tgbot '123456789:AA...' '<admin-chat-id>'
 cat > /usr/local/bin/nova-tgbot <<'NTB'
@@ -403,6 +413,11 @@ ok "agent installed at $AGENT_DIR"
 # ---- host + TLS cert ---------------------------------------------------------
 # Iran-reachable IP echoes only: ifconfig.me is sanction-blocked from Iran (403).
 PUBIP="$(curl -fsSL --max-time 6 https://api.ipify.org 2>/dev/null || curl -fsSL --max-time 6 https://icanhazip.com 2>/dev/null || curl -fsSL --max-time 6 https://ipinfo.io/ip 2>/dev/null || hostname -I | awk '{print $1}')"
+# The IP-echo endpoints are network-reachable, so treat their output as untrusted:
+# it lands in the network-settings.json body below, and a crafted response could
+# otherwise inject JSON. Keep only a bare IPv4/IPv6 literal; blank anything else.
+PUBIP="$(printf '%s' "$PUBIP" | tr -d '[:space:]')"
+case "$PUBIP" in *[!0-9.:a-fA-F]* | "") PUBIP="" ;; esac
 # The node always comes up self-signed on its public IP. If NOVA_DOMAIN is set we
 # switch it to a trusted Let's Encrypt cert further down, once the agent is live
 # (same code path the app/panel "add a domain" button uses).
@@ -516,20 +531,31 @@ if [ "${NOVA_ADMIN_PASS:-}" != "" ]; then
     -d "{\"password\":\"$NOVA_ADMIN_PASS\"}" >/dev/null 2>&1 || true
 fi
 
-# Host, self-signed flag, and every protocol on by default (the app then
-# auto-picks the fastest); Hysteria2 only when sing-box installed.
-HY2=false; [ "${HAS_SINGBOX:-0}" = 1 ] && HY2=true
-curl -fsS -b "$CJ" -X POST "$B/admin/network-settings.json" -H "$UA" -H 'Content-Type: application/json' \
-  -d "{\"host\":\"$HOST\",\"insecure\":$INSECURE,\"protocols\":{\"vless\":true,\"vmess\":true,\"trojan\":true,\"hysteria2\":$HY2}}" >/dev/null 2>&1 || true
+# Seed host and the standard protocol set only on a genuinely fresh install.
+# Re-running the installer upgrades binaries without overwriting an operator's
+# later protocol choices.
+if [ "$CONFIGURED" = false ]; then
+  HY2=false; [ "${HAS_SINGBOX:-0}" = 1 ] && HY2=true
+  if ! curl -fsS -b "$CJ" -X POST "$B/admin/network-settings.json" -H "$UA" -H 'Content-Type: application/json' \
+    -d "{\"host\":\"$HOST\",\"insecure\":$INSECURE,\"protocols\":{\"vless\":true,\"vmess\":true,\"trojan\":true,\"hysteria2\":$HY2}}" >/dev/null 2>&1; then
+    warn "Could not seed the initial protocol settings; finish setup from the panel."
+  fi
+fi
 
-# Seed one user so the node is usable immediately, but only on a fresh node
-# (re-running the installer must not churn an existing user's UUID).
-USER_COUNT="$(curl -fsS -b "$CJ" "$B/admin/network-settings.json" -H "$UA" 2>/dev/null \
-  | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log((JSON.parse(s).users||[]).length)}catch{console.log(0)}})" 2>/dev/null || echo 0)"
-if [ "${USER_COUNT:-0}" = 0 ]; then
-  UUID="$(cat /proc/sys/kernel/random/uuid)"
-  curl -fsS -b "$CJ" -X POST "$B/admin/users.json" -H "$UA" -H 'Content-Type: application/json' \
-    -d "{\"action\":\"add\",\"user\":{\"id\":\"me\",\"uuid\":\"$UUID\",\"email\":\"me\",\"enabled\":true}}" >/dev/null 2>&1 || true
+# A fresh standalone panel gets one unrestricted starter user. No inboundIds
+# allowlist means every current and future all-users inbound is included in its
+# personal subscription. Managed nodes receive users from their parent panel,
+# and upgrades must never recreate a user an operator intentionally deleted.
+if [ "$CONFIGURED" = false ] && [ "$NODE_MODE" != 1 ]; then
+  USER_COUNT="$(curl -fsS -b "$CJ" "$B/admin/network-settings.json" -H "$UA" 2>/dev/null \
+    | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log((JSON.parse(s).users||[]).length)}catch{console.log(0)}})" 2>/dev/null || echo 0)"
+  if [ "${USER_COUNT:-0}" = 0 ]; then
+    UUID="$(cat /proc/sys/kernel/random/uuid)"
+    if ! curl -fsS -b "$CJ" -X POST "$B/admin/users.json" -H "$UA" -H 'Content-Type: application/json' \
+      -d "{\"action\":\"add\",\"user\":{\"id\":\"me\",\"uuid\":\"$UUID\",\"email\":\"me\",\"enabled\":true}}" >/dev/null 2>&1; then
+      warn "Could not create the starter user; add one from the Users page."
+    fi
+  fi
 fi
 
 # If a domain was requested, provision a trusted Let's Encrypt cert and switch
