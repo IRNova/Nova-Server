@@ -1,17 +1,24 @@
-# Nova Server v1.14.9
+# Nova Server v1.16.0
 
-A manual "Reapply core" control.
+Get-online-in-one-scan onboarding, and Hysteria2 port hopping.
 
 ## Added
 
-- A **Reapply core** button in the dashboard System row. It rebuilds xray's config
-  from your current settings and reloads the proxy core, so it clears a stuck core or
-  a stale config left by a change that no save happened to touch. The panel briefly
-  reconnects while xray reloads, and a confirm tells you so before it runs.
+- **Quick connect on the dashboard.** A genuinely fresh install now creates one
+  ready-to-use starter user and a set of standard protocols, and the owner dashboard
+  shows that user's personal subscription as a QR. Scan it with Nova, Hiddify,
+  v2rayNG, Clash, or sing-box and you are online, no need to open the Users page
+  first. Reruns and managed nodes are left untouched.
+- **Hysteria2 port hopping.** A Hysteria2 inbound can now use a UDP port range. The
+  client rotates across the range instead of a single fixed port, so a censor cannot
+  pin every connection to one IP and port. Set a range like 20000 to 40000 on the
+  inbound; the node redirects the whole range to it and the subscription link carries
+  the range automatically. It is fully opt-in: with no range set, nothing changes.
 
 ## Notes
 
-- Normal saves already reload xray automatically when an xray-relevant setting
-  changes; this is the manual safety valve for the cases that do not trigger that.
+- Port hopping uses a dedicated firewall chain, so it never touches your other rules,
+  and it is UDP-only. Pick a high, unused range that does not overlap another UDP
+  service on the box.
 - Existing nodes pick this up through the panel's version-gated update. Nova Server
   ships as an obfuscated build by design; the installer and verified tools stay open.

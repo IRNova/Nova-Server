@@ -14,7 +14,7 @@ multi-user accounts, a multi-node fleet, Iran bridge tunnels, one-click SSL, a T
 bot with a Mini App, and two-factor auth.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.14.9-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
+[![Version](https://img.shields.io/badge/version-1.16.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
@@ -77,7 +77,7 @@ The installer first asks a few short questions:
 - **Panel secret path**: press Enter for a random path, type your own, or use `none` to keep the panel at the root.
 - **Extra panel port**: optionally a separate HTTPS port for the panel (for example `2053`). The firewall port is opened automatically.
 
-Then the proxy cores, the panel, and the tunnel backends are set up, and your panel URL is shown (with the secret path, so save it). Open it, set an admin password, and use the **Setup Wizard** to add a domain, a recommended protocol, and your first user.
+Then the proxy cores, the panel, and the tunnel backends are set up, every available standard protocol is enabled, and a starter user named `me` is created. Open the printed panel URL, set an admin password, and scan that user's personal subscription QR from **Quick connect** on the main dashboard. The Setup Wizard remains available when you want to add a domain or customize the setup.
 
 For a scripted (unattended) install, set everything with environment variables: `NOVA_DOMAIN`, `NOVA_DOMAIN_EMAIL`, `NOVA_PANEL_PATH` (or `none`), `NOVA_PANEL_PORT`, `NOVA_ADMIN_PASS`, and `NOVA_NO_PROMPT=1` to skip all prompts.
 
@@ -108,7 +108,7 @@ Never run a server before? This is the whole path, in plain steps. Every technic
 
 4. **(Optional) Add a domain and free HTTPS.** A domain (a web address like `vpn.example.com`) and an SSL certificate (the lock that keeps the connection trusted) are optional. Without them, your node runs on its IP and the Nova app still connects. With a domain, the panel gets a free certificate automatically. You can skip this step and add it later.
 
-5. **Create your first user and connect.** On the **Users** page, add a user and copy its subscription link (one link that holds all the connection settings and keeps itself up to date). Open it in the Nova app, scan the QR code with your phone, or paste it into a normal client such as v2rayNG, sing-box, or Clash. You are online.
+5. **Scan and connect.** Nova already created the starter user `me` with access to every available protocol and all-users inbound. On the main dashboard, find **Quick connect** and scan the personal subscription QR with the Nova app, Hiddify, v2rayNG, sing-box, or Clash. You can also copy the same auto-updating link. Add separate users later when you want individual limits or access rules.
 
 6. **Grow whenever you need to.** Add more users with data or time limits, add more entry points on the Inbounds page, stay online under heavy filtering with an Iran bridge or a DNS tunnel, and scale from one panel to many servers (nodes).
 
@@ -208,7 +208,7 @@ Two operator tools live under **Settings > Security**.
 | **Protocols** | VLESS, VMess, Trojan, Shadowsocks-2022, VLESS-Reality (XTLS-Vision), Hysteria2, TUIC v5, NaiveProxy, native WireGuard, AmneziaWG |
 | **Transports** | TCP, WebSocket, gRPC, XHTTP, HTTPUpgrade, mKCP, over TLS or Reality |
 | **Users** | Data quota (total or split), expiry (fixed or from first connection), device limit, daily/weekly/monthly reset, per-user protocol and inbound access; saved plans (a reusable limit set applied to one or many users, for example 30 days / 50 GB / 3 devices), bulk actions (enable, disable, renew, reset, apply plan, or delete across selected users), and CSV import/export of users (auto-update by name) |
-| **Subscriptions** | One self-updating link per user, a live usage page, QR codes, and Clash/Mihomo and sing-box formats |
+| **Subscriptions** | One self-updating link per user, dashboard Quick connect QR, a live usage page, and Clash/Mihomo and sing-box formats |
 | **Routing** | Point-and-click geosite/geoip/CIDR/domain/protocol rules, direct Iran and domestic bypass, ad/torrent/QUIC blocking, and secure and anti-sanction DNS |
 | **Egress** | Direct, block, WARP (with a WARP+ license), Tor, Psiphon, custom SOCKS/HTTP outbounds, and per-inbound egress assignment |
 | **Iran tunnels** | Bridge to the exit with Backhaul, BackPack, rathole, or wstunnel; carries TCP and UDP so Hysteria2 keeps working; one-click point-all-links-at-the-bridge across every format (raw, Clash, sing-box); only forwarded ports travel through the bridge (recommended: just `443`, so other inbounds stay direct and fast with the bridged link as fallback) |
