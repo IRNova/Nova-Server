@@ -191,33 +191,41 @@ port_sweep() {
   fi
   local tmp p; tmp="$(mktemp -d)"
   for p in $opened; do
-    ( local t0 t1 rtt
-      t0="$(date +%s%3N 2>/dev/null || echo 0)"
-      if timeout 3 bash -c "exec 3<>/dev/tcp/${exit_host}/${p}" 2>/dev/null; then
-        t1="$(date +%s%3N 2>/dev/null || echo 0)"; rtt=$(( t1 - t0 )); [ "$rtt" -lt 0 ] && rtt=0
-        printf '%s 1 %s\n' "$p" "$rtt" > "$tmp/$p"
-      else
-        printf '%s 0 0\n' "$p" > "$tmp/$p"
-      fi ) &
+    ( t0="$(date +%s%3N 2>/dev/null || echo 0)"
+      # 1) connect for latency
+      if ! timeout 3 bash -c "exec 3<>/dev/tcp/${exit_host}/${p}" 2>/dev/null; then
+        printf '%s 0 0 0\n' "$p" > "$tmp/$p"; exit 0
+      fi
+      t1="$(date +%s%3N 2>/dev/null || echo 0)"; rtt=$(( t1 - t0 )); [ "$rtt" -lt 0 ] && rtt=0
+      # 2) download the sweep payload for throughput (Mbps); a throttled port
+      # transfers little in the window and scores near zero.
+      d0="$(date +%s%3N 2>/dev/null || echo 0)"
+      bytes="$(timeout 12 bash -c "exec 3<>/dev/tcp/${exit_host}/${p} && cat <&3" 2>/dev/null | wc -c | tr -d ' ')"
+      d1="$(date +%s%3N 2>/dev/null || echo 0)"; dms=$(( d1 - d0 )); [ "$dms" -lt 1 ] && dms=1
+      mbps=$(( ${bytes:-0} * 8 / (dms * 1000) ))
+      printf '%s 1 %s %s\n' "$p" "$rtt" "$mbps" > "$tmp/$p"
+    ) &
   done
   wait
-  local results="" best="" bestrtt=999999 ok rtt
+  local results="" best="" bestscore=-1 ok rtt mbps score
   for p in $opened; do
     [ -f "$tmp/$p" ] || continue
-    read -r p ok rtt < "$tmp/$p"
+    read -r p ok rtt mbps < "$tmp/$p"
     if [ "$ok" = 1 ]; then
-      ok "port ${p}: reachable (${rtt} ms)"
-      [ "$rtt" -lt "$bestrtt" ] && { bestrtt="$rtt"; best="$p"; }
-      results="${results}{\"port\":${p},\"ok\":true,\"rttMs\":${rtt}},"
+      ok "port ${p}: ${mbps} Mbps, ${rtt} ms"
+      # rank by throughput first, latency as the tiebreaker
+      score=$(( mbps * 1000 - rtt ))
+      [ "$score" -gt "$bestscore" ] && { bestscore="$score"; best="$p"; }
+      results="${results}{\"port\":${p},\"ok\":true,\"rttMs\":${rtt},\"mbps\":${mbps}},"
     else
       warn "port ${p}: blocked or unreachable from Iran right now"
-      results="${results}{\"port\":${p},\"ok\":false,\"rttMs\":0},"
+      results="${results}{\"port\":${p},\"ok\":false,\"rttMs\":0,\"mbps\":0},"
     fi
   done
   rm -rf "$tmp"
   CAP_PORT_RESULTS="[${results%,}]"; CAP_BEST_PORT="$best"
   if [ -n "$best" ]; then
-    ok "Recommended tunnel control port: ${best} (${bestrtt} ms). Set this on the foreign panel."
+    ok "Recommended tunnel control port: ${best} (fastest by throughput). Set this on the foreign panel."
   else
     warn "No candidate port reached the exit. Iran may be blocking them now; try again later or pick a port by hand."
   fi
