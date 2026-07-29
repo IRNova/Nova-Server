@@ -13,7 +13,7 @@ VLESS · VMess · Trojan · Shadowsocks · Reality · Hysteria2 · TUIC · Naive
 SSL یک‌کلیکی، ربات تلگرام با Mini App و احراز هویت دومرحله‌ای.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.14.1-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
+[![Version](https://img.shields.io/badge/version-1.14.5-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
@@ -193,7 +193,7 @@ Nova یک تونل DNS داخلی و اختیاری دارد که ترافیک �
 | **اشتراک‌ها** | یک لینک خودبه‌روزرسان برای هر کاربر، صفحه مصرف زنده، QR، فرمت‌های Clash/Mihomo و sing-box |
 | **مسیریابی** | قوانین نقطه‌ای geosite/geoip/CIDR/دامنه/پروتکل، دسترسی مستقیم ایران و بایپس داخلی، مسدودسازی تبلیغات/تورنت/QUIC، DNS امن و ضد تحریم |
 | **خروج** | مستقیم، مسدود، WARP (با لایسنس WARP+)، Tor، Psiphon، خروجی‌های سفارشی SOCKS/HTTP و اختصاص خروجی به هر ورودی |
-| **تونل‌های ایران** | پل به خروج با Backhaul، BackPack، rathole یا wstunnel؛ انتقال TCP و UDP تا Hysteria2 کار کند؛ هدایت یک‌کلیکیِ همهٔ لینک‌ها به پل روی همهٔ فرمت‌ها (خام، ⁦Clash⁩ و ⁦sing-box⁩)؛ فقط پورت‌های فوروارد‌شده (پیش‌فرض ⁦443⁩ و ⁦8443/udp⁩) از پل عبور می‌کنند |
+| **تونل‌های ایران** | پل به خروج با Backhaul، BackPack، rathole یا wstunnel؛ انتقال TCP و UDP تا Hysteria2 کار کند؛ هدایت یک‌کلیکیِ همهٔ لینک‌ها به پل روی همهٔ فرمت‌ها (خام، ⁦Clash⁩ و ⁦sing-box⁩)؛ فقط پورت‌های فوروارد‌شده از پل عبور می‌کنند (پیشنهادی: فقط ⁦443⁩، تا بقیهٔ ورودی‌ها مستقیم و سریع بمانند و لینکِ از راه پل جایگزین باشد) |
 | **تونل DNS** | تونل DNS داخلی و اختیاری که ترافیک را داخل کوئری‌های DNS تونل می‌کند، آخرین راه انتقال برای وقتی که فقط DNS جواب می‌دهد، با انتخاب موتور: ⁦MasterDnsVPN⁩ (پیش‌فرض ساده) یا ⁦CottenDns⁩ (resolverهای ⁦DoT/DoH⁩، توزیع بار روی چند resolver، بازیابی از افت، برای شبکه‌های بسیار خصمانه)؛ واگذاری خودکار `NS` روی Cloudflare یا راه‌اندازی دستی با راهنما، همراه با خروجی‌گرفتن کانفیگ کلاینت از پنل |
 | **دامنه و SSL** | Let's Encrypt یک‌کلیکی، Cloudflare کاملاً خودکار (DNS + وایلدکارت) یا گواهی Origin، همه با تمدید خودکار |
 | **دسترسی پنل** | مسیر مخفی تصادفی برای پنل با ۴۰۴ ساده برای بقیه مسیرها، به‌همراه پورت HTTPS اختصاصی اختیاری؛ هر دو قابل تغییر در تنظیمات > عمومی؛ دستور `nova-passwd` آدرس فعلی پنل را نمایش می‌دهد |

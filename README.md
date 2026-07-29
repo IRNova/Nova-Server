@@ -14,7 +14,7 @@ multi-user accounts, a multi-node fleet, Iran bridge tunnels, one-click SSL, a T
 bot with a Mini App, and two-factor auth.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.14.1-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
+[![Version](https://img.shields.io/badge/version-1.14.5-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
@@ -147,7 +147,7 @@ Front your foreign exit with a clean-IP server inside Iran, so clients connect t
 - Selectable backends: **Backhaul** and **BackPack** (recommended), **rathole**, and **wstunnel**.
 - Carries both TCP and UDP, so Hysteria2 keeps working through the tunnel.
 - **One click points every client link at the bridge**, applied across every app format (raw, Clash, sing-box), so every client type follows the bridge.
-- Only the ports you forward travel through the bridge (`443` and `8443/udp` by default); a link on any other inbound stays direct, so add an inbound's port to Forwards to route it through Iran too.
+- Only the ports you forward travel through the bridge. Recommended: forward just `443` (your main VLESS link). Your other inbounds then stay direct and faster while the exit is reachable, and the VLESS-through-bridge link is your always-working fallback if the exit's IP is ever blocked, so the client's url-test gives users speed now and resilience when they need it. Add more ports only to bridge-protect those inbounds too, at the cost of an extra hop; Hysteria2 and other UDP protocols stay direct because they cannot ride the tunnel.
 - A **bridge readiness check** (`nova-bridge.sh --check`) confirms a direct public IP (not NAT) and free ports before installing, and a **port-viability sweep** finds a live control port when Iran blocks the default. Both are surfaced on a bridge health card in the panel.
 - A step-by-step setup wizard lives right in the panel.
 
@@ -211,7 +211,7 @@ Two operator tools live under **Settings > Security**.
 | **Subscriptions** | One self-updating link per user, a live usage page, QR codes, and Clash/Mihomo and sing-box formats |
 | **Routing** | Point-and-click geosite/geoip/CIDR/domain/protocol rules, direct Iran and domestic bypass, ad/torrent/QUIC blocking, and secure and anti-sanction DNS |
 | **Egress** | Direct, block, WARP (with a WARP+ license), Tor, Psiphon, custom SOCKS/HTTP outbounds, and per-inbound egress assignment |
-| **Iran tunnels** | Bridge to the exit with Backhaul, BackPack, rathole, or wstunnel; carries TCP and UDP so Hysteria2 keeps working; one-click point-all-links-at-the-bridge across every format (raw, Clash, sing-box); only forwarded ports (default `443` and `8443/udp`) travel through the bridge |
+| **Iran tunnels** | Bridge to the exit with Backhaul, BackPack, rathole, or wstunnel; carries TCP and UDP so Hysteria2 keeps working; one-click point-all-links-at-the-bridge across every format (raw, Clash, sing-box); only forwarded ports travel through the bridge (recommended: just `443`, so other inbounds stay direct and fast with the bridged link as fallback) |
 | **DNS tunnel** | Optional built-in DNS tunnel that tunnels traffic inside DNS queries, a last-resort transport for when only DNS answers, with an engine choice: MasterDnsVPN (simple default) or CottenDns (DoT/DoH resolvers, multi-resolver load balancing, loss recovery, for very hostile networks); automatic `NS` delegation on Cloudflare or guided manual setup, plus client-config export from the panel |
 | **Domain and SSL** | One-click Let's Encrypt, fully automatic Cloudflare (DNS + wildcard) or an Origin certificate, all with auto-renewal |
 | **Panel access** | A random secret path for the panel with a plain 404 for every other path, plus an optional dedicated HTTPS port; both changeable in Settings > General; `nova-passwd` prints the current panel URL |

@@ -1,20 +1,22 @@
-# Nova Server v1.14.4
+# Nova Server v1.14.5
 
-A bridge speed optimizer, so the tunnel uses the fastest port, not just a reachable one.
+Guidance and a smarter default for the recommended Iran-bridge setup.
 
-## Added
+## Changed
 
-- **Throughput-aware port sweep.** When you set up or check a bridge, the sweep now
-  measures real download speed (Mbps) for each candidate control port, not only its
-  latency. A port Iran throttles shows a low speed and is passed over. The panel's
-  bridge health card shows the speed and latency per port and recommends the fastest
-  one to use as your control port.
+- The Tunnel **Forwards** field now defaults to just **443** (previously 443 and
+  8443/udp). Forwarding only your main VLESS link is the recommended setup: your
+  other inbounds stay direct and faster while the exit is reachable, and the
+  VLESS-through-bridge link is the always-working fallback if the exit's IP is ever
+  blocked. The client's url-test picks the fastest working one, so you get speed now
+  and resilience when you need it.
+- The Forwards hint, the in-panel tunnel guide (English, Persian, Russian), and the
+  README now explain this reasoning, and note that Hysteria2 and other UDP protocols
+  stay direct because they cannot ride a backhaul tunnel.
 
 ## Notes
 
-- wssmux remains the recommended transport for an Iran bridge: it disguises the tunnel
-  as ordinary TLS and survives deep packet inspection.
-- No change is needed for an existing tunnel. This helps you pick the best port when
-  setting one up or re-checking it.
+- No change is needed for an existing tunnel. This makes new setups land on the best
+  balance of speed and resilience by default.
 - Nova Server ships as an obfuscated build by design; Nova Proxy and the verified tools
   stay open.
