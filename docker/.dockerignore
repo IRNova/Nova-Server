@@ -1,0 +1,4 @@
+.env
+.env.*
+README.md
+nova-docker.sh

@@ -10,8 +10,9 @@
 # services. Host networking gives it the real ports; privileged + the kernel
 # module mount let the optional AmneziaWG server load its module from the host.
 #
-# All state lives on named volumes, so `docker compose down` then `up` keeps your
-# users, settings, and certificate.
+# Durable state lives on named volumes. Image-layer runtime files are restored
+# from the checksum-pinned release bundled into the image whenever a container
+# is recreated.
 services:
   nova-node:
     build: .

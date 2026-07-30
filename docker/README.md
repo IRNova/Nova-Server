@@ -15,12 +15,12 @@ keeps your users, settings, and certificate.
 bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/docker/nova-docker.sh)
 ```
 
-It installs Docker if missing, drops the compose files in `/opt/nova-docker`,
-builds the image, and starts the node. Then watch the first boot install Nova and
-print your panel URL:
+It installs Docker if missing, downloads and verifies the release package,
+bundles the installer and agent into the image, and starts the node. Then watch
+the first boot install Nova and print your panel URL:
 
 ```bash
-cd /opt/nova-docker && docker compose logs -f nova-node
+cd /opt/nova-docker/docker && docker compose logs -f nova-node
 ```
 
 Pass the same options as the native installer as environment variables:
@@ -34,9 +34,12 @@ NOVA_DOMAIN=node.example.com NOVA_ADMIN_PASS='StrongPass123' \
 
 ```bash
 mkdir nova-docker && cd nova-docker
-for f in Dockerfile entry.sh firstboot.sh nova-firstboot.service docker-compose.yml; do
+for f in Dockerfile entry.sh firstboot.sh nova-firstboot.service docker-compose.yml .dockerignore .env.example; do
   curl -fsSL "https://raw.githubusercontent.com/IRNova/Nova-Server/main/docker/$f" -o "$f"
 done
+curl -fsSL "https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh" -o nova-node.sh
+curl -fsSL "https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node-agent.tar.gz" -o nova-node-agent.tar.gz
+curl -fsSL "https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node-agent.tar.gz.sha256" -o nova-node-agent.tar.gz.sha256
 cp .env.example .env   # or create .env yourself
 docker compose up -d --build
 docker compose logs -f nova-node
@@ -46,7 +49,7 @@ docker compose logs -f nova-node
 
 | Key | Meaning |
 | --- | --- |
-| `NOVA_ADMIN_PASS` | Panel admin password. Blank leaves the panel at its first-run "create password" screen. |
+| `NOVA_ADMIN_PASS` | Panel admin password. Blank generates a strong password that is kept across interrupted first-boot retries and printed in the install log. |
 | `NOVA_DOMAIN` | A domain pointing at this host. It gets a free Let's Encrypt certificate. Blank uses the host IP with a self-signed certificate. |
 | `NOVA_DOMAIN_EMAIL` | Email for certificate renewal notices (optional). |
 | `NOVA_PANEL_PATH` | Secret panel subpath. Blank generates a random one; `none` keeps the panel at the root. |
@@ -71,7 +74,7 @@ A Nova node is a VPN appliance, not a plain web app:
 ## Common commands
 
 ```bash
-cd /opt/nova-docker
+cd /opt/nova-docker/docker
 docker compose logs -f nova-node     # watch logs / find the panel URL
 docker compose restart nova-node     # restart
 docker compose down                  # stop (keeps the data volumes)

@@ -14,7 +14,7 @@ multi-user accounts, a multi-node fleet, Iran bridge tunnels, one-click SSL, a T
 bot with a Mini App, and two-factor auth.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.24.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
+[![Version](https://img.shields.io/badge/version-1.25.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
@@ -52,7 +52,7 @@ Nova Server turns a plain Linux VPS into a private, censorship-resistant proxy n
 - 👥 **Full per-user control**: data quota, expiry, device limit, data reset, and per-user protocol access
 - 🛰️ **Multi-node fleet**: manage many servers from one panel; add a new node by running a single panel-built command on a fresh VPS
 - 🌐 **Resilience mode**: one switch spreads every config across the main server, all your nodes, and all Iran bridges, so a user's client url-tests and fails over automatically when an IP is blocked
-- 🏷️ **Bridge domains with per-SNI certs**: give each Iran bridge its own domain with a valid certificate (auto-issued over Cloudflare DNS, or paste your own); the exit serves the matching cert by SNI, so clients dial the bridge's domain directly with no allowInsecure and each config looks like a different site
+- 🏷️ **Bridge domains with per-SNI certs**: give each Iran bridge its own domain with a valid certificate (auto-issued over Cloudflare DNS, or paste your own); the exit serves the matching cert by SNI and adds the domain to subscriptions automatically, so clients dial it directly with no allowInsecure and no duplicate tunnel control connection; the failover list stays reserved for separate Iran servers
 - 🔒 **Hidden panel**: on a fresh install the panel sits behind a random secret path (with an optional dedicated port) and every other path returns a plain 404, so scanners see nothing
 - 🛡️ **Login Guard**: a fail2ban-style shield that blocks an IP after too many failed attempts; on by default, with a live list of active blocks and one-click unblock
 - 🔔 **Webhooks**: a signed POST to your own URL when a user is created, expires, or hits quota, when a node joins, or when an IP is blocked
@@ -130,7 +130,7 @@ The panel itself also carries a more detailed **step-by-step setup guide** insid
 
 ## 🐳 Install with Docker
 
-Prefer a container? Nova ships a Docker option as an alternative to the native one-line installer. It is reproducible, easy to stop, move, and upgrade, and your data lives on named volumes that survive a rebuild.
+Prefer a container? Nova ships a Docker option as an alternative to the native one-line installer. It is reproducible, easy to stop, move, and upgrade, and your data lives on named volumes that survive a rebuild. The installer and checksum-pinned agent package are bundled into the image, and a recreated container restores its runtime without losing the persistent database or certificates.
 
 Run this on a real Linux VPS as root. It installs Docker if it is missing, builds the image, and brings the node up:
 
@@ -140,10 +140,10 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/dock
 
 You get the same installer options as the native path, passed as environment variables: `NOVA_ADMIN_PASS`, `NOVA_DOMAIN`, `NOVA_PANEL_PATH`, and `NOVA_PANEL_PORT`.
 
-Once it is up, follow the first-run setup and find the panel URL with:
+Once it is up, find the generated password and panel URL with:
 
 ```bash
-cd /opt/nova-docker && docker compose logs -f nova-node
+cd /opt/nova-docker/docker && docker compose logs -f nova-node
 ```
 
 **Important:** this method needs a real Linux host with host networking. It does **not** work on Docker Desktop for Mac or Windows, because they cannot take the host's port `443` the way a node needs. The container runs systemd inside itself and uses host networking with privileged mode, because a Nova node is a VPN appliance: it takes port `443` (on TCP and UDP), and when needed `53/udp` and a UDP port for WireGuard, and it manages systemd services. Full details are in `docker/README.md`.
@@ -161,7 +161,15 @@ Front your foreign exit with a clean-IP server inside Iran, so clients connect t
 - **One click points every client link at the bridge**, applied across every app format (raw, Clash, sing-box), so every client type follows the bridge.
 - Only the ports you forward travel through the bridge. Recommended: forward just `443` (your main VLESS link). Your other inbounds then stay direct and faster while the exit is reachable, and the VLESS-through-bridge link is your always-working fallback if the exit's IP is ever blocked, so the client's url-test gives users speed now and resilience when they need it. Add more ports only to bridge-protect those inbounds too, at the cost of an extra hop; Hysteria2 and other UDP protocols stay direct because they cannot ride the tunnel.
 - A **bridge readiness check** (`nova-bridge.sh --check`) confirms a direct public IP (not NAT) and free ports before installing, and a **port-viability sweep** finds a live control port when Iran blocks the default. Both are surfaced on a bridge health card in the panel.
-- A step-by-step setup wizard lives right in the panel.
+- The trilingual **Setup Assistant** opens on the first panel visit and remains
+  available for later adjustments. It asks who the server is for, network
+  restrictions, whether this is one server or a bridge/node fleet, how domains
+  and Cloudflare should be used, and whether simplicity, speed, or resilience
+  matters most. Before applying anything, it lists the exact protocols,
+  transports, security methods, and ports that will be active. It then validates
+  and applies safe defaults, Reality and Hysteria2 fallbacks, and personal user
+  links in one transaction, with guided continuation into domain, Cloudflare,
+  Iran bridge, and certificate-pinned node enrollment tools.
 
 ### 🕳️ DNS tunnel (last resort)
 
@@ -234,7 +242,7 @@ Two operator tools live under **Settings > Security**.
 | **Login Guard** | fail2ban-style per-IP blocking after repeated failed attempts (configurable threshold and ban time), a live list of active blocks, and one-click unblock; on by default |
 | **Security** | Multiple admins with owner and reseller roles, two-factor auth (Google Authenticator), and server-side password reset |
 | **Automation** | Nightly backups (disk and Telegram), proactive health alerts, auto-update, clean-IP refresh, health check, factory reset (back to a fresh install, keeping your admin login), and an in-panel log viewer (no SSH) |
-| **Panel** | English, Persian (RTL), Russian; global search, a setup wizard, per-section help and a full in-panel guide; light and dark themes |
+| **Panel** | English, Persian (RTL), Russian; global search, an always-available automated Setup Assistant, per-section help and a full in-panel guide; light and dark themes |
 
 ---
 

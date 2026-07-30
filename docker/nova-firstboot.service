@@ -2,15 +2,14 @@
 Description=Nova node first-boot installer
 After=network-online.target
 Wants=network-online.target
-# Skip once the node is installed on the persistent volume.
-ConditionPathExists=!/var/lib/nova/.docker-installed
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 EnvironmentFile=-/run/nova/env
 ExecStart=/opt/nova/firstboot.sh
-# If the install fails (for example no network yet), let systemd retry.
+# First boot also repairs a recreated container whose persistent marker and
+# database survived but whose image-layer runtime did not.
 Restart=on-failure
 RestartSec=10
 

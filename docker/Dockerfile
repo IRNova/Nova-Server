@@ -17,7 +17,7 @@ ENV DEBIAN_FRONTEND=noninteractive container=docker
 # that make no sense in a container so systemd boots cleanly.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      systemd systemd-sysv curl ca-certificates iproute2 kmod sudo \
+      systemd systemd-sysv curl ca-certificates iproute2 kmod sudo openssl \
  && rm -rf /var/lib/apt/lists/* \
  && rm -f /lib/systemd/system/multi-user.target.wants/* \
           /etc/systemd/system/*.wants/* \
@@ -26,11 +26,23 @@ RUN apt-get update \
           /lib/systemd/system/sockets.target.wants/*initctl* \
           /lib/systemd/system/systemd-update-utmp* 2>/dev/null || true
 
+# The Docker build context is docker/. The production build stages the installer
+# and release package into that context before the signed image is built. First
+# boot executes only these image-bundled artifacts and never downloads an
+# installer from a mutable branch. The release tarball is checksum-verified at
+# build time and again immediately before installation.
 COPY entry.sh /opt/nova/entry.sh
 COPY firstboot.sh /opt/nova/firstboot.sh
 COPY nova-firstboot.service /etc/systemd/system/nova-firstboot.service
+COPY nova-node.sh /opt/nova/nova-node.sh
+COPY nova-node-agent.tar.gz /opt/nova/release/nova-node-agent.tar.gz
+COPY nova-node-agent.tar.gz.sha256 /opt/nova/release/nova-node-agent.tar.gz.sha256
 
-RUN chmod +x /opt/nova/entry.sh /opt/nova/firstboot.sh \
+RUN cd /opt/nova/release \
+ && sha256sum -c nova-node-agent.tar.gz.sha256 \
+ && chmod 0555 /opt/nova/entry.sh /opt/nova/firstboot.sh /opt/nova/nova-node.sh \
+ && chmod 0444 /opt/nova/release/nova-node-agent.tar.gz \
+               /opt/nova/release/nova-node-agent.tar.gz.sha256 \
  && systemctl enable nova-firstboot.service
 
 # systemd's graceful-shutdown signal.
