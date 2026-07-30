@@ -14,7 +14,7 @@ multi-user accounts, a multi-node fleet, Iran bridge tunnels, one-click SSL, a T
 bot with a Mini App, and two-factor auth.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.20.1-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
+[![Version](https://img.shields.io/badge/version-1.21.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
@@ -52,6 +52,7 @@ Nova Server turns a plain Linux VPS into a private, censorship-resistant proxy n
 - 👥 **Full per-user control**: data quota, expiry, device limit, data reset, and per-user protocol access
 - 🛰️ **Multi-node fleet**: manage many servers from one panel; add a new node by running a single panel-built command on a fresh VPS
 - 🌐 **Resilience mode**: one switch spreads every config across the main server, all your nodes, and all Iran bridges, so a user's client url-tests and fails over automatically when an IP is blocked
+- 🏷️ **Bridge domains with per-SNI certs**: give each Iran bridge its own domain with a valid certificate (auto-issued over Cloudflare DNS, or paste your own); the exit serves the matching cert by SNI, so clients dial the bridge's domain directly with no allowInsecure and each config looks like a different site
 - 🔒 **Hidden panel**: on a fresh install the panel sits behind a random secret path (with an optional dedicated port) and every other path returns a plain 404, so scanners see nothing
 - 🛡️ **Login Guard**: a fail2ban-style shield that blocks an IP after too many failed attempts; on by default, with a live list of active blocks and one-click unblock
 - 🔔 **Webhooks**: a signed POST to your own URL when a user is created, expires, or hits quota, when a node joins, or when an IP is blocked
