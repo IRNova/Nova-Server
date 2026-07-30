@@ -1,34 +1,31 @@
-# Nova Server v1.25.0
+# Nova Server v1.26.0
 
-Nova Server 1.25.0 adds an all-in-one Setup Assistant and completes the remaining security and lifecycle hardening.
+Nova Server 1.26.0 adds one safe place to manage primary, additional-server, Iran-bridge, and managed-node domains, and improves the Setup Assistant for multi-server planning.
 
-## Setup Assistant
+## Multiple domains and certificates
 
-- Opens automatically on the first authenticated panel visit and stays available for later adjustments.
-- Asks simple questions about personal, family, or business use, network restrictions, safer browsing, and users.
-- Explains and plans a single server, an Iran bridge, an additional Nova node, or both.
-- Guides primary domains, bridge domains, trusted certificates, and Cloudflare DNS.
-- Explains that Cloudflare orange-cloud proxying supports WebSocket traffic, while Reality and Hysteria2 remain direct.
-- Shows every active protocol, transport, security method, obfuscation choice, and port before applying changes.
-- Preserves manually created users and inbounds and links into the existing domain, bridge, and pinned node tools.
-- Includes complete English, Persian, and Russian guidance.
+- Keep one primary panel domain and add up to 20 additional domains or subdomains for the same server.
+- Choose automatic Let's Encrypt, automatic Cloudflare DNS, or a validated pasted certificate for each address.
+- Nova verifies the certificate and a candidate Xray reload before publishing a new address in subscriptions.
+- Failed and pending domains stay private and never appear in user configurations.
+- Cloudflare orange-cloud addresses are automatically limited to the shared WebSocket front because direct TLS, Reality, and UDP cannot pass through that proxy.
+- Hysteria2, TUIC, and NaiveProxy aliases are published only when the primary Cloudflare wildcard certificate covers the subdomain.
 
-## Security and reliability
+## Bridges, nodes, and guided setup
 
-- Self-signed parent and node enrollment now pins the exact certificate before any owner token is sent.
-- Fresh installation requires a root-only, one-time claim token and uses a 128-bit secret panel path.
-- Host values and join URLs are validated against shell injection and remote cleartext downgrade.
-- Docker images run only the installer and checksum-pinned package bundled into the signed image.
-- Interrupted Docker setup can resume safely, and recreated containers restore missing runtime files without replacing persistent configuration.
-- Docker completion markers are written only after both the local API and HTTPS proxy front are healthy.
-- Webhook delivery pins validated public DNS answers, rejects internal and mixed targets, and revalidates redirects.
-- Certificate storage is created with restrictive ownership and rejects unsafe symlink paths.
-- Active bridge domains create subscription alternatives without starting duplicate tunnel control connections.
-- Uninstall removes Nova-owned runtime, firewall, tunnel, and helper artifacts while preserving host tools and rules Nova did not create.
-- The public archive now fails closed if tests, Git metadata, source maps, or repository-only development instructions enter the package.
+- The panel clearly separates ordinary server aliases, Iran bridge domains, and managed-node domains so an address cannot be attached to the wrong traffic path.
+- A new managed node can receive its trusted domain and certificate email in the generated one-command enrollment flow.
+- Setup Assistant users can select an Iran bridge and an additional node independently, including both together.
+- The assistant remains available after installation for later changes and explains the protocols, transports, security methods, and ports before applying a plan.
+- Domain and certificate storage is created automatically with restrictive permissions. No manual `chmod 777` workaround is required.
+- Cookie-authenticated admin changes now reject cross-origin requests and simple-form content types, closing a same-site sibling-subdomain CSRF path.
 
-## Upgrade notes
+## Upgrade
 
-- Existing standalone servers can use the normal in-panel update.
-- Existing self-signed fleet nodes must be removed and enrolled again after the parent is updated. This stores the new certificate pin and rotates the owner token.
-- The public repository contains the obfuscated runtime package, installers, documentation, checksums, and Docker release context. The unobfuscated server source remains private.
+Existing standalone servers can update normally from the panel. No database migration or manual domain change is required.
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
+```
+
+The public repository contains only the obfuscated runtime package, installers, checksums, documentation, and Docker release context. The unobfuscated server source remains private.
