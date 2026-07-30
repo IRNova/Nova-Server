@@ -14,7 +14,7 @@ multi-user accounts, a multi-node fleet, Iran bridge tunnels, one-click SSL, a T
 bot with a Mini App, and two-factor auth.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.23.1-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
+[![Version](https://img.shields.io/badge/version-1.24.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>

@@ -364,6 +364,14 @@ exec node /opt/nova-node-agent/bin/reset-access.mjs "$@"
 NAC
 chmod +x /usr/local/bin/nova-access 2>/dev/null || true
 
+# Reclaim a managed node whose parent panel is gone (turns nodeMode off and sets a
+# new admin password so you can sign in locally):  nova-unlock 'YourPassword'
+cat > /usr/local/bin/nova-unlock <<'NUL'
+#!/bin/bash
+exec node /opt/nova-node-agent/bin/unlock-node.mjs "$@"
+NUL
+chmod +x /usr/local/bin/nova-unlock 2>/dev/null || true
+
 # Shortcut to configure + enable the built-in Telegram control bot, e.g.
 #   nova-tgbot '123456789:AA...' '<admin-chat-id>'
 cat > /usr/local/bin/nova-tgbot <<'NTB'
@@ -614,26 +622,32 @@ if [ "$NODE_MODE" = 1 ]; then
       *) warn "The main panel did not accept the enrollment (token expired or address unreachable). Response: ${ERESP:-none}" ;;
     esac
   fi
-  # Lock the node regardless: a managed node should never expose a sign-in, even
-  # if enrollment needs a retry from the parent side.
-  curl -fsS -b "$CJ" -X POST "$B/admin/network-settings.json" -H "$UA" -H 'Content-Type: application/json' \
-    -d '{"nodeMode":true}' >/dev/null 2>&1 || true
+  # Only lock the node (nodeMode = no sign-in) and drop the temp password AFTER a
+  # CONFIRMED enrollment. A failed enroll must leave a recoverable box: keep the
+  # password and nodeMode off so the operator can still sign in locally or add the
+  # node by hand, instead of orphaning it (no parent control AND no local login).
+  if [ "$ENROLLED" = 1 ]; then
+    curl -fsS -b "$CJ" -X POST "$B/admin/network-settings.json" -H "$UA" -H 'Content-Type: application/json' \
+      -d '{"nodeMode":true}' >/dev/null 2>&1 || true
+    NOVA_DB="$DB_DIR/nova.db" node -e 'import("/opt/nova-node-agent/src/kv/sqlite.mjs").then(async m=>{const kv=m.openKv(process.env.NOVA_DB);await kv.delete("admin_pass");}).catch(()=>{})' >/dev/null 2>&1 || true
+  fi
   rm -f "$CJ"
-  # Clear the temporary admin password (nodeMode already blocks sign-in; this
-  # removes the credential entirely).
-  NOVA_DB="$DB_DIR/nova.db" node -e 'import("/opt/nova-node-agent/src/kv/sqlite.mjs").then(async m=>{const kv=m.openKv(process.env.NOVA_DB);await kv.delete("admin_pass");}).catch(()=>{})' >/dev/null 2>&1 || true
   sleep 2
   echo
-  printf '%s\n' "${c_grn}${c_bld}Nova managed node is ready.${c_rst}"
-  echo
-  printf '  %-16s %s\n' "Node address:" "$NODE_URL"
   if [ "$ENROLLED" = 1 ]; then
+    printf '%s\n' "${c_grn}${c_bld}Nova managed node is ready.${c_rst}"
+    echo
+    printf '  %-16s %s\n' "Node address:" "$NODE_URL"
     printf '  %-16s %s\n' "Registered to:" "$NOVA_JOIN_URL"
     printf '  %s\n' "Manage this node from that panel's Nodes page. It has no panel of its own."
   else
-    printf '  %s\n' "${c_yel}Not yet registered.${c_rst} In the main panel, add the node manually:"
-    printf '  %s\n' "  URL: $NODE_URL   (mark \"no domain\" if it shows a self-signed cert)"
-    printf '  %s\n' "  API token: shown once above was not captured; re-run \"Add node\" for a new one-liner."
+    printf '%s\n' "${c_yel}${c_bld}Node installed, but NOT registered.${c_rst}"
+    echo
+    printf '  %s\n' "Kept as a normal panel so it is not stranded. To add it by hand in the main"
+    printf '  %s\n' "panel (Nodes > add manually), use this address and API token:"
+    printf '  %-16s %s\n' "Node address:" "$NODE_URL"
+    printf '  %-16s %s\n' "API token:" "${NODE_TOKEN:-<none minted; re-run Add node for a fresh one-liner>}"
+    printf '  %s\n' "For local sign-in on this box, set a password:  nova-passwd 'YourPassword'"
   fi
   echo
   exit 0
