@@ -436,6 +436,18 @@ chgrp nogroup "$CERT_DIR/origin.pem" "$CERT_DIR/origin.key" 2>/dev/null || true
 chmod 640 "$CERT_DIR/origin.pem" "$CERT_DIR/origin.key"
 ok "certificate ready"
 
+# ---- kernel network tuning ---------------------------------------------------
+# TCP BBR + fq: better throughput on lossy, high-latency links (Iran's routes).
+# Helps every TCP protocol; Hysteria2 has its own CC. Safe since kernel 4.9. The
+# agent also re-applies this on boot per the panel toggle, so it self-heals.
+modprobe tcp_bbr 2>/dev/null || true
+cat > /etc/sysctl.d/99-nova-net.conf <<'SYSCTL'
+# Nova: BBR congestion control for better throughput on lossy/high-latency links.
+net.core.default_qdisc=fq
+net.ipv4.tcp_congestion_control=bbr
+SYSCTL
+sysctl -p /etc/sysctl.d/99-nova-net.conf >/dev/null 2>&1 || true
+
 # ---- env + systemd -----------------------------------------------------------
 say "Configuring services"
 cat > "$CERT_DIR/agent.env" <<ENV

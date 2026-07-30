@@ -14,7 +14,7 @@ multi-user accounts, a multi-node fleet, Iran bridge tunnels, one-click SSL, a T
 bot with a Mini App, and two-factor auth.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.21.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
+[![Version](https://img.shields.io/badge/version-1.22.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
@@ -59,6 +59,7 @@ Nova Server turns a plain Linux VPS into a private, censorship-resistant proxy n
 - 📊 **Per-inbound traffic**: a daily traffic chart for every inbound on the Inbounds page, so you can see which entry points carry the load
 - 🤖 **Telegram bot + Mini App**: run the whole panel inside Telegram
 - 🛡️ **Anti-censorship exits**: WARP (with your own WARP+ license), Tor, and Psiphon, all built in
+- 🚀 **Speed tuning**: TCP BBR congestion control is on by default, boosting throughput for TCP protocols (VLESS/Reality, Trojan, VMess) on Iran's lossy, high-latency routes
 - ⚙️ **Automation**: backups, health alerts, auto-update, clean-IP refresh, and a first-run launcher
 - 🧹 **Factory reset and log viewer**: reset everything back to a fresh install with one button (your admin login is kept), and read the last lines of the agent, Xray, or sing-box log inside the panel without SSH
 - 🌍 **Trilingual panel**: English, Persian (RTL), and Russian, with a full in-panel guide

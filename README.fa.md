@@ -13,7 +13,7 @@ VLESS · VMess · Trojan · Shadowsocks · Reality · Hysteria2 · TUIC · Naive
 SSL یک‌کلیکی، ربات تلگرام با Mini App و احراز هویت دومرحله‌ای.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.21.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
+[![Version](https://img.shields.io/badge/version-1.22.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
@@ -57,6 +57,7 @@ Nova Server یک VPS ساده لینوکسی را به یک نود پروکسی 
 - 📊 **ترافیک هر ورودی**: نمودار ترافیک روزانه برای هر ورودی در صفحهٔ ورودی‌ها، تا ببینید کدام نقاط ورود بار بیشتری دارند
 - 🤖 **ربات تلگرام + Mini App**: اجرای کل پنل داخل تلگرام
 - 🛡️ **خروج ضد فیلترینگ**: WARP (با لایسنس WARP+ خودتان)، Tor و Psiphon، به‌صورت داخلی
+- 🚀 **تنظیم سرعت**: کنترل ازدحام ⁦TCP BBR⁩ به‌صورت پیش‌فرض روشن است و توان عبوری پروتکل‌های ⁦TCP⁩ (⁦VLESS/Reality⁩، ⁦Trojan⁩، ⁦VMess⁩) را روی مسیرهای پرتلفات و پرتأخیر ایران بالا می‌برد
 - ⚙️ **خودکارسازی**: پشتیبان‌گیری، هشدارهای سلامت، به‌روزرسانی خودکار، تازه‌سازی آی‌پی تمیز و راه‌انداز اولین اجرا
 - 🧹 **بازنشانی کارخانه‌ای و نمایشگر لاگ**: با یک دکمه همه‌چیز را به نصب تازه برگردانید (ورود مدیر شما حفظ می‌شود)، و آخرین خطوط لاگ ⁦agent⁩، ⁦Xray⁩ یا ⁦sing-box⁩ را بدون ⁦SSH⁩ داخل پنل ببینید
 - 🌍 **پنل سه‌زبانه**: انگلیسی، فارسی (راست‌به‌چپ) و روسی، همراه با راهنمای کامل داخل پنل

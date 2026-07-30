@@ -1,12 +1,12 @@
-# Nova Server v1.21.0
+# Nova Server v1.22.0
 
-A domain and valid certificate for each Iran bridge.
+Faster connections on lossy links.
 
 ## Added
 
-- **Bridge domains with per-SNI certificates.** In the Tunnel section, give each Iran bridge its own domain with a valid certificate. Nova auto-issues and renews it over Cloudflare DNS (even though the domain points at the Iran bridge), or you can paste your own certificate, which the panel verifies covers the domain before saving. The foreign exit then serves the matching certificate by SNI, so clients dial the bridge domain directly, with no allowInsecure, and each config looks like a different site to a censor. Put the bridge domain in the failover-bridges list and each config presents its own domain as SNI.
+- **TCP BBR congestion control (default on).** Nova now enables BBR + the fq qdisc on the node, which measurably improves throughput for TCP-based protocols (VLESS/Reality, Trojan, VMess) on lossy, high-latency links, exactly the conditions on Iran's international routes. It is applied at install and re-applied by the agent on boot, so existing nodes get it through the update. A toggle with a live status line lives in Xray Settings > Network tuning. Hysteria2 has its own congestion control and is unaffected.
 
 ## Notes
 
-- Opt-in and default off; existing setups are unchanged. Certs live at /etc/nova/certs and renew hands-off.
+- On by default; the downside is negligible. Turn it off in the panel if you prefer the kernel default (cubic).
 - Existing nodes pick this up through the version-gated update. Nova Server ships as an obfuscated build by design; the installer and verified tools stay open.
