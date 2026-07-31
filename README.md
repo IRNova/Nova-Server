@@ -14,7 +14,7 @@ multi-user accounts, a multi-node fleet, Iran bridge tunnels, one-click SSL, a T
 bot with a Mini App, and two-factor auth.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.26.2-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
+[![Version](https://img.shields.io/badge/version-1.26.3-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
@@ -51,7 +51,7 @@ Nova Server turns a plain Linux VPS into a private, censorship-resistant proxy n
 - 🇮🇷 **Iran bridge tunnels with failover**: put a clean-IP server inside Iran in front of a foreign exit (Backhaul, BackPack, rathole, wstunnel); one click points every client link at the bridge across all formats (raw, Clash, sing-box), and only the ports you forward travel through the bridge; list several bridges and the exit dials all of them so clients fail over automatically if one drops; a bridge readiness check (`nova-bridge.sh --check`) confirms a direct public IP and free ports before install, and a port sweep finds a live control port when Iran blocks the default
 - 🔐 **One-click SSL**: Let's Encrypt or fully automatic Cloudflare (auto DNS + wildcard), with support for user and account-owned API tokens and no manual port 80 juggling
 - 🌍 **Multiple domains and subdomains**: keep one primary panel address, add up to 20 trusted server aliases, issue and renew each certificate automatically, and publish each working address as an independent subscription fallback; activation is health-gated and restores the previous certificate, DNS, Xray, and sing-box state on failure; Cloudflare orange-cloud aliases are safely limited to WebSocket
-- 👥 **Full per-user control**: data quota, expiry, device limit, data reset, and per-user protocol access
+- 👥 **Full per-user control**: data quota with consistent GB display and editing, expiry, device limit, data reset, and per-user protocol access
 - 🛰️ **Multi-node fleet**: manage many servers from one panel; add a new node by running a single panel-built command on a fresh VPS
 - 🌐 **Resilience mode**: one switch spreads every config across the main server, all your nodes, and all Iran bridges, so a user's client url-tests and fails over automatically when an IP is blocked
 - 🏷️ **Bridge domains with per-SNI certs**: give each Iran bridge its own domain with a valid certificate (auto-issued over Cloudflare DNS, or paste your own); the exit serves the matching cert by SNI and adds the domain to subscriptions automatically, so clients dial it directly with no allowInsecure and no duplicate tunnel control connection; the failover list stays reserved for separate Iran servers
