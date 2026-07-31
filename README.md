@@ -14,7 +14,7 @@ multi-user accounts, a multi-node fleet, Iran bridge tunnels, one-click SSL, a T
 bot with a Mini App, and two-factor auth.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.26.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
+[![Version](https://img.shields.io/badge/version-1.26.1-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
@@ -49,7 +49,7 @@ Nova Server turns a plain Linux VPS into a private, censorship-resistant proxy n
 - 🧭 **Automated Setup Assistant**: opens on the first panel visit and remains available for later adjustments. A few plain-language questions cover users, network restrictions, independent Iran bridge and additional-node choices, domains, Cloudflare, and the balance between simplicity, speed, and resilience. Before applying anything, it shows every protocol, transport, security method, and port it will use, then validates the plan and links directly to the secure domain, bridge, or node tools that finish it
 - 🐇 **Hysteria2, hardened**: UDP port hopping over a range you pick (so no single port to block), Salamander obfuscation, and ECH to hide the SNI; the full port-hopping + ECH config is delivered in the sing-box subscription, while the private ECH key never leaves the node
 - 🇮🇷 **Iran bridge tunnels with failover**: put a clean-IP server inside Iran in front of a foreign exit (Backhaul, BackPack, rathole, wstunnel); one click points every client link at the bridge across all formats (raw, Clash, sing-box), and only the ports you forward travel through the bridge; list several bridges and the exit dials all of them so clients fail over automatically if one drops; a bridge readiness check (`nova-bridge.sh --check`) confirms a direct public IP and free ports before install, and a port sweep finds a live control port when Iran blocks the default
-- 🔐 **One-click SSL**: Let's Encrypt or fully automatic Cloudflare (auto DNS + wildcard), with no manual port 80 juggling
+- 🔐 **One-click SSL**: Let's Encrypt or fully automatic Cloudflare (auto DNS + wildcard), with support for user and account-owned API tokens and no manual port 80 juggling
 - 🌍 **Multiple domains and subdomains**: keep one primary panel address, add up to 20 trusted server aliases, issue and renew each certificate automatically, and publish each working address as an independent subscription fallback; Cloudflare orange-cloud aliases are safely limited to WebSocket
 - 👥 **Full per-user control**: data quota, expiry, device limit, data reset, and per-user protocol access
 - 🛰️ **Multi-node fleet**: manage many servers from one panel; add a new node by running a single panel-built command on a fresh VPS
@@ -239,7 +239,7 @@ Two operator tools live under **Settings > Security**.
 | **Egress** | Direct, block, WARP (with a WARP+ license), Tor, Psiphon, custom SOCKS/HTTP outbounds, and per-inbound egress assignment |
 | **Iran tunnels** | Bridge to the exit with Backhaul, BackPack, rathole, or wstunnel; carries TCP and UDP so Hysteria2 keeps working; one-click point-all-links-at-the-bridge across every format (raw, Clash, sing-box); only forwarded ports travel through the bridge (recommended: just `443`, so other inbounds stay direct and fast with the bridged link as fallback) |
 | **DNS tunnel** | Optional built-in DNS tunnel that tunnels traffic inside DNS queries, a last-resort transport for when only DNS answers, with an engine choice: MasterDnsVPN (simple default) or CottenDns (DoT/DoH resolvers, multi-resolver load balancing, loss recovery, for very hostile networks); automatic `NS` delegation on Cloudflare or guided manual setup, plus client-config export from the panel |
-| **Domains and SSL** | One primary panel domain plus up to 20 additional server domains, separate Iran bridge domains, and optional managed-node domains; one-click Let's Encrypt, automatic Cloudflare DNS, or a pasted certificate; runtime validation before publication, auto-renewal, and safe WebSocket-only handling for orange-cloud aliases |
+| **Domains and SSL** | One primary panel domain plus up to 20 additional server domains, separate Iran bridge domains, and optional managed-node domains; one-click Let's Encrypt, automatic Cloudflare DNS with user or account-owned API tokens, or a pasted certificate; runtime validation before publication, auto-renewal, and safe WebSocket-only handling for orange-cloud aliases |
 | **Panel access** | A random secret path for the panel with a plain 404 for every other path, plus an optional dedicated HTTPS port; both changeable in Settings > General; `nova-passwd` prints the current panel URL |
 | **Fleet** | Register and manage many Nova nodes from one panel, aggregate users and usage, provision remotely; join a fresh VPS as a managed node with a single panel-built command (one-time token, no local panel) |
 | **API and bot** | REST API with token auth (`/api/v1`) and a full Telegram bot with a Mini App that opens the whole panel in Telegram |
