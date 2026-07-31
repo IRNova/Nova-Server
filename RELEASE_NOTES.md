@@ -1,3 +1,31 @@
+# Nova Server v1.26.5
+
+Nova Server 1.26.5 polishes the persistent agent build indicator and keeps it synchronized with live update checks.
+
+## A clearer agent build indicator
+
+- The sidebar now presents the agent build as a compact, readable version badge instead of a long overflowing string.
+- The full build identifier remains available as a tooltip for diagnostics.
+- Update checks refresh the visible badge immediately when a newer current version is reported.
+- English, Persian, and Russian layouts keep the badge aligned without wrapping or clipping.
+
+## Validation
+
+- Regression coverage verifies version formatting, live update synchronization, and compact badge styling.
+- The production archive remains source-free and excludes tests, Git metadata, source maps, and internal instructions.
+
+## Upgrade
+
+Existing servers can update normally from the panel. No database migration is required.
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
+```
+
+The public repository contains only the obfuscated runtime package, installers, checksums, documentation, and Docker release context. The unobfuscated server source remains private.
+
+---
+
 # Nova Server v1.26.4
 
 Nova Server 1.26.4 fixes certificate activation feedback and subscription addresses across the panel, API, Telegram bot, installer, and recovery tools.
