@@ -1,15 +1,29 @@
-# Nova Server v1.26.3
+# Nova Server v1.26.4
 
-Nova Server 1.26.3 fixes inconsistent data quota units in the user editor. A limit entered as 10 GB now displays as 10 GB everywhere instead of 10.7 GB.
+Nova Server 1.26.4 fixes certificate activation feedback and subscription addresses across the panel, API, Telegram bot, installer, and recovery tools.
 
-## Consistent user quotas
+## Certificates that recover and explain failures
 
-- The user list, edit modal, and full user detail page now format usage and limits with the same binary unit basis used by quota enforcement.
-- Both user editors convert total, upload, and download limits through one shared helper.
-- Opening and saving a user no longer changes a quota between decimal and binary units.
-- Saved plans, CSV import and export, subscriptions, and Telegram already used this binary convention and now agree with the panel.
-- Existing quota bytes and usage counters are not migrated or reset.
-- A regression test executes the panel helpers and verifies that 10 GB round-trips to exactly 10 GB.
+- Let's Encrypt HTTP validation can add a tracked Nova-owned UFW rule for TCP port 80 while preserving rules that already existed. If ownership tracking cannot be saved, Nova removes only the rule it just added.
+- Fresh installation reports immediate certificate request failures and timeouts instead of silently falling back.
+- Candidate activation uses a longer retry window for the local Xray TLS front on slower VPS instances.
+- Nova captures the peer certificate as soon as the TLS response arrives, avoiding a false readiness failure after Node releases the response socket.
+- English, Persian, and Russian errors now distinguish Xray configuration rejection, Xray restart failure, sing-box restart failure, and TLS-front readiness failure.
+- Transactional activation still restores the previous certificate, runtime configuration, services, settings, and Nova-created Cloudflare DNS change on failure.
+
+## Subscription links that open correctly
+
+- IP-only nodes no longer advertise plaintext HTTP subscription URLs on an unserved port.
+- Subscription secrets always use HTTPS, including self-signed nodes.
+- Custom front ports are preserved in panel, REST API, Telegram, installer, enrollment, and recovery output.
+- SSH recovery commands load the active front port from Nova's root-owned environment, reject malformed replacement hosts, and never reflect rejected host text into terminal output.
+- IPv6 literals remain complete and are correctly bracketed in URLs.
+- Unsafe Host-header authorities are rejected instead of being reflected into generated links.
+
+## Validation
+
+- Regression coverage includes self-signed IPv4, IPv6, custom front ports, host injection, installer certificate failures, slow Xray readiness, TLS socket lifecycle handling, and real admin and REST subscription responses.
+- The production archive contains obfuscated runtime modules and excludes tests, Git metadata, source maps, and internal instructions.
 
 ## Upgrade
 

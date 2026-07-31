@@ -394,6 +394,10 @@ mkdir -p /etc/nova/tunnel && chmod 700 /etc/nova/tunnel
 #   nova-passwd 'NewPassword' [--clear-2fa]
 cat > /usr/local/bin/nova-passwd <<'NPW'
 #!/bin/bash
+if [ -r /etc/nova/agent.env ]; then
+  nova_front_port="$(sed -n 's/^NOVA_FRONT_PORT=//p' /etc/nova/agent.env | tail -n 1)"
+  case "$nova_front_port" in ''|*[!0-9]*) ;; *) export NOVA_FRONT_PORT="$nova_front_port" ;; esac
+fi
 exec node /opt/nova-node-agent/bin/reset-password.mjs "$@"
 NPW
 chmod +x /usr/local/bin/nova-passwd 2>/dev/null || true
@@ -404,6 +408,10 @@ chmod +x /usr/local/bin/nova-passwd 2>/dev/null || true
 #   nova-access --reset    revert to a self-signed no-domain node (server IP)
 cat > /usr/local/bin/nova-access <<'NAC'
 #!/bin/bash
+if [ -r /etc/nova/agent.env ]; then
+  nova_front_port="$(sed -n 's/^NOVA_FRONT_PORT=//p' /etc/nova/agent.env | tail -n 1)"
+  case "$nova_front_port" in ''|*[!0-9]*) ;; *) export NOVA_FRONT_PORT="$nova_front_port" ;; esac
+fi
 exec node /opt/nova-node-agent/bin/reset-access.mjs "$@"
 NAC
 chmod +x /usr/local/bin/nova-access 2>/dev/null || true
@@ -412,6 +420,10 @@ chmod +x /usr/local/bin/nova-access 2>/dev/null || true
 # new admin password so you can sign in locally):  nova-unlock 'YourPassword'
 cat > /usr/local/bin/nova-unlock <<'NUL'
 #!/bin/bash
+if [ -r /etc/nova/agent.env ]; then
+  nova_front_port="$(sed -n 's/^NOVA_FRONT_PORT=//p' /etc/nova/agent.env | tail -n 1)"
+  case "$nova_front_port" in ''|*[!0-9]*) ;; *) export NOVA_FRONT_PORT="$nova_front_port" ;; esac
+fi
 exec node /opt/nova-node-agent/bin/unlock-node.mjs "$@"
 NUL
 chmod +x /usr/local/bin/nova-unlock 2>/dev/null || true
@@ -475,11 +487,19 @@ case "$PUBIP" in *[!0-9.:a-fA-F]* | "") PUBIP="" ;; esac
 # (same code path the app/panel "add a domain" button uses).
 HOST="$PUBIP"; INSECURE=true
 
+url_host() {
+  case "$1" in *:*) printf '[%s]' "$1";; *) printf '%s' "$1";; esac
+}
+
+json_error() {
+  node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const v=JSON.parse(s);console.log(String(v.error||'').replace(/[\\r\\n]+/g,' ').slice(0,500))}catch{}})" 2>/dev/null || true
+}
+
 if [ ! -s "$CERT_DIR/origin.pem" ] || [ ! -s "$CERT_DIR/origin.key" ]; then
   say "Generating a TLS certificate for $HOST"
   openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
     -keyout "$CERT_DIR/origin.key" -out "$CERT_DIR/origin.pem" \
-    -subj "/CN=$HOST" -addext "subjectAltName=DNS:$HOST,IP:$PUBIP" >/dev/null 2>&1 \
+    -subj "/CN=$HOST" -addext "subjectAltName=IP:$PUBIP" >/dev/null 2>&1 \
     || openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
        -keyout "$CERT_DIR/origin.key" -out "$CERT_DIR/origin.pem" -subj "/CN=$HOST" >/dev/null 2>&1
 fi
@@ -691,16 +711,32 @@ if [ -n "${NOVA_DOMAIN:-}" ]; then
   DOMAIN_ARGS=(domain string "$NOVA_DOMAIN" method string letsencrypt)
   [ -n "${NOVA_DOMAIN_EMAIL:-}" ] && DOMAIN_ARGS+=(email string "$NOVA_DOMAIN_EMAIL")
   DBODY="$(json_body "${DOMAIN_ARGS[@]}")"
-  curl -fsS -b "$CJ" -X POST "$B/admin/domain" -H "$UA" -H 'Content-Type: application/json' \
-    --data-binary @- <<< "$DBODY" >/dev/null 2>&1 || true
-  for i in $(seq 1 36); do
-    sleep 5
-    DST="$(curl -fsS -b "$CJ" "$B/admin/domain" -H "$UA" 2>/dev/null || true)"
-    case "$DST" in
-      *'"state":"active"'*) HOST="$NOVA_DOMAIN"; INSECURE=false; ok "certificate issued for $NOVA_DOMAIN"; break;;
-      *'"state":"error"'*)  warn "could not get a certificate; leaving the node on its IP + self-signed cert."; break;;
-    esac
-  done
+  DOMAIN_START="$(curl -sS -b "$CJ" -X POST "$B/admin/domain" -H "$UA" -H 'Content-Type: application/json' \
+    --data-binary @- <<< "$DBODY" 2>/dev/null || true)"
+  DOMAIN_FINISHED=0
+  case "$DOMAIN_START" in
+    *'"error"'*)
+      DOMAIN_FINISHED=1
+      DOMAIN_ERROR="$(printf '%s' "$DOMAIN_START" | json_error)"
+      warn "Certificate setup could not start; leaving the node on its IP + self-signed certificate."
+      [ -n "$DOMAIN_ERROR" ] && warn "$DOMAIN_ERROR";;
+  esac
+  if [ "$DOMAIN_FINISHED" != 1 ]; then
+    for i in $(seq 1 36); do
+      sleep 5
+      DST="$(curl -fsS -b "$CJ" "$B/admin/domain" -H "$UA" 2>/dev/null || true)"
+      case "$DST" in
+        *'"state":"active"'*) HOST="$NOVA_DOMAIN"; INSECURE=false; DOMAIN_FINISHED=1; ok "certificate issued for $NOVA_DOMAIN"; break;;
+        *'"state":"error"'*)
+          DOMAIN_FINISHED=1
+          DOMAIN_ERROR="$(printf '%s' "$DST" | json_error)"
+          warn "could not get a certificate; leaving the node on its IP + self-signed cert."
+          [ -n "$DOMAIN_ERROR" ] && warn "$DOMAIN_ERROR"
+          break;;
+      esac
+    done
+  fi
+  [ "$DOMAIN_FINISHED" = 1 ] || warn "Certificate setup did not finish within 3 minutes. The node remains available on its IP with a self-signed certificate; retry from the panel."
 fi
 
 SUBTOKEN="$(curl -fsS -b "$CJ" "$B/admin/network-settings.json" -H "$UA" 2>/dev/null | grep -oE '"subToken":"[a-f0-9]+"' | cut -d'"' -f4 || true)"
@@ -711,7 +747,8 @@ SUBTOKEN="$(curl -fsS -b "$CJ" "$B/admin/network-settings.json" -H "$UA" 2>/dev/
 ENROLLED=0
 if [ "$NODE_MODE" = 1 ]; then
   say "Registering this node with ${NOVA_JOIN_URL}"
-  NODE_URL="https://$HOST"
+  NODE_PORT_SFX=""; [ "${FRONT_PORT:-443}" != 443 ] && NODE_PORT_SFX=":$FRONT_PORT"
+  NODE_URL="https://$(url_host "$HOST")$NODE_PORT_SFX"
   NODE_CERT_DER=""
   if [ "$INSECURE" = true ]; then
     NODE_CERT_DER="$(openssl x509 -in "$CERT_DIR/origin.pem" -outform DER 2>/dev/null | base64 -w0 2>/dev/null || true)"
@@ -833,8 +870,9 @@ EFF_PORT="${EFF##*|}"
 # Carry the custom front port into every printed link so they point where the
 # node actually serves (not the default 443 the box could not use).
 PORT_SFX=""; [ "${FRONT_PORT:-443}" != 443 ] && PORT_SFX=":$FRONT_PORT"
-PANEL_URL="https://$HOST$PORT_SFX/"
-[ -n "$EFF_PATH" ] && PANEL_URL="https://$HOST$PORT_SFX/$EFF_PATH/"
+URL_HOST="$(url_host "$HOST")"
+PANEL_URL="https://$URL_HOST$PORT_SFX/"
+[ -n "$EFF_PATH" ] && PANEL_URL="https://$URL_HOST$PORT_SFX/$EFF_PATH/"
 echo
 printf '%s\n' "${c_grn}${c_bld}Nova node is ready.${c_rst}"
 echo
@@ -845,8 +883,8 @@ else
   printf '  %-16s %s\n' "Admin password:" "$ADMIN_PASS"
 fi
 printf '  %-16s %s\n' "Web panel:" "$PANEL_URL"
-[ -n "${EFF_PORT:-}" ] && [ "$EFF_PORT" != 0 ] && printf '  %-16s %s\n' "Panel port:" "https://$HOST:$EFF_PORT/${EFF_PATH:+$EFF_PATH/}"
-[ -n "${SUBTOKEN:-}" ] && printf '  %-16s %s\n' "Subscription:" "https://$HOST$PORT_SFX/sub?token=$SUBTOKEN"
+[ -n "${EFF_PORT:-}" ] && [ "$EFF_PORT" != 0 ] && printf '  %-16s %s\n' "Panel port:" "https://$URL_HOST:$EFF_PORT/${EFF_PATH:+$EFF_PATH/}"
+[ -n "${SUBTOKEN:-}" ] && printf '  %-16s %s\n' "Subscription:" "https://$URL_HOST$PORT_SFX/sub?token=$SUBTOKEN"
 echo
 if [ -n "$EFF_PATH" ]; then
   printf '  %s\n' "${c_yel}${c_bld}Save the panel URL: the secret path is what hides your panel.${c_rst}"
