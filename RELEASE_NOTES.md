@@ -1,24 +1,22 @@
-# Nova Server v1.26.1
+# Nova Server v1.26.2
 
-Nova Server 1.26.1 fixes Cloudflare account-owned API token support and makes failed automatic certificates clear and recoverable.
+Nova Server 1.26.2 makes every primary, additional-server, and Iran-bridge certificate change transactional, so a failed domain attempt cannot take working configurations offline.
 
-## Cloudflare token compatibility
+## Safe certificate activation
 
-- Both user API tokens and account-owned API tokens are accepted.
-- Nova discovers the accessible account from the token's zones and verifies account-owned tokens through the correct Cloudflare account endpoint.
-- Connecting Cloudflare now confirms that the token can list at least one active zone, so a missing Zone Read permission is reported before domain setup begins.
-- Use a scoped token with Zone DNS Edit and Zone Read for the domains Nova should manage.
-
-## Domain and certificate recovery
-
-- Automatic Cloudflare setup creates the DNS record and uses DNS validation, so inbound TCP port 80 is not required.
-- Automatic Let's Encrypt now clearly explains that the domain must already point directly to the server and TCP port 80 must be reachable.
-- Certificate errors distinguish DNS resolution, port 80 reachability, and Cloudflare permission problems in English, Persian, and Russian.
-- Raw commands, API errors, tokens, internal paths, and process details are no longer exposed in the panel.
+- Nova snapshots the working certificate, private key, renewal hook, Xray config, and sing-box config before starting a domain change.
+- Certificate jobs and runtime configuration writes are serialized, so overlapping changes cannot restore stale state over a newer successful change.
+- Xray and sing-box restart failures are now observable during certificate activation instead of being treated as success.
+- The candidate domain must serve Nova's local build marker through the TLS front and present a certificate that covers its exact SNI before settings are published.
+- A failed activation restores the previous certificate and runtime files, reapplies the previous settings, restarts the services, and verifies the restored front.
+- Reissuing an already-active additional or bridge domain keeps the previous working address active if the replacement fails.
+- Failed automatic Cloudflare activation also restores the previous DNS record or removes the record Nova created.
+- Cloudflare credentials, the root renewal hook, and proxy configs now use atomic replacement with exact secret-safe permissions, and their ownership state is included in rollback.
+- If rollback itself cannot be verified, the panel gives a distinct trilingual recovery action and warns the operator not to retry until Xray is healthy.
 
 ## Upgrade
 
-Existing servers can update normally from the panel. No database migration is required. If a valid account-owned Cloudflare token was previously rejected, reconnect the same token after updating.
+Existing servers can update normally from the panel. No database migration is required.
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
