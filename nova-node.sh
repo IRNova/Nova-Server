@@ -33,7 +33,17 @@
 # =============================================================================
 set -euo pipefail
 
-TARBALL_URL="${NOVA_TARBALL_URL:-https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node-agent.tar.gz}"
+# The public release channel. A preview or mirror copy of this script overrides
+# the two URLs below; either way the node is pinned to whatever it installed
+# from, and PUBLIC_TARBALL_URL is what "is this the public build" is measured
+# against, so it must keep pointing at the real release.
+PUBLIC_TARBALL_URL="https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node-agent.tar.gz"
+TARBALL_URL="${NOVA_TARBALL_URL:-$PUBLIC_TARBALL_URL}"
+PUBLIC_VERSION_URL="https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node-agent.version"
+VERSION_URL="${NOVA_VERSION_URL:-$PUBLIC_VERSION_URL}"
+# Set to 1 only in a published preview/mirror copy of this script. Env cannot
+# turn it on, so a pasted NOVA_TARBALL_URL= cannot make itself permanent.
+PERSIST_CHANNEL=0
 AGENT_DIR=/opt/nova-node-agent
 CERT_DIR=/etc/nova
 DB_DIR=/var/lib/nova
@@ -532,6 +542,55 @@ NOVA_XRAY_BIN=$XRAY_BIN
 ENV
 # Custom front port (443 was taken): the agent fronts xray here and every link uses it.
 [ "${FRONT_PORT:-443}" != 443 ] && printf 'NOVA_FRONT_PORT=%s\n' "$FRONT_PORT" >> "$CERT_DIR/agent.env"
+
+# Update channel. Persisting this is what keeps a preview or mirror node from
+# replacing itself with the public build on its next check, but it is also the
+# node's SUPPLY CHAIN: agent.env is the EnvironmentFile of a root service, the
+# self-updater reads the URL from there, and the .sha256 it verifies against
+# comes from the same origin, so the checksum proves nothing about a URL someone
+# else chose. Three gates, because a one-liner with a variable prepended is a
+# shape operators already see and paste.
+if [ "$TARBALL_URL" != "$PUBLIC_TARBALL_URL" ] || [ "$VERSION_URL" != "$PUBLIC_VERSION_URL" ]; then
+  # Every gate below guards what gets WRITTEN, so all of it lives inside the
+  # PERSIST_CHANNEL branch. Validating earlier would reject installs that
+  # persist nothing: the Docker image installs from a local file:// archive
+  # (docker/firstboot.sh), so an https check out here refuses to build or
+  # recreate any container, and the failure lands after agent.env is written but
+  # before the systemd unit exists.
+  if [ "$PERSIST_CHANNEL" = 1 ]; then
+    # 1. No shell or systemd metacharacters. A newline would append arbitrary
+    #    extra KEY=value lines to a root service's environment; a quote or
+    #    backslash corrupts the file through systemd's own parsing.
+    case "$TARBALL_URL$VERSION_URL" in
+      *[!A-Za-z0-9:/._~%?=+-]*) die "Refusing to persist a malformed update URL." ;;
+    esac
+    # 2. Plain http would let anyone on the path replace the agent.
+    case "$TARBALL_URL" in https://*) ;; *) die "A persisted update channel must be https." ;; esac
+    case "$VERSION_URL" in https://*) ;; *) die "A persisted update channel must be https." ;; esac
+    # Both halves must come from the same place. A custom tarball with the
+    # public version marker pins the node to a build that never sees another
+    # update while the panel reports "up to date"; the reverse restarts the
+    # agent every 24h without ever converging.
+    if [ "$TARBALL_URL" != "$PUBLIC_TARBALL_URL" ] && [ "$VERSION_URL" = "$PUBLIC_VERSION_URL" ]; then
+      die "A persisted channel needs NOVA_VERSION_URL from the same origin as NOVA_TARBALL_URL."
+    fi
+    if [ "$VERSION_URL" != "$PUBLIC_VERSION_URL" ] && [ "$TARBALL_URL" = "$PUBLIC_TARBALL_URL" ]; then
+      die "A persisted channel needs NOVA_TARBALL_URL from the same origin as NOVA_VERSION_URL."
+    fi
+    printf 'NOVA_TARBALL_URL=%s\n' "$TARBALL_URL" >> "$CERT_DIR/agent.env"
+    printf 'NOVA_VERSION_URL=%s\n' "$VERSION_URL" >> "$CERT_DIR/agent.env"
+    warn "This node tracks a custom update channel, not the public Nova release."
+  else
+    # PERSIST_CHANNEL is baked into a rebranded installer by whoever publishes
+    # that channel, and cannot be set from the environment, so a pasted
+    # NOVA_TARBALL_URL= is a ONE-TIME install and updates stay on the public
+    # release. Silent for file:// (the Docker image's normal path).
+    case "$TARBALL_URL$VERSION_URL" in
+      *file://*) ;;
+      *) warn "Installed once from a custom URL. Updates still come from the public release." ;;
+    esac
+  fi
+fi
 
 NODE_BIN="$(command -v node)"
 cat > /etc/systemd/system/nova-agent.service <<UNIT

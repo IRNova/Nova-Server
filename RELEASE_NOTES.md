@@ -1,147 +1,53 @@
-# Nova Server v1.28.0
+# Nova Server v1.29.0
 
-Nova Server 1.28.0 fixes three ways a config could be handed out that did not work, and makes the node's certificate, rather than a saved setting, decide which domains it claims to answer for.
+Nova Server 1.29.0 stops the Clash and sing-box subscriptions from handing out configs that could never work, and changes what happens when a subscription has nothing in it.
 
-## Configs that pointed at the wrong server
+Two of the problems below are not new. They have been present in every release to date, and both put a user's real address on the wire while their client reported it was connected. If you run Nova for anyone on a censored network, this is the release to take.
 
-- An inbound running on a fleet node was listed at the panel's address in the Clash and sing-box subscriptions, so that entry dialled a port the panel does not listen on and could never connect. It now uses the node's own address, matching the plain subscription.
-- Resilience mode spreads an inbound across every node. The Clash and sing-box subscriptions only ever carried the local copy, so the redundancy was missing from the formats most desktop clients import.
-- Per-country exits reached the plain subscription only. A user who had opted into them received none in Clash or sing-box.
+## Global mode sent everything outside the tunnel
 
-Both subscription builders now share one function for deciding where an inbound lives, so they cannot drift apart again.
+mihomo, the core behind Clash Meta, Clash Verge, FlClash and ClashMetaForAndroid, builds its own `GLOBAL` selector before it reads a subscription, and that selector lists `DIRECT` first, so `DIRECT` is what it selects. Nova never defined a `GLOBAL` group of its own, so a user who switched their client to Global mode, which people do precisely to force everything through the VPN, got the exact opposite: every request left on their real IP with the real SNI, while the client showed a healthy connection and the correct server name.
 
-## The Telegram bot hands out the same configs as the subscription link
+Nova now defines `GLOBAL` itself, pointing at the working proxy group. Rule mode is unchanged.
 
-- Configs sent by the bot were missing the Iran bridge routing, the spread across nodes, and the extra-domain fallbacks. A user who took their configs from the bot quietly received a weaker set than one who imported the subscription link.
-- A user with many inbounds got an error and no configs at all, because the whole list was sent as one message and Telegram rejects anything over its size limit. The list is now split across messages, always between configs, never through one.
+## One inbound could take down every subscription
 
-## The certificate decides what the node claims
+An inbound stored with Reality security but no key made the subscription builder throw. Because `/sub` renders every inbound in a single pass, one such record returned an error to **every** user on the panel, in every format, until it was found and deleted. The subscription page showed an empty list rather than an error, which made it look like a configuration problem rather than a fault.
 
-- The wildcard setting records what was requested when a certificate was ordered, not what was issued. A node could hold the setting without holding a matching certificate, and then every subdomain looked valid while no client could verify it.
-- Nova now reads the certificate itself and trusts what it actually covers. Where no certificate can be read, the previous behaviour is kept, so nothing changes for a node that was already correct.
+Such an inbound is now left out instead. It is not emitted with an empty key either: sing-box answers `invalid public_key` and xray answers `empty password`, and both refuse the whole configuration, so one bad record would have cost that user every config they had.
 
-## Configs current clients would not load at all
+## Transports those formats cannot express
 
-- Recent sing-box versions removed the routing fields Nova was still using, and the Nova client itself ships one of those versions. Any server with ad blocking, Iranian direct routing, or QUIC blocking turned on was producing a config that sing-box refused to open. Those settings now use the current form and load again.
-- A user whose name matched one the client reserves for itself (for example "DIRECT") made the client throw away the entire subscription, not just that one entry. Names are now made unique before they are sent.
+XHTTP is Xray-only. sing-box has no implementation of it, and Nova's sing-box builder knows only WebSocket and gRPC. An XHTTP inbound was still written into both formats anyway:
 
-## Validation
+- In sing-box, so Hiddify, Karing and anything else built on it, the entry lost its transport and dialled plain TLS at a server speaking XHTTP. It could not connect, and the error said nothing useful.
+- In Clash the entry carried `network: xhttp`. mihomo does not reject a transport it does not recognise; it ignores the field and quietly falls back to plain TCP, so the client showed a working proxy that was speaking the wrong protocol.
 
-- 446 automated tests pass, including regression coverage for fleet placement, resilience, per-country exits, message splitting, client-reserved names, the current sing-box routing form, certificate pinning, and certificate reading verified against real certificates.
-- The production archive remains source-free and excludes tests, Git metadata, source maps, and internal instructions.
+XHTTP and httpupgrade are now left out of those two formats. Nothing is lost: the plain subscription link still carries both, and that is what an Xray client reads. If you use XHTTP, hand out the subscription link rather than a Clash or sing-box profile.
 
-## Upgrade
+Hand-edited Advanced (JSON) inbounds are left out for the same reason, when their guided fields disagree with the pasted JSON. Nova did not build those inbounds and cannot describe them, so it was filling in defaults and publishing a Reality entry with a key nothing was listening with. The Advanced tab now says so.
 
-Existing servers can update normally from the panel. No database migration is required.
+## A subscription with nothing in it
 
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
-```
+The changes above make it possible for a subscription to contain no proxies. In practice the common reason is much more ordinary: the user expired, ran out of quota, or was disabled.
 
-The public repository contains only the obfuscated runtime package, installers, checksums, documentation, and Docker release context. The unobfuscated server source remains private.
+Both formats used to produce a file the client refused to load. That was accidental, but it was the safe outcome. The fix keeps the file loadable and makes the refusal deliberate: an empty subscription now blocks traffic rather than carrying it.
 
----
+This matters because clients re-download subscriptions on a timer. Had the empty file simply allowed traffic through, a user whose plan lapsed overnight would open their client, see "connected", and browse with their real address in the clear, with nothing on screen to suggest the tunnel was gone.
 
-# Nova Server v1.27.0
+Getting that right took more than a catch-all rule. In sing-box, `route.rules` govern only connections that arrive through an inbound; internal dialers such as a DNS transport with no detour go straight to whatever `final` names, so an ordinary direct outbound there kept leaking DNS after everything else was blocked. `final` now names an outbound that cannot carry anything.
 
-Nova Server 1.27.0 lets the QUIC protocols answer for a node's extra domains, replaces the free-text public address with a picker, and adds configuration health checks that catch a node handing out configs that cannot connect.
+## Nodes installed from a test build stay on it
 
-## Hysteria2, TUIC and NaiveProxy can choose a domain
+The installer can record its update channel in `/etc/nova/agent.env`, so a node installed from a preview or mirror stops replacing itself with the public build. Persisting that is gated: the URL must contain no shell or systemd metacharacters, it must be https, and the choice lives in the installer script rather than in an environment variable, so a pasted one-liner cannot make itself permanent. Public installs are unaffected and nothing is written for them.
 
-- Each of these inbounds now presents the certificate for its own domain instead of always using the node's primary pair.
-- The subscription advertises that same name, so the link and the listener always agree. Clash, sing-box and the raw list all match.
-- A node with no extra domains produces exactly the configuration it did before.
-- A domain the node holds no certificate for falls back to the main host rather than emitting a link that cannot connect.
+## Verification
 
-## A domain picker instead of a free-text box
+The emitted configs were checked against the real clients rather than only against Nova's own tests: xray-core 26.3.27, mihomo 1.19.29, and sing-box 1.11.15, 1.12.16, 1.13.15 and 1.14.0-beta.4. Five security review passes ran before release, and three of them found a defect in the fix from the pass before.
 
-- The inbound editor lists only domains with a working certificate, plus a Custom option.
-- Choosing one moves the connection name with it, which previously had to be remembered by hand.
-- Reality inbounds keep their borrowed SNI untouched, because that name is meant to imitate an unrelated site.
-- An inbound whose public address was literally the main host is normalised to blank on save. Blank means the main host and keeps the Iran bridge routing, the multi-node spread and the extra-domain fallbacks, all of which a literal value switched off.
+## Upgrading
 
-## Configuration health checks
-
-- Diagnostics previously inspected only services, ports, disk and certificate expiry, so a node could report perfect health while a config was undeliverable.
-- New checks: a connection name with no certificate, a QUIC dial address with no certificate, an inbound no user receives, and a user whose inbound list is empty and therefore denies everything.
-- Each finding offers one-click fixes, re-validated on the server before anything is written, and configuration problems now affect the headline verdict.
-- Inbounds that run on another node are left to that node, and an inbound reserved to a plan is reported as a note rather than a failure.
-
-## Validation
-
-- 427 automated tests pass, including regression coverage for certificate selection, subscription output in every format, and each health check and its fix.
-- The production archive remains source-free and excludes tests, Git metadata, source maps, and internal instructions.
-
-## Upgrade
-
-Existing servers can update normally from the panel. No database migration is required.
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
-```
-
-The public repository contains only the obfuscated runtime package, installers, checksums, documentation, and Docker release context. The unobfuscated server source remains private.
-
----
-
-# Nova Server v1.26.5
-
-Nova Server 1.26.5 polishes the persistent agent build indicator and keeps it synchronized with live update checks.
-
-## A clearer agent build indicator
-
-- The sidebar now presents the agent build as a compact, readable version badge instead of a long overflowing string.
-- The full build identifier remains available as a tooltip for diagnostics.
-- Update checks refresh the visible badge immediately when a newer current version is reported.
-- English, Persian, and Russian layouts keep the badge aligned without wrapping or clipping.
-
-## Validation
-
-- Regression coverage verifies version formatting, live update synchronization, and compact badge styling.
-- The production archive remains source-free and excludes tests, Git metadata, source maps, and internal instructions.
-
-## Upgrade
-
-Existing servers can update normally from the panel. No database migration is required.
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
-```
-
-The public repository contains only the obfuscated runtime package, installers, checksums, documentation, and Docker release context. The unobfuscated server source remains private.
-
----
-
-# Nova Server v1.26.4
-
-Nova Server 1.26.4 fixes certificate activation feedback and subscription addresses across the panel, API, Telegram bot, installer, and recovery tools.
-
-## Certificates that recover and explain failures
-
-- Let's Encrypt HTTP validation can add a tracked Nova-owned UFW rule for TCP port 80 while preserving rules that already existed. If ownership tracking cannot be saved, Nova removes only the rule it just added.
-- Fresh installation reports immediate certificate request failures and timeouts instead of silently falling back.
-- Candidate activation uses a longer retry window for the local Xray TLS front on slower VPS instances.
-- Nova captures the peer certificate as soon as the TLS response arrives, avoiding a false readiness failure after Node releases the response socket.
-- English, Persian, and Russian errors now distinguish Xray configuration rejection, Xray restart failure, sing-box restart failure, and TLS-front readiness failure.
-- Transactional activation still restores the previous certificate, runtime configuration, services, settings, and Nova-created Cloudflare DNS change on failure.
-
-## Subscription links that open correctly
-
-- IP-only nodes no longer advertise plaintext HTTP subscription URLs on an unserved port.
-- Subscription secrets always use HTTPS, including self-signed nodes.
-- Custom front ports are preserved in panel, REST API, Telegram, installer, enrollment, and recovery output.
-- SSH recovery commands load the active front port from Nova's root-owned environment, reject malformed replacement hosts, and never reflect rejected host text into terminal output.
-- IPv6 literals remain complete and are correctly bracketed in URLs.
-- Unsafe Host-header authorities are rejected instead of being reflected into generated links.
-
-## Validation
-
-- Regression coverage includes self-signed IPv4, IPv6, custom front ports, host injection, installer certificate failures, slow Xray readiness, TLS socket lifecycle handling, and real admin and REST subscription responses.
-- The production archive contains obfuscated runtime modules and excludes tests, Git metadata, source maps, and internal instructions.
-
-## Upgrade
-
-Existing servers can update normally from the panel. No database migration is required.
+Nodes with automatic updates enabled will take this on their next check. To update now, use the panel's update button, or re-run the installer:
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
