@@ -1,3 +1,47 @@
+# Nova Server v1.28.0
+
+Nova Server 1.28.0 fixes three ways a config could be handed out that did not work, and makes the node's certificate, rather than a saved setting, decide which domains it claims to answer for.
+
+## Configs that pointed at the wrong server
+
+- An inbound running on a fleet node was listed at the panel's address in the Clash and sing-box subscriptions, so that entry dialled a port the panel does not listen on and could never connect. It now uses the node's own address, matching the plain subscription.
+- Resilience mode spreads an inbound across every node. The Clash and sing-box subscriptions only ever carried the local copy, so the redundancy was missing from the formats most desktop clients import.
+- Per-country exits reached the plain subscription only. A user who had opted into them received none in Clash or sing-box.
+
+Both subscription builders now share one function for deciding where an inbound lives, so they cannot drift apart again.
+
+## The Telegram bot hands out the same configs as the subscription link
+
+- Configs sent by the bot were missing the Iran bridge routing, the spread across nodes, and the extra-domain fallbacks. A user who took their configs from the bot quietly received a weaker set than one who imported the subscription link.
+- A user with many inbounds got an error and no configs at all, because the whole list was sent as one message and Telegram rejects anything over its size limit. The list is now split across messages, always between configs, never through one.
+
+## The certificate decides what the node claims
+
+- The wildcard setting records what was requested when a certificate was ordered, not what was issued. A node could hold the setting without holding a matching certificate, and then every subdomain looked valid while no client could verify it.
+- Nova now reads the certificate itself and trusts what it actually covers. Where no certificate can be read, the previous behaviour is kept, so nothing changes for a node that was already correct.
+
+## Configs current clients would not load at all
+
+- Recent sing-box versions removed the routing fields Nova was still using, and the Nova client itself ships one of those versions. Any server with ad blocking, Iranian direct routing, or QUIC blocking turned on was producing a config that sing-box refused to open. Those settings now use the current form and load again.
+- A user whose name matched one the client reserves for itself (for example "DIRECT") made the client throw away the entire subscription, not just that one entry. Names are now made unique before they are sent.
+
+## Validation
+
+- 446 automated tests pass, including regression coverage for fleet placement, resilience, per-country exits, message splitting, client-reserved names, the current sing-box routing form, certificate pinning, and certificate reading verified against real certificates.
+- The production archive remains source-free and excludes tests, Git metadata, source maps, and internal instructions.
+
+## Upgrade
+
+Existing servers can update normally from the panel. No database migration is required.
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
+```
+
+The public repository contains only the obfuscated runtime package, installers, checksums, documentation, and Docker release context. The unobfuscated server source remains private.
+
+---
+
 # Nova Server v1.27.0
 
 Nova Server 1.27.0 lets the QUIC protocols answer for a node's extra domains, replaces the free-text public address with a picker, and adds configuration health checks that catch a node handing out configs that cannot connect.
