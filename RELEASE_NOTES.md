@@ -1,54 +1,27 @@
-# Nova Server v1.32.3
+# Nova Server v1.32.4
 
-**If you run fleet nodes, take this release.** Giving a node a second domain destroyed the first one, and there was no way to avoid it.
+1.32.3 made node certificates safe to change but left them reachable only over the API. This release adds the panel screen, and stops the panel from sending an unsafe request to a node that has not updated yet.
 
-## Adding a domain to a node broke every link on its existing domain
+## Node certificates now have a screen
 
-Every TLS inbound on a server, and the node's own API, share a single certificate file. Asking a node for a certificate always ran the *primary* domain job, so issuing one for a second domain overwrote that file.
+Each node in the Fleet list has a **Certificate** button. It shows the node's primary domain, the names on its current certificate, and any additional domains with their status, then offers the two operations 1.32.3 separated:
 
-The node then presented a certificate naming only the new domain. Everything on the old one broke at the handshake: every client already using it, and the panel's own control channel, which failed with "Hostname/IP does not match certificate's altnames". Fleet sync stopped with it, so the node went on serving a configuration that quietly drifted out of date. That is the same invisible failure 1.31.0 was written to end, reintroduced through a different door.
+- **Add a domain**, which leaves the node's existing certificate serving and publishes the new one alongside it. This is what an inbound that needs its own name should use.
+- **Change primary**, which is presented as the destructive action it is, since every link already issued on the old name stops working and the node's address in the panel changes.
 
-There was no way to get the intended result either. Nothing could add a domain to a node, only replace its domain, so publishing one inbound on its own name was impossible.
+Before this, neither these nor the certificate endpoint added in 1.31.0 had any control in the panel at all.
 
-Nodes now accept both, explicitly:
+## The panel no longer sends "add a domain" to a node that cannot do it
 
-- **Adding a domain** issues a certificate into its own file and offers it alongside the primary, matched by SNI, exactly as bridge domains already work. The primary is untouched, so existing links keep working. This is what an inbound that needs its own name should use.
-- **Replacing the primary** is still available, but it now has to be asked for. Since it orphans every link already issued on the old name and leaves the panel dialling a name the node no longer answers to, a request that would change the primary is refused and tells you both options instead of performing a silent outage.
+A node older than 1.32.3 does not know the field that distinguishes the two operations, and an unknown field is ignored rather than rejected. So "add a domain" aimed at an older node fell straight through to the old behaviour and replaced its certificate: the exact outage 1.32.3 exists to prevent, performed by the button meant to avoid it.
 
-The node's certificate status also reports additional domains separately from the primary, so a panel can follow one without mistaking it for the other.
+The panel now asks the node what it supports before sending anything, and refuses with an explanation if the node is too old. It reads the answer from the node's own certificate response rather than comparing version strings, so it cannot be fooled by a node that reports a version it does not behave like.
 
-Both are driven through the node API (`POST /api/v1/cert`, owner token) or the panel's `/admin/nodes` `cert` action, with `kind: "alias"` to add a domain and `replace: true` to change the primary. **There is still no button for this in the panel**, for node certificates generally, not just these two modes. That UI is the obvious next piece of work; this release makes the underlying operation safe and possible, which it was not before.
-
-Three smaller faults on the same path went with it: the Cloudflare method was tested against a field that is never written, so DNS-01 was refused on nodes that genuinely had a token connected (and DNS-01 is the only method that does not stop xray for the challenge); a hand-installed certificate was reported back as a Cloudflare one; and a bad pasted certificate was accepted with a success response and only failed later.
-
-Certificate jobs also queue behind one another, and a job that waited more than fifteen minutes for its turn was treated as dead before it started, then issued a certificate and rolled it back anyway. Provisioning several domains in a row is exactly what triggers it, which is what this release makes people do.
-
-## Resellers can now be charged for renewals
-
-1.32.2 closed a hole where a reseller could hand out any plan's access for free, and deliberately left two related gaps open because they needed a pricing decision: extending a customer's expiry and resetting their usage cost nothing, so a customer bought once could be renewed for ever.
-
-Both are now priced, and no new price list was needed. Re-applying a plan was already a charged operation, so extend and reset were simply cheaper doors to the same commercial outcome. They now bill at the customer's own plan rate:
-
-- **Extending** costs a share of the plan price, pro-rated by the plan's own length. Ten days of a thirty-day plan costs a third of it.
-- **Resetting usage** costs a renewal, because it grants the plan's volume again.
-- **Goodwill stays free.** The first three days of any extension cost nothing, so a few days after an outage need no thought. The allowance is configurable.
-- A customer who is not on a plan has no price to derive from, so the renewal is refused with that explanation rather than being quietly free.
-
-**Nothing changes for an existing deployment.** Updating does not re-price a running business: renewals stay free until you turn charging on, and the health check now points out that they are free and offers the switch. New installs start with charging on.
+If you run fleet nodes, update the nodes as well as the panel. Until a node takes 1.32.3 or later, adding a domain to it stays unavailable, which is the point.
 
 ## Verification
 
-Exercised end to end on a live panel and a live fleet node, against a real Let's Encrypt issuance, with two domains pointed at one node:
-
-```
-primary certificate  -> ir.vbhshm.cloud     (unchanged by the second issuance)
-SNI ir.vbhshm.cloud  -> ir.vbhshm.cloud
-SNI ir2.vbhshm.cloud -> ir2.vbhshm.cloud
-```
-
-Both names served their own certificate from one node, with the panel's control channel and fleet sync healthy throughout, and subscriptions serving unchanged.
-
-Per-inbound certificates were listed as **untested** in 1.31.0 and 1.32.2. They are now tested, and the fault that testing exposed is what this release fixes. Certificate issuance through Cloudflare DNS-01 remains untested.
+The panel screen was driven in a browser against a live agent: the certificate view, both dialogs, and the unreachable-node path. Interface text is present in English, Persian and Russian; the English screens were checked visually.
 
 ## Upgrading
 
