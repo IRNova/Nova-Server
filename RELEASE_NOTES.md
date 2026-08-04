@@ -1,27 +1,33 @@
-# Nova Server v1.32.4
+# Nova Server v1.32.5
 
-1.32.3 made node certificates safe to change but left them reachable only over the API. This release adds the panel screen, and stops the panel from sending an unsafe request to a node that has not updated yet.
+## Your server was telling anyone who asked that it is a VPN panel
 
-## Node certificates now have a screen
+Connect to a Nova server on 443 by its bare IP, under any name at all, and it answered with the sign-in page. Found on a live Iran bridge, which returned the panel byte for byte:
 
-Each node in the Fleet list has a **Certificate** button. It shows the node's primary domain, the names on its current certificate, and any additional domains with their status, then offers the two operations 1.32.3 separated:
+```
+https://<bridge ip>/  ->  200, 1,392,610 bytes
+<title>Nova Server</title>     "Admin password"     "Sign in"
+```
 
-- **Add a domain**, which leaves the node's existing certificate serving and publishes the new one alongside it. This is what an inbound that needs its own name should use.
-- **Change primary**, which is presented as the destructive action it is, since every link already issued on the old name stops working and the node's address in the panel changes.
+That is the cheapest possible thing for a censor to find. No traffic analysis, no timing, no active probing of the protocol: one HTTP request and a string match identifies the server and every other one running the same software. It also put a sign-in form on the most exposed machine in the deployment.
 
-Before this, neither these nor the certificate endpoint added in 1.31.0 had any control in the panel at all.
+A Nova server can now answer anything that did not arrive on its own domain with an ordinary, unremarkable page, while the panel stays exactly where its owner expects it. After turning it on, the same request returns 695 bytes titled "Welcome", with no mention of Nova, no build number, no framework fingerprint and no external requests, since a fetch to a CDN would be its own tell. The admin surface returns a plain 404 to anything arriving that way, so it does not admit to existing.
 
-## The panel no longer sends "add a domain" to a node that cannot do it
+The page is deliberately generic rather than a copy of a real site. Impersonating a genuine company would be dishonest, and it is also weaker camouflage, since any mismatch against the real thing is itself a signal.
 
-A node older than 1.32.3 does not know the field that distinguishes the two operations, and an unknown field is ignored rather than rejected. So "add a domain" aimed at an older node fell straight through to the old behaviour and replaced its certificate: the exact outage 1.32.3 exists to prevent, performed by the button meant to avoid it.
+**Nothing a user holds is affected.** Subscriptions, the fleet API, tunnels and relays keep answering on whatever address the client dialled, because those URLs have already been handed out. Only the panel surface is hidden.
 
-The panel now asks the node what it supports before sending anything, and refuses with an explanation if the node is too old. It reads the answer from the node's own certificate response rather than comparing version strings, so it cannot be fooled by a node that reports a version it does not behave like.
+**You cannot lock yourself out.** Three separate guarantees, each one covered by a test:
 
-If you run fleet nodes, update the nodes as well as the panel. Until a node takes 1.32.3 or later, adding a domain to it stays unavailable, which is the point.
+- A server with no domain of its own, or with an IP where its domain would be, is never hidden from its own address. There, the bare address *is* the address.
+- A stealth path, if you use one, always reaches the panel whatever name you used.
+- A signed-in session always reaches the panel, from any address. A scanner has no session, and in a censorship context the domain is exactly what gets blocked, which is when you need the IP most.
+
+**Existing deployments keep their current behaviour** until you turn this on, so nobody's bookmarked address stops working on an update. The health check now reports the exposure and offers the switch. New installs start with it on.
 
 ## Verification
 
-The panel screen was driven in a browser against a live agent: the certificate view, both dialogs, and the unreachable-node path. Interface text is present in English, Persian and Russian; the English screens were checked visually.
+Exercised against the live deployment that exposed it. Before: 1,392,610 bytes of admin panel on the bridge IP. After: 695 bytes titled "Welcome", zero occurrences of "Nova", "Admin password" or "Sign in", `/admin/*` returning 404, while the panel on its own domain, all three subscription formats, a subscription fetched by bare IP, and the node API were all unchanged.
 
 ## Upgrading
 
