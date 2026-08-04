@@ -1,53 +1,18 @@
-# Nova Server v1.31.0
+# Nova Server v1.31.1
 
-This release covers 1.30.0 and 1.31.0 together, since 1.30.0 was never published separately. Every item below was found by running Nova against real servers and real client cores, not by reading code, and most of them are faults that had been live for some time.
+A hotfix for two fleet-sync faults reported from production. **If you run fleet nodes on 1.30.0 or 1.31.0, take this one.**
 
-If you run Nova with fleet nodes, or on a server without a domain, this is an important release to take.
+## Your users were being disconnected every ten minutes
 
-## A fleet node could sit unconfigured, and nothing said so
+Pushing configuration to a node forced the node's proxy core to reload, which drops every live connection on it. That was harmless while a push only happened when you changed something. 1.30.0 added a ten-minute reconciler so that a node left alone would still receive its configuration, and the two combined into "disconnect every user on every node, once per interval".
 
-`syncFleet` only ever ran when someone saved an inbound or a user. There was no timer and no manual "sync now". So a node that was enrolled and then left alone **never received its configuration at all**. It kept whatever it had at enrollment.
+A push now compares what it is sending against what the node already has, and reloads only on a real difference. Introduced in 1.30.0; earlier releases are unaffected.
 
-That state was invisible. The sync result was discarded, every error was swallowed, and the panel's `lastSeen` is written by enrollment and the Test button but never by sync, so a node that had never synced looked exactly like a healthy one.
+## Inbounds using a custom outbound dropped all traffic
 
-On the deployment where this was found, the node held zero user credentials for a day. Every config in every subscription that pointed at it completed a TCP handshake and then failed authentication, which reads to a user as "low ping but no data".
+If you defined your own outbound in the panel, a SOCKS5 proxy for example, and set a node inbound to leave through it, the node received the routing rule naming that outbound but never the outbound itself. Its proxy core then routed traffic to a tag it had no definition for, and every connection through that inbound dropped, with nothing in the panel to indicate why.
 
-Now: per-node results are recorded, reconciliation runs every ten minutes, the Nodes API gained a `sync` action, and the health check reports a node that has never synced as a failure. The fan-out is concurrent rather than serial, because a serial pass with a fifteen-second per-node timeout could stall traffic accounting, quota enforcement and the xray self-heal for minutes on a larger fleet.
-
-## A server without a domain could never obtain a certificate
-
-The agent binds port 80 itself on a no-domain server, to serve the subscription over plain HTTP, because clients refuse to *fetch* a subscription from a self-signed HTTPS URL. Let's Encrypt needs that same port for the HTTP-01 challenge, and a shell hook cannot free a listener that lives inside the agent process.
-
-So the workaround for having no certificate was the thing preventing the server from ever getting one. The port is now released for the challenge and restored afterwards.
-
-The restore is a reconcile against current state, not a plain restart, and that detail matters: issuance completes before the server is marked as having a domain, so a naive resume rebound port 80 and held it forever. The unattended renewal sixty days later would then fail to bind and the certificate would quietly expire at day ninety.
-
-## A managed node could never obtain one either
-
-A managed node closes its admin surface, and the node API had no certificate route, so there was no path to issuance at all. A node enrolled on its IP kept the self-signed certificate from enrollment while the panel advertised a domain for its inbounds, and every client that verifies certificates refused the handshake.
-
-The node API now has `POST /api/v1/cert` and `GET /api/v1/cert`, owner-token only, using the same job machinery the panel uses on itself.
-
-## Clash Global mode sent everything outside the tunnel
-
-Covered in 1.29.0 for the empty-subscription case, but the same fault applied to every populated subscription. mihomo builds its own `GLOBAL` selector before reading a subscription and lists `DIRECT` first, so `DIRECT` is what it selected. A user who switched to Global mode, which people do precisely to force everything through the VPN, got the opposite. Nova now defines `GLOBAL` itself.
-
-## Hiddify and Karing never received the 1.29.0 transport fix
-
-Nova picks the subscription format from the client's User-Agent, and matched only `sing-box`. Hiddify sends `HiddifyNext/...`, so it fell through to the plain list and kept receiving XHTTP entries its core cannot implement, which was the original complaint 1.29.0 set out to fix. Hiddify, Karing and the official sing-box apps are now recognised.
-
-HiddifyNG is deliberately excluded: despite the name it is an Xray fork, and handing it a sing-box document would take it from a partly working list to one it cannot parse at all.
-
-## Certificates are now verified rather than assumed
-
-Two places trusted a flag or a filename instead of the certificate itself:
-
-- A **bridge domain** both joins the exit's certificate list and rewrites the SNI of every link that dials that bridge. Nova only checked that the certificate and key files existed, so an expired or wrong-domain certificate silently rewrote the SNI and broke every affected config. Coverage and validity are now checked, and the expiry is re-evaluated on every use, because a failed renewal leaves the file unchanged on disk.
-- A subscription link pointing at the wrong server returned an error that read like an expired account. Both link forms now explain what is actually wrong, with identical wording for panels and nodes so the response cannot be used to tell them apart.
-
-## Links that current Xray refuses outright
-
-Xray-core removed `allowInsecure` and now refuses to start on a configuration that sets it. A no-domain server's plain-TLS links carry exactly that, so they are dead on v2rayNG, v2rayN and Streisand rather than merely insecure. The health check now reports those inbounds and offers to convert them to Reality, which needs no certificate.
+Nodes now receive the outbounds their inbounds actually use. Only those: a node is never sent credentials for an egress it does not use, and a push that omits them leaves a node's existing egresses alone.
 
 ## Verification
 
