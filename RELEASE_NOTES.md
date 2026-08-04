@@ -1,24 +1,40 @@
-# Nova Server v1.31.2
+# Nova Server v1.32.2
 
-Completes the 1.31.1 hotfix. **If you took 1.31.1, take this one too**, and note that both ends need it: the guard that stops the disconnect lives on the node, so a panel on 1.31.2 talking to a node on 1.31.1 will still see reloads.
+Covers 1.32.x. **This release contains a security fix that applies to every panel, including ones that never took 1.32.0.**
 
-## The disconnect fix did not reach every panel
+## Security: a reseller could hand out any plan's access, for free
 
-1.31.1 stopped a configuration push from reloading the node's proxy core when nothing had changed. That was correct, but incomplete.
+If you use resellers, take this release, and take it promptly.
 
-A node works out some things for itself from its own traffic: when a "N days from first use" plan actually starts, and when a traffic cycle resets. Your panel never sees node traffic, so its copy of the customer has neither. The push overwrote the node's values with the panel's blanks, which made every reconcile look like a change, which kept forcing the reload.
+Applying a plan to customers in bulk did not check that the plan was one you had marked sellable, and did not charge the reseller for it. A reseller could name any plan you had ever created, including a private one, and grant their customer its inbounds and its node access without spending a single unit of balance. The plan could be named by its name as well as its id, and resellers can already see your plan list, so this took two clicks in their own panel.
 
-So if your plans expire a set number of days after first use, 1.31.1 did not stop your disconnects. This does. The node keeps what it worked out, and anything the panel actually sets still wins, so changing an expiry on the panel still takes effect.
+Bulk plan application is now gated to sellable plans for resellers, and charged per customer, matching every other reseller provisioning path. Nothing changes for owners.
 
-## A failed reload was never retried
+Two related gaps are **not** closed here, deliberately, because they need a pricing decision rather than a fix: a reseller can still extend a customer's expiry and reset their usage without being charged, so a customer bought once can be renewed indefinitely for nothing. If that matters to you, restrict user editing for your resellers until those can be priced.
 
-Configuration is saved before the core is reloaded. If that reload failed, the next push saw no difference, skipped the reload, and the node kept serving the old configuration indefinitely while the panel showed the sync as successful. An outstanding reload is now remembered and retried.
+## Applying a plan no longer resets what a customer paid for
+
+Applying a plan to change a customer's access also overwrote their traffic allowance, expiry and device limit. The apply-plan dialog now offers "Only give access, keep their current traffic and expiry".
+
+Note what that does and does not do: the plan's inbounds and nodes **replace** the customer's current access, they are not added to it. Traffic and expiry are left alone.
+
+## Per-profile SNI
+
+Setting a different SNI on each profile works for ordinary TLS and gRPC. It does not work for Reality, or for Hysteria2, TUIC and NaiveProxy, and it cannot: Reality only accepts an SNI that is one of the inbound's own server names, and the QUIC protocols present a single certificate, so every profile is published on that one name.
+
+Reality now honours a profile SNI **that is one of its server names**, so a profile can choose which of them to present. Where a profile's SNI cannot be used, the health check says so, instead of leaving you to wonder whether the field saved.
+
+## Health check: three new things it tells you
+
+- **An inbound on a node whose egress that node cannot provide.** WARP needs its own Cloudflare registration on the node, and per-country exits run only on the main server, so the node's core has no definition for the tag and every connection through that inbound is dropped. Tor and Psiphon are reported separately as a note, because a node does build those, and they work if Tor or Psiphon is running on that node.
+- **An outbound that is defined but disabled**, which dangles exactly like a missing one.
+- **Hysteria2, TUIC and NaiveProxy listen on UDP.** They never appear in `ss -lnt` or `netstat -tlnp`, which is what most people check, so "the port is not listening" is usually a TCP-only check. The panel now says this and names the port.
 
 ## Verification
 
-Emitted configurations were checked against real client binaries: xray-core 26.3.27, mihomo 1.19.29, and sing-box 1.11.15, 1.12.16, 1.13.15 and 1.14.0-beta.4. The subscription and certificate paths were exercised end to end against live servers, including an Android emulator running Hiddify 4.1.1.
+Emitted configurations were checked against real client binaries: xray-core 26.3.27, mihomo 1.19.29, and sing-box 1.11.15 through 1.14.0-beta.4. Every config on a live panel and its node was driven through a real client end to end.
 
-Two areas remain **untested** and are called out deliberately: certificate issuance through Cloudflare DNS-01, and per-inbound certificates for individual domains. Both need DNS write access that was not available. If you use either, treat this release as unproven for that path.
+Cloudflare DNS-01 certificate issuance and per-inbound certificates remain **untested**. If you use either, treat this release as unproven for that path.
 
 ## Upgrading
 
