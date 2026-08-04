@@ -1,20 +1,14 @@
-# Nova Server v1.32.6
+# Nova Server v1.32.7
 
-## A server without a domain has been handing out links that cannot connect
+## The health check no longer calls an empty subscription healthy
 
-Xray-core removed `allowInsecure` and now refuses any configuration that sets it. A no-domain server serves a self-signed certificate, so its links carried exactly that, and the replacement was to pin the certificate instead: same result without a domain, and strictly safer than "trust anything", because a substituted certificate no longer passes.
+Sing-box and Clash cannot implement XHTTP or httpupgrade, so since 1.29.0 Nova skips those entries rather than emitting configurations those clients cannot use. The health check never modelled that skip: it counted any inbound a user was granted, whatever transport it ran on.
 
-That replacement was written, and never switched on. The function producing the pin existed, was correct, and was documented at length, but nothing ever called it. The rewrite only runs when a pin is present, so on every server without a domain it never ran at all, and the links kept the parameter that current Xray rejects.
+So a user granted only XHTTP inbounds had a working v2rayNG list and a completely empty subscription in sing-box, Hiddify, Karing and Clash, and the health check reported them as fine. The operator had no way to see it short of loading that user's subscription in one of those clients.
 
-The effect: on a no-domain server, every VLESS, VMess and Trojan link has been dead on v2rayNG, v2rayN and Streisand. Not degraded, refused at load. Sing-box and Clash clients use a different parameter and were unaffected throughout, which is why this could go unnoticed.
+Now a user whose every reachable inbound is one the structured formats skip is reported as a failure, naming the clients that get nothing and what to change.
 
-The pin is now supplied wherever subscriptions are built. Links from a no-domain server carry `pcs`, a pin of that server's exact certificate, and no longer carry the parameter that breaks them.
-
-Nothing changes for a server with a domain, which is most of them.
-
-## Verification
-
-Checked against a certificate rather than a fixture: the pin matches the SHA-256 of the leaf certificate's DER, in hex rather than base64, since Xray hex-decodes the field and refuses the whole configuration otherwise. Both outcomes are covered, no pin leaving links untouched and a real pin producing `pcs` with `allowInsecure` gone, along with the rule that any subscription that can be built in insecure mode is also handed the pin, so this cannot silently come unwired again.
+Hysteria2 is deliberately not counted, even when it carries an unusual transport label. Those protocols take free-form labels, so treating them as skipped would report working configurations as broken.
 
 ## Upgrading
 
