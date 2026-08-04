@@ -1,33 +1,20 @@
-# Nova Server v1.32.5
+# Nova Server v1.32.6
 
-## Your server was telling anyone who asked that it is a VPN panel
+## A server without a domain has been handing out links that cannot connect
 
-Connect to a Nova server on 443 by its bare IP, under any name at all, and it answered with the sign-in page. Found on a live Iran bridge, which returned the panel byte for byte:
+Xray-core removed `allowInsecure` and now refuses any configuration that sets it. A no-domain server serves a self-signed certificate, so its links carried exactly that, and the replacement was to pin the certificate instead: same result without a domain, and strictly safer than "trust anything", because a substituted certificate no longer passes.
 
-```
-https://<bridge ip>/  ->  200, 1,392,610 bytes
-<title>Nova Server</title>     "Admin password"     "Sign in"
-```
+That replacement was written, and never switched on. The function producing the pin existed, was correct, and was documented at length, but nothing ever called it. The rewrite only runs when a pin is present, so on every server without a domain it never ran at all, and the links kept the parameter that current Xray rejects.
 
-That is the cheapest possible thing for a censor to find. No traffic analysis, no timing, no active probing of the protocol: one HTTP request and a string match identifies the server and every other one running the same software. It also put a sign-in form on the most exposed machine in the deployment.
+The effect: on a no-domain server, every VLESS, VMess and Trojan link has been dead on v2rayNG, v2rayN and Streisand. Not degraded, refused at load. Sing-box and Clash clients use a different parameter and were unaffected throughout, which is why this could go unnoticed.
 
-A Nova server can now answer anything that did not arrive on its own domain with an ordinary, unremarkable page, while the panel stays exactly where its owner expects it. After turning it on, the same request returns 695 bytes titled "Welcome", with no mention of Nova, no build number, no framework fingerprint and no external requests, since a fetch to a CDN would be its own tell. The admin surface returns a plain 404 to anything arriving that way, so it does not admit to existing.
+The pin is now supplied wherever subscriptions are built. Links from a no-domain server carry `pcs`, a pin of that server's exact certificate, and no longer carry the parameter that breaks them.
 
-The page is deliberately generic rather than a copy of a real site. Impersonating a genuine company would be dishonest, and it is also weaker camouflage, since any mismatch against the real thing is itself a signal.
-
-**Nothing a user holds is affected.** Subscriptions, the fleet API, tunnels and relays keep answering on whatever address the client dialled, because those URLs have already been handed out. Only the panel surface is hidden.
-
-**You cannot lock yourself out.** Three separate guarantees, each one covered by a test:
-
-- A server with no domain of its own, or with an IP where its domain would be, is never hidden from its own address. There, the bare address *is* the address.
-- A stealth path, if you use one, always reaches the panel whatever name you used.
-- A signed-in session always reaches the panel, from any address. A scanner has no session, and in a censorship context the domain is exactly what gets blocked, which is when you need the IP most.
-
-**Existing deployments keep their current behaviour** until you turn this on, so nobody's bookmarked address stops working on an update. The health check now reports the exposure and offers the switch. New installs start with it on.
+Nothing changes for a server with a domain, which is most of them.
 
 ## Verification
 
-Exercised against the live deployment that exposed it. Before: 1,392,610 bytes of admin panel on the bridge IP. After: 695 bytes titled "Welcome", zero occurrences of "Nova", "Admin password" or "Sign in", `/admin/*` returning 404, while the panel on its own domain, all three subscription formats, a subscription fetched by bare IP, and the node API were all unchanged.
+Checked against a certificate rather than a fixture: the pin matches the SHA-256 of the leaf certificate's DER, in hex rather than base64, since Xray hex-decodes the field and refuses the whole configuration otherwise. Both outcomes are covered, no pin leaving links untouched and a real pin producing `pcs` with `allowInsecure` gone, along with the rule that any subscription that can be built in insecure mode is also handed the pin, so this cannot silently come unwired again.
 
 ## Upgrading
 
