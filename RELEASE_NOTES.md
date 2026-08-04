@@ -1,18 +1,18 @@
-# Nova Server v1.31.1
+# Nova Server v1.31.2
 
-A hotfix for two fleet-sync faults reported from production. **If you run fleet nodes on 1.30.0 or 1.31.0, take this one.**
+Completes the 1.31.1 hotfix. **If you took 1.31.1, take this one too**, and note that both ends need it: the guard that stops the disconnect lives on the node, so a panel on 1.31.2 talking to a node on 1.31.1 will still see reloads.
 
-## Your users were being disconnected every ten minutes
+## The disconnect fix did not reach every panel
 
-Pushing configuration to a node forced the node's proxy core to reload, which drops every live connection on it. That was harmless while a push only happened when you changed something. 1.30.0 added a ten-minute reconciler so that a node left alone would still receive its configuration, and the two combined into "disconnect every user on every node, once per interval".
+1.31.1 stopped a configuration push from reloading the node's proxy core when nothing had changed. That was correct, but incomplete.
 
-A push now compares what it is sending against what the node already has, and reloads only on a real difference. Introduced in 1.30.0; earlier releases are unaffected.
+A node works out some things for itself from its own traffic: when a "N days from first use" plan actually starts, and when a traffic cycle resets. Your panel never sees node traffic, so its copy of the customer has neither. The push overwrote the node's values with the panel's blanks, which made every reconcile look like a change, which kept forcing the reload.
 
-## Inbounds using a custom outbound dropped all traffic
+So if your plans expire a set number of days after first use, 1.31.1 did not stop your disconnects. This does. The node keeps what it worked out, and anything the panel actually sets still wins, so changing an expiry on the panel still takes effect.
 
-If you defined your own outbound in the panel, a SOCKS5 proxy for example, and set a node inbound to leave through it, the node received the routing rule naming that outbound but never the outbound itself. Its proxy core then routed traffic to a tag it had no definition for, and every connection through that inbound dropped, with nothing in the panel to indicate why.
+## A failed reload was never retried
 
-Nodes now receive the outbounds their inbounds actually use. Only those: a node is never sent credentials for an egress it does not use, and a push that omits them leaves a node's existing egresses alone.
+Configuration is saved before the core is reloaded. If that reload failed, the next push saw no difference, skipped the reload, and the node kept serving the old configuration indefinitely while the panel showed the sync as successful. An outstanding reload is now remembered and retried.
 
 ## Verification
 
