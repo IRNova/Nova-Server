@@ -1,40 +1,54 @@
-# Nova Server v1.32.2
+# Nova Server v1.32.3
 
-Covers 1.32.x. **This release contains a security fix that applies to every panel, including ones that never took 1.32.0.**
+**If you run fleet nodes, take this release.** Giving a node a second domain destroyed the first one, and there was no way to avoid it.
 
-## Security: a reseller could hand out any plan's access, for free
+## Adding a domain to a node broke every link on its existing domain
 
-If you use resellers, take this release, and take it promptly.
+Every TLS inbound on a server, and the node's own API, share a single certificate file. Asking a node for a certificate always ran the *primary* domain job, so issuing one for a second domain overwrote that file.
 
-Applying a plan to customers in bulk did not check that the plan was one you had marked sellable, and did not charge the reseller for it. A reseller could name any plan you had ever created, including a private one, and grant their customer its inbounds and its node access without spending a single unit of balance. The plan could be named by its name as well as its id, and resellers can already see your plan list, so this took two clicks in their own panel.
+The node then presented a certificate naming only the new domain. Everything on the old one broke at the handshake: every client already using it, and the panel's own control channel, which failed with "Hostname/IP does not match certificate's altnames". Fleet sync stopped with it, so the node went on serving a configuration that quietly drifted out of date. That is the same invisible failure 1.31.0 was written to end, reintroduced through a different door.
 
-Bulk plan application is now gated to sellable plans for resellers, and charged per customer, matching every other reseller provisioning path. Nothing changes for owners.
+There was no way to get the intended result either. Nothing could add a domain to a node, only replace its domain, so publishing one inbound on its own name was impossible.
 
-Two related gaps are **not** closed here, deliberately, because they need a pricing decision rather than a fix: a reseller can still extend a customer's expiry and reset their usage without being charged, so a customer bought once can be renewed indefinitely for nothing. If that matters to you, restrict user editing for your resellers until those can be priced.
+Nodes now accept both, explicitly:
 
-## Applying a plan no longer resets what a customer paid for
+- **Adding a domain** issues a certificate into its own file and offers it alongside the primary, matched by SNI, exactly as bridge domains already work. The primary is untouched, so existing links keep working. This is what an inbound that needs its own name should use.
+- **Replacing the primary** is still available, but it now has to be asked for. Since it orphans every link already issued on the old name and leaves the panel dialling a name the node no longer answers to, a request that would change the primary is refused and tells you both options instead of performing a silent outage.
 
-Applying a plan to change a customer's access also overwrote their traffic allowance, expiry and device limit. The apply-plan dialog now offers "Only give access, keep their current traffic and expiry".
+The node's certificate status also reports additional domains separately from the primary, so a panel can follow one without mistaking it for the other.
 
-Note what that does and does not do: the plan's inbounds and nodes **replace** the customer's current access, they are not added to it. Traffic and expiry are left alone.
+Both are driven through the node API (`POST /api/v1/cert`, owner token) or the panel's `/admin/nodes` `cert` action, with `kind: "alias"` to add a domain and `replace: true` to change the primary. **There is still no button for this in the panel**, for node certificates generally, not just these two modes. That UI is the obvious next piece of work; this release makes the underlying operation safe and possible, which it was not before.
 
-## Per-profile SNI
+Three smaller faults on the same path went with it: the Cloudflare method was tested against a field that is never written, so DNS-01 was refused on nodes that genuinely had a token connected (and DNS-01 is the only method that does not stop xray for the challenge); a hand-installed certificate was reported back as a Cloudflare one; and a bad pasted certificate was accepted with a success response and only failed later.
 
-Setting a different SNI on each profile works for ordinary TLS and gRPC. It does not work for Reality, or for Hysteria2, TUIC and NaiveProxy, and it cannot: Reality only accepts an SNI that is one of the inbound's own server names, and the QUIC protocols present a single certificate, so every profile is published on that one name.
+Certificate jobs also queue behind one another, and a job that waited more than fifteen minutes for its turn was treated as dead before it started, then issued a certificate and rolled it back anyway. Provisioning several domains in a row is exactly what triggers it, which is what this release makes people do.
 
-Reality now honours a profile SNI **that is one of its server names**, so a profile can choose which of them to present. Where a profile's SNI cannot be used, the health check says so, instead of leaving you to wonder whether the field saved.
+## Resellers can now be charged for renewals
 
-## Health check: three new things it tells you
+1.32.2 closed a hole where a reseller could hand out any plan's access for free, and deliberately left two related gaps open because they needed a pricing decision: extending a customer's expiry and resetting their usage cost nothing, so a customer bought once could be renewed for ever.
 
-- **An inbound on a node whose egress that node cannot provide.** WARP needs its own Cloudflare registration on the node, and per-country exits run only on the main server, so the node's core has no definition for the tag and every connection through that inbound is dropped. Tor and Psiphon are reported separately as a note, because a node does build those, and they work if Tor or Psiphon is running on that node.
-- **An outbound that is defined but disabled**, which dangles exactly like a missing one.
-- **Hysteria2, TUIC and NaiveProxy listen on UDP.** They never appear in `ss -lnt` or `netstat -tlnp`, which is what most people check, so "the port is not listening" is usually a TCP-only check. The panel now says this and names the port.
+Both are now priced, and no new price list was needed. Re-applying a plan was already a charged operation, so extend and reset were simply cheaper doors to the same commercial outcome. They now bill at the customer's own plan rate:
+
+- **Extending** costs a share of the plan price, pro-rated by the plan's own length. Ten days of a thirty-day plan costs a third of it.
+- **Resetting usage** costs a renewal, because it grants the plan's volume again.
+- **Goodwill stays free.** The first three days of any extension cost nothing, so a few days after an outage need no thought. The allowance is configurable.
+- A customer who is not on a plan has no price to derive from, so the renewal is refused with that explanation rather than being quietly free.
+
+**Nothing changes for an existing deployment.** Updating does not re-price a running business: renewals stay free until you turn charging on, and the health check now points out that they are free and offers the switch. New installs start with charging on.
 
 ## Verification
 
-Emitted configurations were checked against real client binaries: xray-core 26.3.27, mihomo 1.19.29, and sing-box 1.11.15 through 1.14.0-beta.4. Every config on a live panel and its node was driven through a real client end to end.
+Exercised end to end on a live panel and a live fleet node, against a real Let's Encrypt issuance, with two domains pointed at one node:
 
-Cloudflare DNS-01 certificate issuance and per-inbound certificates remain **untested**. If you use either, treat this release as unproven for that path.
+```
+primary certificate  -> ir.vbhshm.cloud     (unchanged by the second issuance)
+SNI ir.vbhshm.cloud  -> ir.vbhshm.cloud
+SNI ir2.vbhshm.cloud -> ir2.vbhshm.cloud
+```
+
+Both names served their own certificate from one node, with the panel's control channel and fleet sync healthy throughout, and subscriptions serving unchanged.
+
+Per-inbound certificates were listed as **untested** in 1.31.0 and 1.32.2. They are now tested, and the fault that testing exposed is what this release fixes. Certificate issuance through Cloudflare DNS-01 remains untested.
 
 ## Upgrading
 
