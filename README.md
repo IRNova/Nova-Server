@@ -14,7 +14,7 @@ multi-user accounts, a multi-node fleet, Iran bridge tunnels, one-click SSL, a T
 bot with a Mini App, and two-factor auth.
 
 [![License](https://img.shields.io/badge/license-Proprietary-8b5cf6?style=for-the-badge)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.28.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
+[![Version](https://img.shields.io/badge/version-1.33.0-blueviolet?style=for-the-badge)](https://github.com/IRNova/Nova-Server)
 [![Stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=for-the-badge&color=0ea5e9)](https://github.com/IRNova/Nova-Server)
 
 </div>
@@ -46,7 +46,8 @@ Nova Server turns a plain Linux VPS into a private, censorship-resistant proxy n
 **What makes Nova Server different:**
 - 🧩 **All the protocols that matter**: VLESS, VMess, Trojan, Shadowsocks, Reality, Hysteria2, TUIC, NaiveProxy, and native WireGuard
 - ⚡ **One-scan onboarding**: a fresh install seeds a starter user with every protocol on, and the dashboard shows a Quick connect QR, so the first client is online in a single scan
-- 🧭 **Automated Setup Assistant**: opens on the first panel visit and remains available for later adjustments. A few plain-language questions cover users, network restrictions, independent Iran bridge and additional-node choices, domains, Cloudflare, and the balance between simplicity, speed, and resilience. Before applying anything, it shows every protocol, transport, security method, and port it will use, then validates the plan and links directly to the secure domain, bridge, or node tools that finish it
+- 🧭 **Five questions, then a working server**: the setup wizard opens on the first panel visit and asks who the node is for, where people connect from, how they reach it, whether you have a second server, and who will use it. Then it does the work itself: issues the certificate if you gave it a domain, configures and hands you the paste-once command for an Iran bridge or an extra node, writes the configuration, creates the accounts, and finishes on a subscription link and QR code per person. Every question can be skipped, each skip takes a working default that is shown before you tap it, and nothing is written until you approve the review
+- 🎚️ **Simple mode by default**: one answer ("where will people connect from?") replaces seven separate censorship toggles, and a fresh node keeps the engine internals off the navigation entirely. One switch in Settings brings back the routing rule builder, custom outbounds, tunnels, Xray engine options, resellers and API tokens. Nothing is removed, and an existing deployment keeps every page it already had
 - 🐇 **Hysteria2, hardened**: UDP port hopping over a range you pick (so no single port to block), Salamander obfuscation, and ECH to hide the SNI; the full port-hopping + ECH config is delivered in the sing-box subscription, while the private ECH key never leaves the node
 - 🇮🇷 **Iran bridge tunnels with failover**: put a clean-IP server inside Iran in front of a foreign exit (Backhaul, BackPack, rathole, wstunnel); one click points every client link at the bridge across all formats (raw, Clash, sing-box), and only the ports you forward travel through the bridge; list several bridges and the exit dials all of them so clients fail over automatically if one drops; a bridge readiness check (`nova-bridge.sh --check`) confirms a direct public IP and free ports before install, and a port sweep finds a live control port when Iran blocks the default
 - 🔐 **One-click SSL**: Let's Encrypt or fully automatic Cloudflare (auto DNS + wildcard), with support for user and account-owned API tokens and no manual port 80 juggling
@@ -64,7 +65,7 @@ Nova Server turns a plain Linux VPS into a private, censorship-resistant proxy n
 - 🤖 **Telegram bot + Mini App**: run the whole panel inside Telegram
 - 🛡️ **Anti-censorship exits**: WARP (with your own WARP+ license), Tor, and Psiphon, all built in
 - 🚀 **Speed tuning**: TCP BBR congestion control is on by default, boosting throughput for TCP protocols (VLESS/Reality, Trojan, VMess) on Iran's lossy, high-latency routes
-- ⚙️ **Automation**: backups, health alerts, auto-update, clean-IP refresh, and a first-run launcher
+- ⚙️ **Automation**: backups, health alerts, auto-update, and clean-IP refresh
 - 🧹 **Factory reset and log viewer**: reset everything back to a fresh install with one button (your admin login is kept), and read the last lines of the agent, Xray, or sing-box log inside the panel without SSH
 - 🌍 **Trilingual panel**: English, Persian (RTL), and Russian, with a full in-panel guide
 
@@ -86,7 +87,11 @@ The installer first asks a few short questions:
 - **Panel secret path**: press Enter for a random path, type your own, or use `none` to keep the panel at the root.
 - **Extra panel port**: optionally a separate HTTPS port for the panel (for example `2053`). The firewall port is opened automatically.
 
-Then the proxy cores, the panel, and the tunnel backends are set up, every available standard protocol is enabled, and a starter user named `me` is created. Open the printed panel URL, set an admin password, and scan that user's personal subscription QR from **Quick connect** on the main dashboard. The Setup Wizard remains available when you want to add a domain or customize the setup.
+Then the proxy cores, the panel, and the tunnel backends are set up, every available standard protocol is enabled, and a starter user named `me` is created. Open the printed panel URL and set an admin password.
+
+From there the **setup wizard opens by itself** and takes it the rest of the way. Five questions (who the server is for, where people connect from, how they reach it, whether you have a second server, and who will use it) and it does the work: issuing the certificate if you gave it a domain, setting up an Iran bridge or an extra node, writing the configuration, creating the accounts, and finishing on a subscription link and QR code for each person. Every question can be skipped, and nothing is written to the server until you approve the review.
+
+A new node starts in **simple mode**: the everyday pages stay on screen and the engine internals are put away, because the wizard configures them for you. One switch in **Settings > Show advanced pages** brings back the routing rule builder, custom outbounds, tunnels, Xray engine options, resellers and API tokens. It changes no setting, only which pages are listed, and a node that predates this release keeps every page it already had.
 
 For a scripted (unattended) install, set everything with environment variables: `NOVA_DOMAIN`, `NOVA_DOMAIN_EMAIL`, `NOVA_PANEL_PATH` (or `none`), `NOVA_PANEL_PORT`, `NOVA_ADMIN_PASS`, and `NOVA_NO_PROMPT=1` to skip all prompts.
 
@@ -219,9 +224,9 @@ The new server installs in **managed-node** mode: it has no standalone panel (ju
 
 ## 🛡️ Login Guard and webhooks
 
-Two operator tools live under **Settings > Security**.
+Two operator tools live under **Settings > Security**. That sub-tab appears once **Show advanced pages** is on in Settings, because a new node hides it: Login Guard already defends the panel on its defaults, so there is nothing to do there on day one.
 
-**Login Guard** is a fail2ban-style shield for the panel login. After too many failed attempts from one IP within a window, that IP is blocked for a while, so password guessing gets nowhere. It is on by default; you can tune the attempt count, the window, and the ban time, and the same page shows every active block with one-click **Unblock** (and **Clear all**).
+**Login Guard** is a fail2ban-style shield for the panel login. After too many failed attempts from one IP within a window, that IP is blocked for a while, so password guessing gets nowhere. It is on by default, whether or not the page is visible; you can tune the attempt count, the window, and the ban time, and the same page shows every active block with one-click **Unblock** (and **Clear all**).
 
 **Webhooks** send a small signed JSON POST to your own URL when something happens on the node: a user is created, edited, or deleted, expires, or hits quota; a node registers; or an IP is blocked. Add as many URLs as you like, pick the events you want for each (or leave it on all), and set an optional secret. When a secret is set, Nova signs the body with HMAC-SHA256 and sends it in an `X-Nova-Signature: sha256=...` header, so the receiver can be sure the call really came from your node. A **Test** button sends a sample so you can confirm the connection. The payload shape is `{ event, timestamp, node, data }`.
 
@@ -250,7 +255,7 @@ Two operator tools live under **Settings > Security**.
 | **Login Guard** | fail2ban-style per-IP blocking after repeated failed attempts (configurable threshold and ban time), a live list of active blocks, and one-click unblock; on by default |
 | **Security** | Multiple admins with owner and reseller roles, two-factor auth (Google Authenticator), and server-side password reset |
 | **Automation** | Nightly backups (disk and Telegram), proactive health alerts, auto-update, clean-IP refresh, health check, factory reset (back to a fresh install, keeping your admin login), and an in-panel log viewer (no SSH) |
-| **Panel** | English, Persian (RTL), Russian; global search, an always-available automated Setup Assistant, per-section help and a full in-panel guide; light and dark themes |
+| **Panel** | English, Persian (RTL), Russian; simple mode with one switch to the full panel, a five-question setup wizard that finishes the job, global search, per-section help and a full in-panel guide; light and dark themes |
 
 ---
 
