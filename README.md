@@ -255,6 +255,7 @@ Two operator tools live under **Settings > Security**. That sub-tab appears once
 | **Login Guard** | fail2ban-style per-IP blocking after repeated failed attempts (configurable threshold and ban time), a live list of active blocks, and one-click unblock; on by default |
 | **Security** | Multiple admins with owner and reseller roles, two-factor auth (Google Authenticator), and server-side password reset |
 | **Automation** | Nightly backups (disk and Telegram), proactive health alerts, auto-update, clean-IP refresh, health check, factory reset (back to a fresh install, keeping your admin login), and an in-panel log viewer (no SSH) |
+| **Getting help** | A one-click support bundle: versions, services, ports, protocols, failed checks and recent logs in a single file, with your address, users, keys and passwords replaced by stable placeholders first. Shown in full in the panel before it goes anywhere. Copy or download it and send it yourself, or send it to Nova support from your browser and get a short code to quote. The node itself never uploads anything and holds no credential that would let it |
 | **Panel** | English, Persian (RTL), Russian; simple mode with one switch to the full panel, a five-question setup wizard that finishes the job, global search, per-section help and a full in-panel guide; light and dark themes |
 
 ---
