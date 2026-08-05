@@ -1,128 +1,61 @@
-# Nova Server v1.34.0
+# Nova Server v1.34.1
 
-Five problems reported from real servers, a way to keep your panel address out of
-your users' configurations, and one button that checks the whole node and repairs
-what it safely can.
+A patch on 1.34.0. The Update button now tells you what happened, and you get
+proper control over which of your domains appear in your users' configurations.
 
-**If your server's disk has been filling up, this is the release that fixes it.**
-Update and it reclaims the space on the next start.
+## The Update button was hiding its own failures
 
-## Your disk was filling up, and nothing was rotating the log
+If you pressed **Update** and nothing seemed to happen, this is why. The update
+ran in the background with its output thrown away, so every possible failure was
+invisible: no network, a refused checksum, a disk with no space left, a release
+file that had not finished publishing. The panel had already said "update
+started", the version simply never changed, and nothing anywhere told you why.
 
-Xray's access log at `/var/log/nova/access.log` had no rotation of any kind. Not
-in the installer, not in `logrotate.d`, not in the agent. It simply grew until the
-disk was full. One operator watched a server go from 50% to 80% in a morning.
+Several operators concluded the button did not work and updated by hand from
+GitHub instead. That was a reasonable conclusion and the button was at fault.
 
-It cannot just be turned off, because Nova reads it to work out who is online. So
-it is now rotated: a logrotate policy at 50 MB keeping three compressed copies,
-plus a hard ceiling the agent enforces itself for machines that have no logrotate
-installed. Both trim the file **in place**, which matters more than it sounds:
-Xray keeps the file open and does not reopen it when a file is renamed, so an
-ordinary rotation would leave it writing to a file nobody can see, filling the
-disk anyway while the online-user list silently stopped updating.
+Now the panel watches the update and tells you how it ended: **"Updated to
+1.34.1"**, or a plain reason such as *"the downloaded file did not match its
+checksum, so it was refused"* or *"the update downloaded but could not be
+unpacked (is the disk full or read-only?)"*.
 
-This is installed every time the agent starts, not only on a fresh install, so a
-server that is already full gets fixed by updating and trims itself immediately.
+The update itself was never broken. It was only silent. Fixing it turned up two
+things worth naming: checksum verification was skipped entirely on systems
+without `sha256sum`, which some minimal images lack, and it was also skipped when
+a release had published its archive but not yet its checksum file. In both cases
+the update installed unverified rather than refusing. Nova now falls back to
+`shasum`, and refuses outright when no checksum is available.
 
-## AmneziaWG stopped turning itself off
+## Choose which of your domains your users' configurations use
 
-If you turned AmneziaWG on and then added, edited or deleted a user, AmneziaWG
-switched off. Every time.
+1.34.0 let a second domain carry your configurations **instead of** your panel
+address. This adds the third option, so you now have full control per domain:
 
-Two different features shared one switch: the per-user WireGuard protocol, which
-Nova manages for you, and the standalone AmneziaWG server you turn on yourself.
-Turning it on yourself does not enable the per-user protocol, so the routine that
-keeps per-user WireGuard in step saw the protocol was off and shut the interface
-down, taking your hand-built server with it.
+- **As an extra address.** Published alongside your main one, so a client can
+  fall back if one is blocked. Unchanged, and still the default.
+- **Instead of the panel address.** This domain carries the configurations and
+  your main one is left out of them entirely.
+- **Never in configurations.** This domain keeps working for the panel and keeps
+  its certificate, but no configuration ever names it.
 
-Nova now records which of the two created an interface and only ever takes down
-its own. A server you enabled yourself is left alone. Existing servers are
-protected the moment you update, without you doing anything.
+The last one is for a domain that points straight at your server. Anyone holding
+a configuration that names it can look it up and find your address.
 
-## Users disconnected by an update, with no warning
+## Nova now tells you when your address is exposed
 
-Xray removed support for the mKCP transport, so Nova deletes mKCP inbounds when it
-starts, because one of them stops the whole configuration from loading. That part
-is unavoidable. What was wrong is that it happened in complete silence.
+If you have put one domain behind Cloudflare to hide your server's address, but
+your configurations still carry another domain that points straight at the
+server, the health check now says so. The proxied domain protects nothing while
+the two are published together: one configuration is enough to find the server.
 
-If a user had only been given mKCP inbounds, their subscription became empty.
-Their app shows every field as `-1` and they cannot connect, and nothing anywhere
-told you it had happened.
+This only appears when you actually have a proxied domain. On a node with no CDN
+in front, every name points at the server, that is simply how it works, and there
+is nothing to warn about.
 
-Nova now names the affected users in the activity log and sends you a Telegram
-alert. It deliberately does **not** hand those users other inbounds by itself:
-quietly giving somebody access their plan never included is a worse surprise than
-the disconnection. The health check offers to restore them, as a choice you make.
-
-## Keep your panel address out of your users' configurations
-
-When you add a second domain, Nova has always published your configurations on
-both that domain and your main one. That is deliberate, so a client can fall back
-if one is blocked, and it stays the default.
-
-But it meant your panel's address travelled inside every configuration you handed
-out, and a configuration that names your panel is a configuration that gets your
-panel blocked along with it.
-
-A second domain can now be set to **"Instead of the panel address"**. Your
-configurations use that domain and your main one is left out of them entirely.
-Anything the second domain cannot carry stays on the main address rather than
-being dropped, because an empty subscription would be worse than a visible name.
-
-Existing domains are unchanged and keep publishing on both.
-
-## AmneziaWG in one press
-
-Turning AmneziaWG on used to leave you with a running server and no clients, so
-there was still nothing to give anybody. **Set up with defaults** now picks
-sensible settings and creates your first client, ready to hand out. The manual
-route with its own strength and port is still there.
-
-## One button to check the whole server and fix what it can
-
-The health check now ends by sorting everything it found into three groups.
-
-**What it can fix for you.** One press repairs all of them and runs the check
-again so you see the result rather than a promise. It lists every change before
-you press, and it will never make a change that gives a user access they did not
-have: anything like that is left as a separate decision, with its own button.
-
-**What needs you.** Choices only you can make, like which domain an inbound should
-present, or whether to charge resellers for renewals.
-
-**What cannot be fixed from here.** When something is left that nothing in the
-panel can repair, the problem is usually in Nova rather than in your setup. Nova
-offers to make a support report instead of leaving you pressing a button that
-cannot help.
-
-## A support report you can read before you send it
-
-**Logs & Xray** has a new **Support bundle**. It gathers your Nova version, your
-operating system, which services are running, your ports and protocols, which
-checks failed, and the last few hundred log lines into one file.
-
-Before you see it, every private value is replaced: your address and domain, your
-users and their names and IDs, every key and password, your bot token, and any
-address that appears in a log line. The same value always becomes the same
-placeholder inside one file, so whoever helps you can follow one person through a
-run of log lines and see what happened to them without ever learning who they are.
-Those placeholders mean nothing in any other file.
-
-Xray's access log is deliberately never collected. It is a record of which sites
-each of your users visited, and no amount of scrambling makes that safe to pass
-around.
-
-The whole file is shown to you in the panel first. Copy it or download it and send
-it however you like. Your server never sends it anywhere on its own and holds no
-credential that would let it.
-
-## Also
-
-- The health check's port section was reading field names that did not exist, so
-  it came back blank on a real server. It now shows what it always should have.
+An operator worked this out for themselves and asked why the panel had not told
+them. It should have.
 
 ---
 
 **Updating:** Settings, then Check for updates. Nothing in this release changes
-your users' configurations: the subscriptions they already hold stay exactly as
-they are, which was verified against a copy of a live server before release.
+your users' configurations.
