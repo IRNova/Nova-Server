@@ -1,26 +1,29 @@
 # Nova Server v1.40.0
 
-Four things operators reported, and one access problem found while checking
-them. Please read the first section before updating.
+Four things operators reported, and one access problem found while checking them.
 
-## Please read: some users may lose a configuration
+## An access fix that may change what some users receive
 
-Nova decides which protocols a user may have. That decision was applied to the
+Nova decides which protocols each user may have. That decision was applied to the
 plain subscription but **not** to the Clash, sing-box, Hiddify and Karing one, so
-a user could be denied a protocol, see it correctly missing from one client, and
+a user could be denied a protocol, see it correctly missing in one client, and
 still receive a working configuration for it in another.
 
-The Hysteria2 front is the case that mattered: the server accepts any enabled
-user, so that configuration genuinely worked. Anyone you restricted could open
-the same subscription link in Hiddify and have access you had not given them.
+The Hysteria2 front is the case that mattered, because the server accepts any
+enabled user, so that configuration genuinely worked. Both now agree.
 
-That is now fixed, and the two agree. **If someone was relying on access they
-were never granted, their client will lose that configuration when it next
-updates.** On one of our own nodes exactly one user was in that position.
+**Whether this changes anything for you is easy to check.** It only applies if
+both of these are true:
 
-If you want them to keep it, grant it deliberately: open the user and tick the
-protocol, or put it in their plan. Users whose inbound list you never restricted
-are unaffected, because that has always meant "everything".
+- the Hysteria2 front is **on** (Settings, Hysteria2), and
+- you have users whose protocol list you **restricted**, by ticking specific
+  entries rather than leaving them all selected.
+
+If the front is off, or you have never restricted anyone's list, nothing changes:
+an unrestricted list has always meant "everything". Where both are true, those
+users lose the Hysteria2 front when their client next refreshes, because they
+were never granted it. If you would rather they keep it, grant it deliberately:
+open the user and tick Hysteria2, or add it to their plan.
 
 ## Backups now keep everyone's usage
 
