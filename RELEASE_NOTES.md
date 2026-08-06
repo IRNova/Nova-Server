@@ -1,55 +1,51 @@
-# Nova Server v1.41.0
+# Nova Server v1.41.1
 
-Two reports, and the first is one you should read before updating if you run
-nodes.
+A setting you already had, which the panel was not showing you.
 
-## Traffic served by a node was never counted
+## "How to use this address" now says so on every domain
 
-An operator made a user with a 500 MB limit, downloaded a large file with it,
-and the panel still showed 0 bytes.
+Add a second domain and you can decide, per domain, whether it is published
+alongside your panel address or instead of it. The list showed that choice only
+when it was set to one of the less common options. On the default it showed
+nothing at all.
 
-They were right, and it was not a display problem. A node counts the traffic it
-serves in its own store, and nothing ever moved those numbers to the panel. On
-the test pair, the same user read 13.3 GB on the panel and a separate 780 KB on
-the node, and the two were never added together.
+So an operator who added a domain for their fronts, saw every configuration
+appear twice, once on the new domain and once on the panel domain, had no way to
+tell there was a switch for it. They reported the duplication as a missing
+feature. It was not missing; it was invisible.
 
-**The number on screen was the smaller half of the problem.** Those same counters
-are what a data limit is measured against, and what your users' apps show them.
-So a user whose configurations pointed at a node had, in practice, no data limit
-at all: they could download without end and nothing stopped them, because the
-part of Nova that enforces the cap could not see the traffic.
+Every domain in the list now states how it is used, including the default. If
+you want a second domain to carry the configurations **instead of** your panel
+address rather than in addition to it, open it and set that: the duplicates go
+away, and your panel address stops travelling inside what your users hold.
 
-Usage is now the total across the panel and every node. A limit applies to the
-whole fleet rather than separately to each server. The panel collects each
-node's counters every half minute, and a node that is unreachable for a while
-has its traffic added in full as soon as it answers again, rather than losing
-it.
+Nothing changed about how any of the three options behave. If your list looks
+right today, it is unchanged.
 
-**Past traffic is not billed retroactively.** Each node's first reading after
-this update is taken as a starting point, not as a bill. Your nodes have been
-counting since the day they were installed, and importing that history would
-have landed months of traffic on every user in a single moment and switched off
-everyone already past their limit, for bytes you never charged them for.
-Counting starts when you update. Everything from that point on is counted in
-full.
+## The manual now covers the CDN case
 
-You do not have to update your nodes for this to work: a node on an older build
-is still counted, just without the upload/download split. Updating them adds
-that detail.
+An operator worked out an arrangement worth passing on, so the Domains guide
+describes it: put a second name behind Cloudflare and let it carry the WebSocket
+configurations, then take your main domain out from behind the CDN. Your users
+keep two things that do not depend on Cloudflare at all, the ability to refresh
+their subscription and Hysteria2, which goes direct and never could pass through
+a CDN anyway.
 
-## Country exits stayed on the main domain
+The guide is honest about the costs, since none of them are obvious: a domain
+that is not behind the CDN publishes this server's address to anyone who looks it
+up, a CDN outage takes every WebSocket configuration with it and leaves Hysteria2
+as the fallback, and the subscription host has to stay on the main domain or the
+outage can stop your users updating after all. It also warns about the order to
+do it in, which the health check already catches: take the main domain off the
+CDN while the second name is still an extra address and every configuration
+carries both names, so the CDN hides nothing.
 
-Giving a front its own domain in 1.38.0 moved the front itself, but the
-per-country exits and the per-carrier variants kept the panel's main domain,
-which an operator reported after setting the domain and finding most of their
-configurations unchanged.
-
-They are the same front reached by a different path, so they now follow it. On a
-panel with two fronts and five country exits, seven configurations per user move
-to the front domain instead of two. Standalone inbounds are unaffected: those
-have their own domain setting and always did.
-
-If you have never set a front domain, nothing changes for you at all.
+One detail decides whether the arrangement works or quietly defeats itself, so
+the guide spells it out: set the CDN name to **WebSocket front only**. Hysteria2
+and TUIC are UDP and cannot pass through Cloudflare at all. On All compatible
+protocols, if your certificate also covers that second name, "instead of the
+panel address" moves those two onto the CDN name too, where they cannot connect,
+and the fallback you were relying on is the thing that breaks.
 
 ---
 
