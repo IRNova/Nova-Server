@@ -1,30 +1,47 @@
-# Nova Server v1.41.2
+# Nova Server v1.41.3
 
-## A front can now be pointed at the domain you added for fronts
+## Country exits were doubled for users who have only the exits
 
-Open a front inbound and its **Public address** list offers your main panel
-domain, your other domains, or a custom one. It left out exactly one kind: a
-domain whose scope is WebSocket front only, which is the kind you add *for*
-fronts.
+If you moved your fronts onto their own domain and then gave someone the
+per-country exits **without** giving them the front itself, they received two
+configurations for every country: one on your panel domain and one on the front
+domain. A user who also held the front received one, correctly, on the front
+domain.
 
-So an operator who added a domain for their fronts opened the front inbound to
-point it there, did not find it in the list, and asked for a new feature to do
-what this list is already for. The domain is now offered, labelled with its
-scope so the choice is not a guess.
+The exits are the front reached by a different path, and Nova works out which
+front domain to use from the front that serves that user. Someone sold only the
+exits is on no front, so there was nothing to read the domain from and it fell
+back to the panel domain, then published that copy on the other domain as well.
 
-That is the difference between a front published on both your panel domain and
-the new one, and a front published only on the new one. If duplicate
-configurations were your reason for asking, this is the per-inbound way to stop
-them: set the front's public address to that domain. The per-domain **How to use
-this address** setting is still there for doing it to every front at once.
+They now follow the front domain like everyone else, and get one configuration
+per country. Nothing changes for a user who already had the front, and nothing
+changes at all if you have not put your fronts on their own domain.
 
-Direct inbounds are unchanged and deliberately so. An inbound clients dial
-straight at this server is still never offered a fronted domain: a CDN carries
-neither QUIC nor Reality, and answering for that name from this server's own
-address ties the fronted domain back to this machine for anyone scanning. That
-reasoning was always about inbounds dialled here directly. A front is served on
-the very shared port the CDN sits in front of, so for a front the fronted name
-is the right answer, and it was the only one missing.
+Where two fronts sit on different domains, a user who belongs to neither is
+still left on the panel domain rather than guessed onto one of them. Publishing
+someone on another customer's domain is worse than an extra entry in the list.
+
+## Three more, found while checking the one above
+
+**A restricted front's domain could reach a user who was denied it.** Where one
+front belongs to a single customer, the fix above could borrow that customer's
+private domain for another user's country exits, as the address and as the
+server name. Only a front published to everyone is borrowed now. If you share
+one front through an explicit user list rather than "all users", exits-only
+customers keep the extra entry rather than being put on a domain that is not
+theirs.
+
+**A user denied every protocol still received a working front in Clash and
+sing-box.** Only on panels that predate the front records, and only with the
+per-carrier variants switched on: those variants were emitted without checking
+the user's protocol list, so someone sold a restricted plan could open the same
+subscription in Clash and connect. The plain list denied them correctly, which
+is what made it hard to see. Both now agree.
+
+**An IPv6 public address produced an unusable link.** An inbound or front given
+a bare IPv6 address emitted a link no client could parse, because the address
+was not bracketed and its colons ran into the port. Affects only operators
+publishing on a literal IPv6 address.
 
 ---
 
