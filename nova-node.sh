@@ -602,10 +602,20 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=$AGENT_DIR
-ExecStart=$NODE_BIN $AGENT_DIR/bin/nova-agent.mjs
+# --max-old-space-size caps V8's heap. Without it V8 sizes the heap from total
+# system RAM and never returns it, so a busy node's agent settles at a few
+# hundred MB and the operator sees "the panel's RAM keeps climbing". 192 MB is
+# well above what a large registry needs and small enough that the agent can
+# never be what fills a 1 GB VPS. MemoryMax is a wall well above the measured
+# working set, and Restart=always means a genuine leak restarts the agent
+# instead of taking the node down (xray keeps serving). No MemoryHigh: it would
+# throttle a node that never receives the heap flag, and the agent writes the
+# same MemoryMax as a drop-in, which is parsed last and must not disagree.
+ExecStart=$NODE_BIN --max-old-space-size=192 $AGENT_DIR/bin/nova-agent.mjs
 EnvironmentFile=$CERT_DIR/agent.env
 Restart=always
 RestartSec=2
+MemoryMax=768M
 User=root
 StateDirectory=nova
 
