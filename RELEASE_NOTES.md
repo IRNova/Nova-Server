@@ -1,47 +1,53 @@
-# Nova Server v1.41.3
+# Nova Server v1.41.4
 
-## Country exits were doubled for users who have only the exits
+## WARP kept telling you its data was low when nothing was wrong
 
-If you moved your fronts onto their own domain and then gave someone the
-per-country exits **without** giving them the front itself, they received two
-configurations for every country: one on your panel domain and one on the front
-domain. A user who also held the front received one, correctly, on the front
-domain.
+If you use WARP on a free account, Nova has been warning you, on Telegram and in
+the activity log, that your **WARP+ data is low, about 0 MB left**. Repeatedly,
+and for as long as WARP was registered.
 
-The exits are the front reached by a different path, and Nova works out which
-front domain to use from the front that serves that user. Someone sold only the
-exits is on no front, so there was nothing to read the domain from and it fell
-back to the panel domain, then published that copy on the other domain as well.
+There was nothing wrong. Cloudflare reports `warp_plus: true` on a brand new
+free account that has never had a licence, and Nova read that as "this is a paid
+plan", so it went looking for the remaining data, found none, and warned about
+it. Verified against Cloudflare's live API with a control: an account with no
+licence at all comes back exactly the same as one with a licence applied.
 
-They now follow the front domain like everyone else, and get one configuration
-per country. Nothing changes for a user who already had the front, and nothing
-changes at all if you have not put your fronts on their own domain.
+Nova now decides from the plan itself, so a free account is left alone. A real
+WARP+ plan still warns when it genuinely runs low or expires, including a plan
+that has run down to zero, which is the case the warning exists for.
 
-Where two fronts sit on different domains, a user who belongs to neither is
-still left on the panel domain rather than guessed onto one of them. Publishing
-someone on another customer's domain is worse than an extra entry in the list.
+## A licence key that changes nothing is no longer reported as success
 
-## Three more, found while checking the one above
+Applying a key showed the account as **plus** straight away. That reading came
+from Cloudflare's reply to the update, which does not include the plan, so Nova
+filled in the optimistic answer.
 
-**A restricted front's domain could reach a user who was denied it.** Where one
-front belongs to a single customer, the fix above could borrow that customer's
-private domain for another user's country exits, as the address and as the
-server name. Only a front published to everyone is borrowed now. If you share
-one front through an explicit user list rather than "all users", exits-only
-customers keep the extra entry rather than being put on a domain that is not
-theirs.
+Nova now reads the account back after applying a key and tells you what it
+actually says. If the key was accepted but left you on the free plan with no
+data, you are told that instead of being congratulated.
 
-**A user denied every protocol still received a working front in Clash and
-sing-box.** Only on panels that predate the front records, and only with the
-per-carrier variants switched on: those variants were emitted without checking
-the user's protocol list, so someone sold a restricted plan could open the same
-subscription in Clash and connect. The plain list denied them correctly, which
-is what made it hard to see. Both now agree.
+**Worth knowing if you use the free "WARP+ key" channels.** Every key from those
+bots that we tested was accepted by Cloudflare and granted nothing: applying one
+attaches your device to an existing account that is itself on the free plan with
+no data left, because the same key has been handed to thousands of people. The
+key is not rejected, it simply does nothing, which is why it looked like Nova
+was at fault.
 
-**An IPv6 public address produced an unusable link.** An inbound or front given
-a bare IPv6 address emitted a link no client could parse, because the address
-was not bracketed and its colons ran into the port. Affects only operators
-publishing on a literal IPv6 address.
+## And the same false alarm on the WARP card
+
+The panel showed **Data left: 0 B** in the warning colour on every free account,
+for the same reason. A free account reports zero because the figure does not
+apply to it, not because you have run out. That row is now left out unless there
+is a number worth showing, and the warning colour stays with the paid plans.
+
+Three smaller things found while checking the above: applying a key when
+Cloudflare would not confirm the result afterwards reported success and
+overwrote your stored plan with "free", which is reachable simply by applying
+two keys quickly, since that endpoint is rate limited. An expired plan that
+Cloudflare has reverted to free now still reports as expired, which the plan
+check would otherwise have hidden. And nodes upgrading from an earlier build
+have the flag the false alarm left behind cleared, so a later genuine warning is
+not swallowed.
 
 ---
 
