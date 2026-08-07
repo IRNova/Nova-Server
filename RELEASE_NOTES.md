@@ -1,32 +1,44 @@
-# Nova Server v1.43.1
+# Nova Server v1.43.2
 
-## The manual and the panel search now cover what 1.43.0 added
+## mieru with no users: the panel now says why, instead of blaming the port
 
-1.43.0 shipped two features and documented neither in the place operators
-actually look. The panel's manual said nothing about Reality short IDs varying
-per user, and nothing about branding the subscription page. Searching the panel
-for "brand", "logo" or "short id" returned nothing at all, so both features were
-reachable only by already knowing where they lived.
+If you turned mieru on before giving it to any user, the server never started
+and the panel told you "nothing is listening" on its port. That is the symptom.
+The cause is that the mieru server refuses to start with an empty user list, and
+nothing said so anywhere: not the health page, not the activity log, not the
+logs on the server.
 
-Both now have manual entries, in English, Persian and Russian:
+One operator hit this twice, on two different ports, and reasonably concluded
+the port was the problem. It was not, and neither was UDP. It was that nobody
+had been granted mieru yet.
 
-- **Inbounds** explains that a Reality inbound holds a set of short IDs rather
-  than one, that each user is given one of them, that saving only ever adds to
-  the set because a configuration a customer already holds carries the ID it was
-  issued with, and that existing inbounds stay as they are until you widen them
-  through the health check, because widening reloads the proxy core and briefly
-  interrupts live connections.
-- **Settings** explains the subscription page branding: your name, your logo,
-  and dropping the Nova social links, plus why the logo is embedded rather than
-  linked and why SVG is not accepted.
+Three things change:
 
-The panel search has a row for each, so "short id", "sni", "brand", "logo" and
-"white label" now find them, in all three languages.
+- **The health page names the cause.** "mieru is on, but no user has been given
+  it, and the mieru server refuses to start with an empty user list. That is why
+  its port shows nothing listening." In English, Persian and Russian. There is
+  deliberately no one-click fix, because which user to grant is your decision
+  and granting widens what that account can reach.
+- **Nova no longer asks the server to start when it cannot.** Enabling mieru
+  before granting it is a perfectly reasonable order to work in, and it is now
+  reported as the half-configured state it is rather than as a failure.
+- **A failed start now says what went wrong.** The real message, "no user
+  found", reaches your activity log. Previously a failure carried no reason at
+  all, so the log recorded "mieru enabled" and nothing else.
 
-Nothing else changed. No code path, no setting, no user, no inbound, and no
-client configuration is affected by this release. If you are on 1.43.0 and do
-not use the manual or the search, there is nothing here you need.
+**If your mieru is showing red right now:** open any user, turn mieru on for
+them, and save. The server starts on its own. Nothing else needs changing, and
+no client configuration is affected.
+
+## A translation gap that could have let this happen again
+
+The health findings live in their own translation tables, and the check that
+guards English, Persian and Russian parity did not cover them. A finding added
+in English only would have passed every gate and reached the one screen people
+open when they are already stuck. That check now covers them, and also fails if
+the server can emit a finding the panel has no translation for.
 
 ---
 
-**Updating:** Settings, then Check for updates.
+**Updating:** Settings, then Check for updates. No user, inbound, or setting is
+changed by this release.
