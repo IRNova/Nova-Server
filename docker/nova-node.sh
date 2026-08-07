@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-#  Nova Node  —  one-line VPS installer for the full Nova panel
+#  Nova Node: one-line VPS installer for the full Nova panel
 #
 #  Installs xray-core + the Nova node agent and wires them together so ONE
 #  public port (443) serves both the admin panel and the tunnel:
@@ -326,6 +326,96 @@ PSI
   fi
 fi
 
+# ---- standalone protocol backends (Telegram MTProto proxy, mieru) ------------
+# Neither protocol can be served by a core Nova already runs: xray-core dropped
+# its mtproto inbound, and the sing-box build here refuses a mieru outbound
+# ("unknown outbound type"). Both are therefore separate daemons the agent
+# manages, and both are OFF until an operator turns them on in the panel; this
+# only puts the binary in place.
+#
+# Pinned by version AND by SHA-256, and served from IRNova/Tools rather than
+# from upstream. A node runs these as a service, so whoever controls the bytes
+# controls the node: pulling a publisher's "latest" would let an upstream
+# account compromise reach every Nova node with no release of ours in between.
+# The mirrored files are byte-identical copies of upstream's releases, so these
+# hashes are also upstream's own published checksums.
+#
+# KEEP IN SYNC WITH src/binaries.mjs. The agent installs the same artifacts on
+# demand, because a node that already exists never re-runs this script, and
+# test/binary-pins.mjs fails if the two ever disagree.
+MTG_VERSION="2.2.8"
+MITA_VERSION="3.35.0"
+
+# `set -e` is on, so the architecture choice is a case statement rather than a
+# `[ ... ] && var=...` one-liner: on x86_64 that pattern ends the line with a
+# non-zero status and takes the whole installer down.
+case "$(uname -m)" in
+  aarch64|arm64)
+    barch="arm64"
+    MTG_SHA256="562a94dd4cafcb8f179b76cfeafb76da12747c8e230bc76235bf8746cc189644"
+    MITA_SHA256="808849223d34ccd9ad86afc0eedef4d6c827133258e96dc3f3794bd17e7d54de"
+    ;;
+  *)
+    barch="amd64"
+    MTG_SHA256="7ef19d079d85f4e00d4f8334ec1f3f3c8718e3d0ed1f3109ea9a8673138a2102"
+    MITA_SHA256="a07d5afc5e1353ab346bb3ddbe95c7f960828204be529f4a88d688dfe83e252d"
+    ;;
+esac
+
+# Verify a downloaded archive against a pinned SHA-256. Fails CLOSED: a host
+# with no sha256 tool refuses rather than installing something unchecked, which
+# is the rule the self-updater learned the hard way in 1.34.1.
+sha_is() { # file expected
+  _got=""
+  if command -v sha256sum >/dev/null 2>&1; then _got="$(sha256sum "$1" | awk '{print $1}')"
+  elif command -v shasum >/dev/null 2>&1; then _got="$(shasum -a 256 "$1" | awk '{print $1}')"
+  else return 1; fi
+  [ "$_got" = "$2" ]
+}
+
+# A private directory per download. A fixed /tmp/<name> is world-predictable,
+# and the window between `tar` and `install` is long enough for an unprivileged
+# local account to swap the file, which would put attacker bytes into
+# /usr/local/bin as root and defeat the checksum that was just verified.
+#
+# Cleaned up explicitly rather than with `trap ... EXIT`: a second EXIT trap
+# silently REPLACES the first, and 1.34.1 records that exact bug swallowing the
+# self-updater's status file. `mktemp -d` is 0700, so a leak on an abort costs
+# nothing.
+btmp="$(mktemp -d)"
+
+if [ ! -x /usr/local/bin/mtg ]; then
+  say "Installing mtg (Telegram MTProto proxy)"
+  if curl -fsSL --proto '=https' --proto-redir '=https' -o "$btmp/mtg.tar.gz" \
+       "https://github.com/IRNova/Tools/releases/download/mtg/mtg-${MTG_VERSION}-linux-${barch}.tar.gz" \
+     && sha_is "$btmp/mtg.tar.gz" "$MTG_SHA256" \
+     && tar -xzf "$btmp/mtg.tar.gz" -C "$btmp" --strip-components=1 "mtg-${MTG_VERSION}-linux-${barch}/mtg" \
+     && install -m 0755 "$btmp/mtg" /usr/local/bin/mtg; then
+    id -u nova-mtg >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin --user-group nova-mtg >/dev/null 2>&1 || true
+    mark_owned mtg
+    ok "mtg installed (checksum verified)"
+  else
+    warn "Could not install mtg; the Telegram proxy will be unavailable."
+  fi
+fi
+
+if [ ! -x /usr/local/bin/mita ]; then
+  say "Installing mita (mieru server)"
+  if curl -fsSL --proto '=https' --proto-redir '=https' -o "$btmp/mita.tar.gz" \
+       "https://github.com/IRNova/Tools/releases/download/mita/mita_${MITA_VERSION}_linux_${barch}.tar.gz" \
+     && sha_is "$btmp/mita.tar.gz" "$MITA_SHA256" \
+     && tar -xzf "$btmp/mita.tar.gz" -C "$btmp" mita \
+     && install -m 0755 "$btmp/mita" /usr/local/bin/mita; then
+    id -u mita >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin --user-group mita >/dev/null 2>&1 || true
+    install -d -m 750 -o mita -g mita /etc/mita /var/lib/mita /var/run/mita 2>/dev/null || true
+    mark_owned mita
+    ok "mita installed (checksum verified)"
+  else
+    warn "Could not install mita; mieru will be unavailable."
+  fi
+fi
+rm -rf "$btmp"
+
 # ---- tunnel backends (Iran bridge <-> foreign exit) --------------------------
 # Selectable reverse-tunnel tools so an Iran box can front a foreign Nova exit
 # over a censorship-resistant transport. Best-effort: a missing binary just means
@@ -602,10 +692,20 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=$AGENT_DIR
-ExecStart=$NODE_BIN $AGENT_DIR/bin/nova-agent.mjs
+# --max-old-space-size caps V8's heap. Without it V8 sizes the heap from total
+# system RAM and never returns it, so a busy node's agent settles at a few
+# hundred MB and the operator sees "the panel's RAM keeps climbing". 192 MB is
+# well above what a large registry needs and small enough that the agent can
+# never be what fills a 1 GB VPS. MemoryMax is a wall well above the measured
+# working set, and Restart=always means a genuine leak restarts the agent
+# instead of taking the node down (xray keeps serving). No MemoryHigh: it would
+# throttle a node that never receives the heap flag, and the agent writes the
+# same MemoryMax as a drop-in, which is parsed last and must not disagree.
+ExecStart=$NODE_BIN --max-old-space-size=192 $AGENT_DIR/bin/nova-agent.mjs
 EnvironmentFile=$CERT_DIR/agent.env
 Restart=always
 RestartSec=2
+MemoryMax=768M
 User=root
 StateDirectory=nova
 
