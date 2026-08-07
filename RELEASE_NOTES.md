@@ -1,45 +1,63 @@
-# Nova Server v1.42.3
+# Nova Server v1.43.0
 
-Two things reported from installs this week.
+## Reality now looks different for each of your users
 
-## A 512 MB server can be installed on now
+An operator pointed out that every client on a Reality inbound presented the
+same SNI and the same short ID, so they all looked alike on the wire. They were
+right, and it was worse than it looked: Xray supports a list of each, but Nova
+minted exactly one short ID and every subscription used the first entry. Even if
+you added ten by hand, every customer still showed the same one.
 
-If you tried Nova on a 512 MB VPS, the install failed partway through with an
-error from the package manager that said nothing about memory. Installing and
-running Node.js is the peak, and 512 MB with no swap does not reach it.
+New Reality inbounds now get a pool of six short IDs, and each user is given one
+of them. The choice is fixed per user, so a customer's config does not change
+when they refresh their subscription, and no single value identifies your whole
+node. The borrowed-SNI field takes a comma separated list, and its suggestion
+chips now add to what is there instead of replacing it.
 
-Nova now checks before it gets there. On a server with less than 1 GB of RAM and
-no swap worth the name, it adds a 1 GB swap file first, and tells you it did.
-The install then completes, and the swap keeps helping afterwards because the
-panel, Xray and sing-box all stay resident.
+**Nothing is ever removed.** A client config carries the short ID it was issued
+with, and Reality rejects a connection whose short ID the server no longer
+lists, so removing one would kill configs already in your customers' hands.
+Values are only ever added, including values Nova would not generate itself.
 
-It is deliberately careful about this:
+Your existing inbounds are left exactly as they are by this update. They are not
+widened automatically, because widening reloads Xray and drops every live
+connection on the node. If you want an existing inbound to use a pool, the
+health check offers it as a fix and you choose when to press it.
 
-- It never touches swap you already have, and never replaces an existing
-  `/swapfile`.
-- If your provider does not allow swap files, it says so and carries on rather
-  than stopping the install.
-- Removing Nova removes only a swap file Nova created. Your own is left alone.
+## Your own brand on the subscription page
 
-Thank you to the operator who worked this out and tested it for an hour before
-telling us.
+The page your customers open can now carry your name, your logo, and none of
+Nova's social links. It is in Settings, under the subscription page section.
 
-## "My panel shows 404"
+The logo is uploaded and stored inside the page rather than linked, because that
+page promises it makes no external requests of any kind, which is part of what
+makes it safe to open on a censored network. A linked logo would also hand its
+host the address of every customer who opens the link. PNG, JPEG, WebP and GIF
+are accepted, SVG is not. If you set a name without a logo, the page shows your
+initials rather than Nova's mark next to your name.
 
-This one is not a fault, and our own instructions were sending you the wrong way.
+## The panel documents the two newest protocols
 
-Nova installs your panel behind a **secret path**, so the address looks like
-`https://your-server/a8f3k2/`. Anything arriving without that path gets a plain
-"404 Not Found" **on purpose**, so that someone scanning your server cannot tell
-there is a panel on it at all. A 404 means the disguise is working, not that the
-install failed.
+The manual has a section on the Telegram proxy and mieru, which it had never
+mentioned, and the panel search finds them, so typing "telegram" or "mieru"
+returns something instead of nothing.
 
-If you have lost the address, sign in to your server and run:
+Health check findings are now in Persian and Russian as well as English. They
+were English sentences on every panel, on the one screen people open when they
+are already stuck.
 
-    nova-access
+## A customer could be served the wrong page
 
-It prints the panel URL and changes nothing else. We previously told people to
-run `nova-passwd`, which **resets your admin password** as a side effect of
-showing the URL, and which prints nothing at all if you run it with no
-arguments. That was our mistake. The installer and the in-panel guide now say
-`nova-access`, in English, Persian and Russian.
+A subscription or panel page carrying certain characters in a stored value, a
+customer name containing `$'` for example, could splice part of the page into
+itself. The visible result was that customer opening their subscription link and
+seeing a demo account instead of their own, silently, with no error.
+
+This is older than this release and affects every version before it. If any of
+your customers has ever reported seeing an account that is not theirs on the
+subscription page, this was why.
+
+---
+
+**Updating:** Settings, then Check for updates. No user, inbound, or setting is
+changed by this release, and no client configuration needs to be reissued.
