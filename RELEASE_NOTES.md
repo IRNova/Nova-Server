@@ -1,40 +1,35 @@
-# Nova Server v1.42.1
+# Nova Server v1.42.2
 
-Three things the panel was showing you that were not true. All reported within
-hours of 1.42.0, thank you.
+## Changing mieru's transport left the old port open
 
-## The Reload button on a Telegram proxy or mieru port did nothing
+If you switched mieru between TCP and UDP, the port you switched **away from**
+stayed open and accepting. The panel told you it was closed, mieru's own
+configuration said it was closed, and one listener was still sitting there.
 
-If either of the new protocols showed a red "nothing is listening", the panel
-offered a **Reload service** button. That button restarted Xray, which has
-nothing to do with either of them, so pressing it changed nothing however many
-times you tried.
+Changing the port number was always handled correctly. It was changing only the
+transport that leaked, because the way mieru was being restarted releases a
+listener when the port moves but not when just the protocol does. Nova now
+restarts the service outright on any change to what it listens on, which is the
+only thing that reliably closes every socket.
 
-It now restarts the service that actually owns the port. For mieru it also
-starts the proxy afterwards, because mieru's service being up is not the same as
-mieru serving traffic: it comes up idle, so a restart that stopped at the service
-would have told you it worked while the port stayed shut.
+If you have ever changed mieru's transport, take this update and the stray
+listener goes away. Nothing else about your setup changes, and no client
+configuration is affected.
 
-## The Persian health page read backwards
+## A note on the "nothing is listening" report
 
-The health check writes its explanations in English, and in a right-to-left page
-their punctuation was being moved to the wrong end of the line. Sentences came
-out looking like ".which ,TUIC and NaiveProxy run over QUIC ,Hysteria2 is UDP"
-on the one page you open when something is already wrong.
+Thank you to whoever reported mieru showing red on a UDP port. We could not
+reproduce that symptom, and mieru on UDP is now tested end to end on a real
+server: it binds, the health check sees it, and the test button passes. So if
+you are still seeing it, we would genuinely like the output of these four
+commands, because it is something we have not seen yet:
 
-Fixed. The text now lays itself out in its own direction, and it will still be
-right when those explanations are eventually translated.
+    ss -lnu | grep <your mieru port>
+    systemctl is-active nova-mieru
+    mita status
+    journalctl -u nova-mieru -n 20 --no-pager
 
-## You can now choose which address goes in the proxy link
-
-If your panel domain is behind Cloudflare, the Telegram proxy link named an
-address nobody could connect to, and mieru had the same problem with no way to
-change it.
-
-Both now have an address picker. It lists only the domains that can actually
-carry these protocols, and a Cloudflare-proxied domain is deliberately not among
-them: neither protocol is HTTP, so the CDN answers the handshake itself and
-nothing reaches your server. If you have no direct domain, leave it on
-**Automatic** and Nova uses the server's own address.
-
-Nothing else changes, and nothing your users hold is affected.
+In the meantime: if mieru shows red, the **Reload service** button on that row
+now actually fixes it. In 1.42.0 that button restarted Xray, which has nothing
+to do with mieru, so it did nothing at all no matter how many times you pressed
+it. That was fixed in 1.42.1 and is confirmed working.
