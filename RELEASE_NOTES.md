@@ -1,35 +1,45 @@
-# Nova Server v1.42.2
+# Nova Server v1.42.3
 
-## Changing mieru's transport left the old port open
+Two things reported from installs this week.
 
-If you switched mieru between TCP and UDP, the port you switched **away from**
-stayed open and accepting. The panel told you it was closed, mieru's own
-configuration said it was closed, and one listener was still sitting there.
+## A 512 MB server can be installed on now
 
-Changing the port number was always handled correctly. It was changing only the
-transport that leaked, because the way mieru was being restarted releases a
-listener when the port moves but not when just the protocol does. Nova now
-restarts the service outright on any change to what it listens on, which is the
-only thing that reliably closes every socket.
+If you tried Nova on a 512 MB VPS, the install failed partway through with an
+error from the package manager that said nothing about memory. Installing and
+running Node.js is the peak, and 512 MB with no swap does not reach it.
 
-If you have ever changed mieru's transport, take this update and the stray
-listener goes away. Nothing else about your setup changes, and no client
-configuration is affected.
+Nova now checks before it gets there. On a server with less than 1 GB of RAM and
+no swap worth the name, it adds a 1 GB swap file first, and tells you it did.
+The install then completes, and the swap keeps helping afterwards because the
+panel, Xray and sing-box all stay resident.
 
-## A note on the "nothing is listening" report
+It is deliberately careful about this:
 
-Thank you to whoever reported mieru showing red on a UDP port. We could not
-reproduce that symptom, and mieru on UDP is now tested end to end on a real
-server: it binds, the health check sees it, and the test button passes. So if
-you are still seeing it, we would genuinely like the output of these four
-commands, because it is something we have not seen yet:
+- It never touches swap you already have, and never replaces an existing
+  `/swapfile`.
+- If your provider does not allow swap files, it says so and carries on rather
+  than stopping the install.
+- Removing Nova removes only a swap file Nova created. Your own is left alone.
 
-    ss -lnu | grep <your mieru port>
-    systemctl is-active nova-mieru
-    mita status
-    journalctl -u nova-mieru -n 20 --no-pager
+Thank you to the operator who worked this out and tested it for an hour before
+telling us.
 
-In the meantime: if mieru shows red, the **Reload service** button on that row
-now actually fixes it. In 1.42.0 that button restarted Xray, which has nothing
-to do with mieru, so it did nothing at all no matter how many times you pressed
-it. That was fixed in 1.42.1 and is confirmed working.
+## "My panel shows 404"
+
+This one is not a fault, and our own instructions were sending you the wrong way.
+
+Nova installs your panel behind a **secret path**, so the address looks like
+`https://your-server/a8f3k2/`. Anything arriving without that path gets a plain
+"404 Not Found" **on purpose**, so that someone scanning your server cannot tell
+there is a panel on it at all. A 404 means the disguise is working, not that the
+install failed.
+
+If you have lost the address, sign in to your server and run:
+
+    nova-access
+
+It prints the panel URL and changes nothing else. We previously told people to
+run `nova-passwd`, which **resets your admin password** as a side effect of
+showing the URL, and which prints nothing at all if you run it with no
+arguments. That was our mistake. The installer and the in-panel guide now say
+`nova-access`, in English, Persian and Russian.

@@ -120,6 +120,14 @@ if owned mita; then userdel mita >/dev/null 2>&1 || true; fi
 rm -f /usr/local/bin/nova-passwd /usr/local/bin/nova-access /usr/local/bin/nova-unlock
 rm -f /usr/local/bin/nova-tgbot /usr/local/bin/nova-uninstall
 rm -f /etc/sysctl.d/99-nova-net.conf
+# The swap file, but only one this installer created on a low-memory box. An
+# operator's own swap is left exactly alone, which is what the ownership marker
+# is for.
+if owned swapfile; then
+  swapoff /swapfile >/dev/null 2>&1 || true
+  rm -f /swapfile
+  sed -i '\#^/swapfile #d' /etc/fstab 2>/dev/null || true
+fi
 if owned awg-config; then rm -f /etc/sysctl.d/99-nova-awg.conf; fi
 rm -rf /var/lib/nova /etc/nova /var/log/nova
 # The Telegram proxy's config lives outside /etc/nova on purpose (that directory

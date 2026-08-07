@@ -147,6 +147,45 @@ else
   die "This installer targets Debian/Ubuntu (apt-get not found)."
 fi
 
+# ---- low-memory boxes: add swap rather than fail halfway ---------------------
+# Reported from the field: "on 512 MB RAM the install is simply not possible,
+# but with swap I ran it for an hour with no problem". That operator was right,
+# and they had to work it out themselves because the installer said nothing.
+#
+# What actually runs out: `apt-get install nodejs` and the Node runtime itself
+# are the peaks, so the failure lands in the middle of the install with an
+# out-of-memory message from apt rather than anything mentioning memory. A
+# little swap carries the box through, and it stays useful afterwards because
+# the agent, xray and sing-box all sit resident.
+#
+# Deliberately conservative: swap is only ADDED when there is none at all, the
+# file is sized once and never resized, and any failure is a warning rather
+# than a stop, because plenty of 512 MB boxes have swap already or run a
+# provider image that forbids swapfiles. Nova never removes an operator's own
+# swap, and the ownership marker means the uninstaller only removes a file this
+# script created.
+mem_mb="$(awk '/^MemTotal:/ {printf "%d", $2/1024}' /proc/meminfo 2>/dev/null || echo 0)"
+swap_mb="$(awk '/^SwapTotal:/ {printf "%d", $2/1024}' /proc/meminfo 2>/dev/null || echo 0)"
+if [ "${mem_mb:-0}" -gt 0 ] && [ "$mem_mb" -lt 1024 ] && [ "${swap_mb:-0}" -lt 256 ]; then
+  say "Only ${mem_mb} MB of RAM and no swap; adding a 1 GB swap file"
+  if [ ! -e /swapfile ] \
+     && { fallocate -l 1G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=1024 status=none 2>/dev/null; } \
+     && chmod 600 /swapfile && mkswap /swapfile >/dev/null 2>&1 && swapon /swapfile 2>/dev/null; then
+    grep -q '^/swapfile ' /etc/fstab 2>/dev/null || printf '/swapfile none swap sw 0 0\n' >> /etc/fstab
+    mark_owned swapfile
+    ok "swap enabled (1 GB), so the install and the panel have room"
+  else
+    # Clean up a half-made swap file. Some hosts allow the file but refuse
+    # swapon (containers, and providers that block it), and leaving a stray 1 GB
+    # behind takes disk from the very box that had none to spare. Only ever the
+    # file this branch just created, never one that already existed.
+    if [ ! -f "$DB_DIR/.owned/swapfile" ] && [ -e /swapfile ] && ! swapon --show 2>/dev/null | grep -q '^/swapfile '; then
+      rm -f /swapfile
+    fi
+    warn "Could not add swap. On ${mem_mb} MB the install may fail; add swap yourself and re-run."
+  fi
+fi
+
 # ---- Node 24 -----------------------------------------------------------------
 need_node=1
 if command -v node >/dev/null 2>&1; then
@@ -1048,7 +1087,13 @@ echo
 if [ -n "$EFF_PATH" ]; then
   printf '  %s\n' "${c_yel}${c_bld}Save the panel URL: the secret path is what hides your panel.${c_rst}"
   printf '  %s\n' "  Anyone opening the bare address just sees \"404 Not Found\"."
-  printf '  %s\n' "  Forgot it? Run ${c_bld}nova-passwd 'NewPassword'${c_rst} over SSH - it prints the URL."
+  # nova-access, NOT nova-passwd. This used to say `nova-passwd 'NewPassword'`,
+  # which resets the admin password as a side effect of asking where the panel
+  # is: the URL is only printed AFTER the reset, and with no argument that
+  # command exits with a usage error instead. Operators losing the URL and being
+  # told to change their password to find it is how "the panel 404s" became a
+  # recurring report.
+  printf '  %s\n' "  Forgot it? Run ${c_bld}nova-access${c_rst} over SSH: it prints the URL and changes nothing."
   echo
 fi
 if [ "${FIRST_RUN:-0}" = 1 ]; then
