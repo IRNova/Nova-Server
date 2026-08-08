@@ -382,7 +382,7 @@ fi
 # KEEP IN SYNC WITH src/binaries.mjs. The agent installs the same artifacts on
 # demand, because a node that already exists never re-runs this script, and
 # test/binary-pins.mjs fails if the two ever disagree.
-MTG_VERSION="2.2.8"
+MTGMULTI_VERSION="1.15.0"
 MITA_VERSION="3.35.0"
 
 # `set -e` is on, so the architecture choice is a case statement rather than a
@@ -391,12 +391,12 @@ MITA_VERSION="3.35.0"
 case "$(uname -m)" in
   aarch64|arm64)
     barch="arm64"
-    MTG_SHA256="562a94dd4cafcb8f179b76cfeafb76da12747c8e230bc76235bf8746cc189644"
+    MTGMULTI_SHA256="9ed776b2052b95e8344896d43fbe01250014f36d7cfdd7f29f7903179bce4bed"
     MITA_SHA256="808849223d34ccd9ad86afc0eedef4d6c827133258e96dc3f3794bd17e7d54de"
     ;;
   *)
     barch="amd64"
-    MTG_SHA256="7ef19d079d85f4e00d4f8334ec1f3f3c8718e3d0ed1f3109ea9a8673138a2102"
+    MTGMULTI_SHA256="f1f8763504753fb863a0ddff83eab19c856747289c376275c44b717f1747908e"
     MITA_SHA256="a07d5afc5e1353ab346bb3ddbe95c7f960828204be529f4a88d688dfe83e252d"
     ;;
 esac
@@ -423,18 +423,21 @@ sha_is() { # file expected
 # nothing.
 btmp="$(mktemp -d)"
 
-if [ ! -x /usr/local/bin/mtg ]; then
-  say "Installing mtg (Telegram MTProto proxy)"
+# mtg-multi, not 9seconds/mtg: the fork carries a [secrets] table, a loopback
+# management API and per-secret counters, which is what makes a per-customer
+# Telegram proxy with its own data limit possible. See docs/mtg-multi-adoption.md.
+if [ ! -x /usr/local/bin/mtg-multi ]; then
+  say "Installing mtg-multi (Telegram MTProto proxy)"
   if curl -fsSL --proto '=https' --proto-redir '=https' -o "$btmp/mtg.tar.gz" \
-       "https://github.com/IRNova/Tools/releases/download/mtg/mtg-${MTG_VERSION}-linux-${barch}.tar.gz" \
-     && sha_is "$btmp/mtg.tar.gz" "$MTG_SHA256" \
-     && tar -xzf "$btmp/mtg.tar.gz" -C "$btmp" --strip-components=1 "mtg-${MTG_VERSION}-linux-${barch}/mtg" \
-     && install -m 0755 "$btmp/mtg" /usr/local/bin/mtg; then
+       "https://github.com/IRNova/Tools/releases/download/mtgMulti/mtg-multi-${MTGMULTI_VERSION}-linux-${barch}.tar.gz" \
+     && sha_is "$btmp/mtg.tar.gz" "$MTGMULTI_SHA256" \
+     && tar -xzf "$btmp/mtg.tar.gz" -C "$btmp" --strip-components=1 "mtg-multi-${MTGMULTI_VERSION}-linux-${barch}/mtg-multi" \
+     && install -m 0755 "$btmp/mtg-multi" /usr/local/bin/mtg-multi; then
     id -u nova-mtg >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin --user-group nova-mtg >/dev/null 2>&1 || true
-    mark_owned mtg
-    ok "mtg installed (checksum verified)"
+    mark_owned mtgMulti
+    ok "mtg-multi installed (checksum verified)"
   else
-    warn "Could not install mtg; the Telegram proxy will be unavailable."
+    warn "Could not install mtg-multi; the Telegram proxy will be unavailable."
   fi
 fi
 
