@@ -1,123 +1,159 @@
-# Nova Server v1.47.0
+# Nova Server v1.48.0
 
-## Clean Cloudflare IPs are now used, instead of being collected and thrown away
+## Nova now knows which of your domains is actually behind Cloudflare
 
-If your domain sits behind Cloudflare's orange cloud, your customers never
-connect to your server. They connect to whichever Cloudflare edge address your
-domain currently resolves to, and Cloudflare passes the traffic on. Filtering in
-Iran works on those edge addresses, so a customer's configuration can stop
-working while your server, your domain and your certificate are all completely
-fine.
+An operator reported a health finding that was simply wrong. Their panel domain
+sits behind Cloudflare with the orange cloud on, but they got its certificate
+from Let's Encrypt rather than through Nova's Cloudflare integration, so Nova had
+never written anything down about it. The health page then told them that domain
+was pointing straight at their server and exposing it beside a proxied one. It
+was not. A false alarm on that page is worse than no alarm, because it teaches
+people to ignore the real one.
 
-The standard answer is to dial a different Cloudflare address while still
-presenting your own domain, and Nova can do that for you now. Turn on
-**Publish clean IPs in configs** on the Clean IPs page, and every one of your
-Cloudflare-fronted configurations gains a second copy that connects to a clean
-Cloudflare address while the SNI and the WebSocket Host stay your own domain. The
-certificate still validates, because the name in the handshake never moved.
+Nova only ever knew about domains it had set up through Cloudflare itself. Now it
+resolves each of your domains and checks whether the addresses belong to
+Cloudflare, whose published ranges are already compiled into the agent. A domain
+that resolves into Cloudflare **is** behind Cloudflare; that is a fact, not a
+guess.
 
-**Nothing is replaced.** The original entry stays exactly where it was, so your
-customer's app simply has two ways in and uses whichever answers. A clean address
-that goes stale costs one dead entry among several, not a customer's whole
-subscription.
+The lookup is encrypted and goes to resolvers named by address, not through
+whatever resolver your server's network hands it. That matters because this
+answer decides what your customers receive: a network that filters your server
+can stop Nova finding out, which leaves the domain at "not established" and
+changes nothing, but it cannot tell Nova something untrue.
 
-Four things about it are worth knowing:
+**Each domain row on the Domains and addresses page now says one of three
+things**, and the third one is the important one:
 
-- **It only applies where a CDN can carry the traffic.** Reality, Hysteria2,
-  TUIC, NaiveProxy, mieru, the Telegram proxy and AmneziaWG are untouched. None
-  of them can pass through Cloudflare, so giving one of them a Cloudflare address
-  would hand out a configuration that cannot connect.
-- **Only when Nova knows a Cloudflare-proxied name is in front of your server.**
-  That means a primary domain Nova set up through Cloudflare with proxying on, or
-  an additional domain marked as proxied. A domain Nova did not set up counts as
-  not proxied, because publishing a Cloudflare address in front of a name that
-  points straight at your server produces a configuration that reaches Cloudflare
-  and stops there.
-- **Every address is checked against Cloudflare's own published ranges** before
-  it can reach anybody, and that check cannot be widened by anything fetched over
-  the network. A list that is wrong, out of date or has been tampered with makes
-  the pool smaller. It cannot send your customers somewhere else.
-- **No single source can fill the pool on its own**, and a day's refresh never
-  takes more than half of what you already have. A network that answers Nova
-  dishonestly can only ever be part of the answer, not all of it.
-- **Each customer keeps the same address between subscription refreshes**, the
-  same way their Reality short ID does, so their configuration does not change
-  under them.
+- **Behind Cloudflare**
+- **Points straight here**
+- **Not established**
 
-The daily **Auto clean-IP refresh** switch on the Settings page fills the list.
-It now collects from the published sources and stores only addresses it has
-proved are Cloudflare's. If it cannot reach a source, or nothing in what it
-receives passes the check, it leaves your existing list exactly as it was and
-says so in the activity log rather than emptying a working pool.
+"Not established" is a real answer and not a polite no. DNS from a server in or
+near Iran is exactly what gets blocked or poisoned, and a lookup that fails must
+never be read as "points straight here". When Nova cannot establish a name, it
+says so and acts on nothing at all: no accusation on the health page, and no
+change to any address a customer dials. That is the same behaviour you had
+before this release.
 
-**A correction worth stating plainly: that switch has never actually collected
-anything, on any node.** It fetched a URL that is a directory rather than a file,
-so GitHub answered 404 every time and the automation stopped there without a
-word. Anything in your Clean IPs list today is something you typed yourself. That
-is fixed.
+**You have the last word.** Each row has a dropdown: work it out automatically,
+it is behind Cloudflare, or it points straight at this server. Your answer beats
+anything Nova worked out, everywhere it is used: the health page, the clean-IP
+feature, and the address the Telegram proxy, mieru and AmneziaWG publish. Use it
+when you can see your DNS panel and this server cannot. **Check again** re-runs
+every lookup immediately rather than waiting for the next scheduled one, which
+happens every six hours.
 
-**Nothing changes unless you turn it on.** Both of our own servers produce
-byte-identical subscriptions on this release, in all six formats.
+Two things follow from this that are worth knowing:
 
-## Fragment and multiplexing inside your customers' configurations
+- **The clean-IP feature now works for you even if Nova did not set up your
+  domain.** It used to require a domain Nova had provisioned through Cloudflare,
+  which shut out every operator who arranged their own.
+- **A domain you put behind Cloudflare yourself will now stop being published as
+  the endpoint for the Telegram proxy, mieru or AmneziaWG.** None of those three
+  can pass through a CDN, so a configuration naming a proxied domain cannot
+  connect at all. If that removes an address you were relying on, the health page
+  explains why and the per-domain dropdown lets you overrule it.
 
-An operator reported that the anti-censorship card "does not apply to configs".
-It is not broken, and nothing about it was fixed: that card is a **server-side**
-setting and its own description says so. It splits the handshake of connections
-**this server** makes outward, to the sites your customers visit. It has never
-been part of what customers receive.
+## Clean IPs: findable, and you choose what customers receive
 
-What they were asking for is a different thing, and it is now a card of its own,
-directly underneath: a fragment and a multiplexing setting written into the
-configurations you hand out, so the customer's own app applies them when it dials
-your node. That is the direction censorship happens in.
+**The Clean IPs page is in the menu.** It had a page and a search entry and no
+navigation entry at all, so the only way in was to already know it existed. There
+is also a shortcut to it directly under the daily refresh switch in Settings,
+which is where the operator who reported this was looking.
 
-You set the piece size, the pause between pieces, which packets to split, the
-multiplexing protocol and how many connections share a tunnel. What actually
-carries it is not the same for every client, and the card says so rather than
-leaving you to find out:
+**You can now choose what customers receive.** Both the domain entry and a
+clean-address copy, which stays the default, or only the clean-address copy.
+"Only" stands down to "both" for as long as nothing has corroborated the pool,
+which covers both a seeded list and a collection that only one source
+contributed to, because withdrawing your customer's working domain entry in
+favour of nothing but untested addresses is a trap rather than a trade; your
+choice is remembered and takes effect the moment a corroborated collection
+lands, or the moment you paste your own list.
+Both is the safer one: if a clean address stops working, the customer loses one
+configuration instead of all of them. Choose only when you want your domain out
+of what clients hold, and the panel states plainly what you are giving up, which
+is that there is no fallback left. Reality, Hysteria2, TUIC, NaiveProxy, mieru
+and Shadowsocks are never affected either way, because a clean address cannot
+carry any of them.
 
-- **Xray JSON** gets both.
-- **Karing** gets the fragment, in its own fork's field, plus multiplexing.
-- **Hiddify and plain sing-box** get multiplexing only. The fragment option does
-  exist in newer builds of each, but both refuse an entire subscription over one
-  field they do not recognise, and there is no way to know which build a customer
-  is running. Giving fragmentation to some customers by taking every
-  configuration away from others is not a trade worth making.
-- **Multiplexing itself** is added only to VLESS, VMess, Trojan and Shadowsocks.
-  Hysteria2, TUIC and NaiveProxy have no such option at all, and adding one to
-  them would have the same effect as the fragment: the client refuses the whole
-  document. Those three are left exactly as they were.
-- **Clash and plain share links** carry neither. No such option exists for them,
-  and Nova will not invent a parameter that a client ignores or refuses.
+**An empty pool is seeded.** If the published sources cannot be reached, Nova
+resolves well-known Cloudflare sites such as chatgpt.com, over the same
+encrypted lookup, and keeps the addresses that pass the same check every other
+candidate passes. The page labels these as
+seeds, and the label matters: they are genuine Cloudflare addresses that nobody
+has tested from inside Iran, so some may already be blocked. A real collection
+replaces them as soon as one succeeds, and seeds never touch a pool that already
+has something in it.
 
-Both switches are off by default.
+## Testing a Tor or Psiphon country exit tells you something useful
 
-## Three smaller things operators asked for
+**A working Psiphon exit was reported as broken.** The Test button asked
+check.torproject.org whatever the service was and required it to answer
+`"IsTor":true`, so a Psiphon exit came back as "something answered on this port
+but it is not a Tor exit". That was true and useless: Psiphon is not Tor and
+never claimed to be. Psiphon is now asked whether traffic gets through and what
+address it leaves from, and nothing about Tor is asserted of it. Tor keeps its
+own check, because that is the only thing that proves the port in front of you
+really is a Tor exit rather than something else that took it.
 
-**The AmneziaWG `.conf` no longer arrives as `.conf.txt` on Android.** Chrome for
-Android renames a download the panel labelled as plain text, and the Amnezia app
-then refuses the file. Every configuration download in both the panel and the
-customer's own subscription page now keeps the name it was given. If a customer
-had a file that would not import, ask them to download it again.
+**A failed test now says which of three things happened**: nothing is listening
+on the exit's local port, so its instance is not running; the port is open but no
+circuit came back; or Tor's own check service could not be reached from this
+server. That last one used to make every country on an affected node look broken,
+because the whole test depended on reaching one host. There is a second check
+now: if traffic gets through while Tor's service is unreachable, the exit is
+reported as working, with the honest note that Nova could not confirm it left
+through Tor.
 
-**A button that opens a customer's subscription page.** On each row in Users,
-beside the copy-link control, it opens that customer's own page in a new tab,
-exactly as they see it: their usage, their expiry, every configuration they hold,
-and their AmneziaWG or mieru file. It is the quickest way to see what somebody is
-actually receiving before answering a support message. It follows the same rule
-about whose customers you may see, so a reseller opens their own customers' pages
-and nobody else's.
+## Where client-side fragment actually lands
 
-**CPU and memory on the dashboard are live.** They refresh every five seconds
-while the dashboard is on screen, so you can watch a load spike as it happens
-instead of reloading. They stop when you go to another page and pause when the
-browser tab is in the background, so a panel left open does not keep asking your
-node for numbers nobody is reading.
+Operators tested v2rayN, Shadowrocket, Streisand and Happ and found no
+client-side fragment. That is correct and it cannot be fixed: a `vless://` share
+link has no fragment parameter at all, so there is nowhere in it for one to go
+and no setting can put one there.
+
+Nova does emit a real client-side fragment, in the **Xray JSON** subscription and
+in Karing. The Xray JSON link is now offered on the Distribution page beside
+Clash and sing-box: give it to a v2rayN or v2rayNG user, who imports it as a
+custom config, and the fragment arrives. The card on the Domains and addresses
+page and the manual both say this plainly now. The same is true of multiplexing.
+
+## New inbound choices, and one that would have taken your node down
+
+- **Reality over XHTTP**, and **Reality over gRPC**, as first-class choices in
+  the inbound editor.
+- **HTTPUpgrade over TLS** as a first-class inbound. Xray marks HTTPUpgrade
+  deprecated in favour of XHTTP; it still works, the editor says so, and XHTTP is
+  the better choice for something new.
+- **The XHTTP port is choosable.** It was pinned at 2087 with no control at all,
+  which is a dead end on a node already using that port. XHTTP and HTTPUpgrade
+  now offer the HTTPS ports Cloudflare actually forwards (443, 2053, 2083, 2087,
+  2096 and 8443), and a port something else on this server binds is shown greyed
+  out with the reason rather than hidden.
+
+Every combination offered was checked against the real Xray binary before it
+shipped, which is how one was found that Nova would previously have accepted:
+**Reality over HTTPUpgrade**. Xray refuses it outright, and a configuration Xray
+refuses does not break one inbound, it stops the whole node reloading and takes
+every other inbound with it. It is refused at save time now.
+
+## Editing a Hysteria2 inbound opened the wrong editor
+
+Pressing Edit on a Hysteria2 inbound opened the **Reality** editor: server name,
+borrow destination and short IDs, on a UDP listener that has none of them.
+Saving from there would have rewritten a working Hysteria2 listener as a Reality
+inbound and taken away every customer's configuration for it. Its card also
+carried a REALITY badge over a "tcp" transport.
+
+Hysteria2, TUIC and NaiveProxy have no Xray transport at all, and their stored
+records carry Nova's standalone defaults in fields nothing reads. The panel was
+reading those defaults as though they meant something. Fixed for all three;
+nothing you have saved needs changing.
 
 ## Upgrading
 
-Nothing to do beyond updating, and nothing changes for any existing customer.
-Both new features are off until you switch them on, and both of our own servers
-produce byte-for-byte identical subscriptions on this release in the raw, Clash,
-sing-box, Hiddify, Karing and Xray JSON formats.
+Nothing here changes what your customers hold unless you change a setting. If
+you have a domain you put behind Cloudflare yourself, open Domains and addresses
+after updating and check what each row now says, because the health page and the
+standalone protocols act on it.
