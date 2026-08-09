@@ -470,8 +470,16 @@ install -d /usr/local/bin
 # latest release (handles versioned/arch-specific asset names that a static
 # /latest/download/ path cannot).
 gh_asset() { # repo  match
+  # The trailing "|| true" is load-bearing. This script runs under `set -euo
+  # pipefail`, and every caller assigns this to a variable: rurl="$(gh_asset ...)".
+  # A rate-limited or blocked GitHub API makes curl exit non-zero, pipefail makes
+  # the pipeline non-zero, and the bare assignment then kills the whole install on
+  # the spot, without printing a word, before any of the "could not install that
+  # backend, carrying on" branches below can run. In a container that turns into a
+  # first-boot unit that restarts forever. An empty result is what the callers
+  # already expect and handle.
   curl -fsSL "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
-    | grep browser_download_url | grep -i "$2" | head -1 | cut -d'"' -f4
+    | grep browser_download_url | grep -i "$2" | head -1 | cut -d'"' -f4 || true
 }
 
 # Backhaul (default): widest transport set, connection pooling, self-signed OK.

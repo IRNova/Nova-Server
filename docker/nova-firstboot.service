@@ -7,7 +7,12 @@ Wants=network-online.target
 Type=oneshot
 RemainAfterExit=yes
 EnvironmentFile=-/run/nova/env
-ExecStart=/opt/nova/firstboot.sh
+# Everything the installer prints goes to the journal AND to the log file that
+# logstream.sh mirrors to the container's stdout. Without the second copy an
+# operator running `docker compose logs -f nova-node` sees nothing at all, which
+# is how a working install looked like a dead container in the field. pipefail
+# keeps the installer's own exit status, not tee's, so Restart= still works.
+ExecStart=/bin/bash -o pipefail -c '/opt/nova/firstboot.sh 2>&1 | tee -a /var/log/nova-firstboot.log'
 # First boot also repairs a recreated container whose persistent marker and
 # database survived but whose image-layer runtime did not.
 Restart=on-failure

@@ -30,6 +30,15 @@ services:
     tmpfs:
       - /run
       - /run/lock
+    # The first-boot log carries the admin password and the subscription token,
+    # and the default json-file driver keeps every byte forever. Cap it so a
+    # node's container log cannot grow without bound and cannot hold that first
+    # boot for the life of the machine.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
       - nova-data:/var/lib/nova      # users, settings, sqlite db

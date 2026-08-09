@@ -32,6 +32,7 @@ RUN apt-get update \
 # installer from a mutable branch. The release tarball is checksum-verified at
 # build time and again immediately before installation.
 COPY entry.sh /opt/nova/entry.sh
+COPY logstream.sh /opt/nova/logstream.sh
 COPY firstboot.sh /opt/nova/firstboot.sh
 COPY nova-firstboot.service /etc/systemd/system/nova-firstboot.service
 COPY nova-node.sh /opt/nova/nova-node.sh
@@ -40,7 +41,8 @@ COPY nova-node-agent.tar.gz.sha256 /opt/nova/release/nova-node-agent.tar.gz.sha2
 
 RUN cd /opt/nova/release \
  && sha256sum -c nova-node-agent.tar.gz.sha256 \
- && chmod 0555 /opt/nova/entry.sh /opt/nova/firstboot.sh /opt/nova/nova-node.sh \
+ && chmod 0555 /opt/nova/entry.sh /opt/nova/logstream.sh /opt/nova/firstboot.sh \
+               /opt/nova/nova-node.sh \
  && chmod 0444 /opt/nova/release/nova-node-agent.tar.gz \
                /opt/nova/release/nova-node-agent.tar.gz.sha256 \
  && systemctl enable nova-firstboot.service
@@ -48,7 +50,9 @@ RUN cd /opt/nova/release \
 # systemd's graceful-shutdown signal.
 STOPSIGNAL SIGRTMIN+3
 
-# entry.sh captures the container's NOVA_* env for the first-boot installer, then
-# hands off to systemd (PID 1), which starts the node.
+# entry.sh corrects the cgroup mount when the runtime gave us a private cgroup
+# namespace (Podman), starts the log relay that mirrors the install to the
+# container's stdout, captures the container's NOVA_* env for the first-boot
+# installer, and then hands off to systemd (PID 1), which starts the node.
 ENTRYPOINT ["/opt/nova/entry.sh"]
 CMD ["/lib/systemd/systemd"]
