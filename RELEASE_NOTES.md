@@ -1,104 +1,123 @@
-# Nova Server v1.46.0
+# Nova Server v1.47.0
 
-## mieru, the Telegram proxy and AmneziaWG on a server with no domain
+## Clean Cloudflare IPs are now used, instead of being collected and thrown away
 
-Reported by an operator, and they were right. All three of these run on a plain
-IP address perfectly well, and they always did whenever the panel's address
-field held one. What did not work was the state where nothing at all was
-stored: the Telegram card produced an empty link, mieru handed out no client
-configuration, and nothing anywhere said why. AmneziaWG was the only one of the
-three that fell back to the server's own address.
+If your domain sits behind Cloudflare's orange cloud, your customers never
+connect to your server. They connect to whichever Cloudflare edge address your
+domain currently resolves to, and Cloudflare passes the traffic on. Filtering in
+Iran works on those edge addresses, so a customer's configuration can stop
+working while your server, your domain and your certificate are all completely
+fine.
 
-Now all three follow one rule, and it ends with the server's own address:
+The standard answer is to dial a different Cloudflare address while still
+presenting your own domain, and Nova can do that for you now. Turn on
+**Publish clean IPs in configs** on the Clean IPs page, and every one of your
+Cloudflare-fronted configurations gains a second copy that connects to a clean
+Cloudflare address while the SNI and the WebSocket Host stay your own domain. The
+certificate still validates, because the name in the handshake never moved.
 
-1. Whatever you typed into the address field on that card.
-2. Your server's main address, if it has one.
-3. A domain you added that points straight at this server.
-4. The address Nova reads off the machine itself.
+**Nothing is replaced.** The original entry stays exactly where it was, so your
+customer's app simply has two ways in and uses whichever answers. A clean address
+that goes stale costs one dead entry among several, not a customer's whole
+subscription.
 
-So a node with no domain and an empty address field hands out working links
-again. Nothing changes on a node that already has an address: on both of our
-own servers this release resolves to exactly the same address as before, for all
-three, with no new warnings.
+Four things about it are worth knowing:
 
-The operators who hit this are the ones who cleared a domain, or whose address
-detection failed when the server was installed, which is why it looked like it
-only happened sometimes.
+- **It only applies where a CDN can carry the traffic.** Reality, Hysteria2,
+  TUIC, NaiveProxy, mieru, the Telegram proxy and AmneziaWG are untouched. None
+  of them can pass through Cloudflare, so giving one of them a Cloudflare address
+  would hand out a configuration that cannot connect.
+- **Only when Nova knows a Cloudflare-proxied name is in front of your server.**
+  That means a primary domain Nova set up through Cloudflare with proxying on, or
+  an additional domain marked as proxied. A domain Nova did not set up counts as
+  not proxied, because publishing a Cloudflare address in front of a name that
+  points straight at your server produces a configuration that reaches Cloudflare
+  and stops there.
+- **Every address is checked against Cloudflare's own published ranges** before
+  it can reach anybody, and that check cannot be widened by anything fetched over
+  the network. A list that is wrong, out of date or has been tampered with makes
+  the pool smaller. It cannot send your customers somewhere else.
+- **No single source can fill the pool on its own**, and a day's refresh never
+  takes more than half of what you already have. A network that answers Nova
+  dishonestly can only ever be part of the answer, not all of it.
+- **Each customer keeps the same address between subscription refreshes**, the
+  same way their Reality short ID does, so their configuration does not change
+  under them.
 
-There is nothing to do beyond updating. Customers who already had working links
-keep them; customers who were being handed nothing start receiving a
-configuration on the next refresh of their subscription.
+The daily **Auto clean-IP refresh** switch on the Settings page fills the list.
+It now collects from the published sources and stores only addresses it has
+proved are Cloudflare's. If it cannot reach a source, or nothing in what it
+receives passes the check, it leaves your existing list exactly as it was and
+says so in the activity log rather than emptying a working pool.
 
-## The health check now says when there is no address to hand out
+**A correction worth stating plainly: that switch has never actually collected
+anything, on any node.** It fetched a URL that is a directory rather than a file,
+so GitHub answered 404 every time and the automation stopped there without a
+word. Anything in your Clean IPs list today is something you typed yourself. That
+is fixed.
 
-The reason this took an operator to report is that it failed silently. New
-health-check findings say what is wrong, in English, Persian and Russian, one
-per card so you can see which one is affected:
+**Nothing changes unless you turn it on.** Both of our own servers produce
+byte-identical subscriptions on this release, in all six formats.
 
-- **No address at all.** No domain, and no IP address Nova can read off the
-  machine. Type the server's address into the field on the card, or add a
-  domain that points straight at it.
-- **Only a private address.** The machine knows itself as something like
-  `10.0.0.4`, which is what a server behind NAT looks like. Nobody outside that
-  network can connect to it, so the address customers actually reach the server
-  on has to be typed in by hand.
-- **Behind a CDN, with nothing else.** See below.
-- **A proxied address, chosen on purpose.** If you type a Cloudflare-proxied
-  domain into one of these cards, the configurations cannot connect. Until now
-  only AmneziaWG told you that; mieru and the Telegram proxy said nothing at
-  all, although the rule was never about AmneziaWG. Your choice is still
-  honoured rather than overruled, and now you are told why it will not work.
+## Fragment and multiplexing inside your customers' configurations
 
-None offers a one-click fix, deliberately: which address to publish is your
-decision, and the wrong one hands out configurations that cannot connect.
+An operator reported that the anti-censorship card "does not apply to configs".
+It is not broken, and nothing about it was fixed: that card is a **server-side**
+setting and its own description says so. It splits the handshake of connections
+**this server** makes outward, to the sites your customers visit. It has never
+been part of what customers receive.
 
-## If every domain in front of your server is behind Cloudflare
+What they were asking for is a different thing, and it is now a card of its own,
+directly underneath: a fragment and a multiplexing setting written into the
+configurations you hand out, so the customer's own app applies them when it dials
+your node. That is the direction censorship happens in.
 
-Unchanged, and worth stating plainly because the health check now explains it
-instead of leaving you to work it out. None of these three protocols passes
-through a CDN: the orange cloud answers the handshake itself and nothing reaches
-your server. Nova will not put your server's real address into a customer's
-configuration while a CDN is hiding it either, because anybody holding a
-subscription link could then find the server directly. That applies whether the
-proxied name is your main domain or one of your extra domains.
+You set the piece size, the pause between pieces, which packets to split, the
+multiplexing protocol and how many connections share a tunnel. What actually
+carries it is not the same for every client, and the card says so rather than
+leaving you to find out:
 
-So on such a node, customers are given nothing for these three rather than a
-link that cannot connect. Your own AmneziaWG configurations in the panel still
-use the real address and still work. Adding one domain that points straight at
-the server (DNS only, grey cloud) turns all three back on for customers.
+- **Xray JSON** gets both.
+- **Karing** gets the fragment, in its own fork's field, plus multiplexing.
+- **Hiddify and plain sing-box** get multiplexing only. The fragment option does
+  exist in newer builds of each, but both refuse an entire subscription over one
+  field they do not recognise, and there is no way to know which build a customer
+  is running. Giving fragmentation to some customers by taking every
+  configuration away from others is not a trade worth making.
+- **Multiplexing itself** is added only to VLESS, VMess, Trojan and Shadowsocks.
+  Hysteria2, TUIC and NaiveProxy have no such option at all, and adding one to
+  them would have the same effect as the fragment: the client refuses the whole
+  document. Those three are left exactly as they were.
+- **Clash and plain share links** carry neither. No such option exists for them,
+  and Nova will not invent a parameter that a client ignores or refuses.
 
-One related fix while we were in there: removing your main domain now also
-clears Nova's record that it was behind Cloudflare. Until now that record stayed
-behind, so a server whose proxied domain had been removed kept behaving as
-though a CDN were still in front of it, which is exactly the state some of the
-operators who reported this were in.
+Both switches are off by default.
 
-If you decide to publish your server's own address anyway, which is the only way
-to run these three on such a node, that now works and the health check adds a
-note saying what it costs: anyone holding a customer's link can read your
-server's real address. It is a trade worth making knowingly rather than finding
-out about later.
+## Three smaller things operators asked for
 
-**One thing to know if you use resellers or managers.** The per-user page never
-carried your server's real address to a reseller before this release and still
-does not, and the same now applies to managers. On a server whose domain is
-behind a CDN, only the owner sees an AmneziaWG configuration on that page, and
-only the owner can take one from the AmneziaWG card, which is owner-only. On
-every other server nothing changes for anybody. The AmneziaWG card also now says
-which customer each peer belongs to, so a peer can be matched to a person.
+**The AmneziaWG `.conf` no longer arrives as `.conf.txt` on Android.** Chrome for
+Android renames a download the panel labelled as plain text, and the Amnezia app
+then refuses the file. Every configuration download in both the panel and the
+customer's own subscription page now keeps the name it was given. If a customer
+had a file that would not import, ask them to download it again.
 
-## The setup assistant writes the address down
+**A button that opens a customer's subscription page.** On each row in Users,
+beside the copy-link control, it opens that customer's own page in a new tab,
+exactly as they see it: their usage, their expiry, every configuration they hold,
+and their AmneziaWG or mieru file. It is the quickest way to see what somebody is
+actually receiving before answering a support message. It follows the same rule
+about whose customers you may see, so a reseller opens their own customers' pages
+and nobody else's.
 
-The assistant's review has always said "no domain, using this address", and then
-nothing ever wrote that address anywhere. On a server with no address stored,
-and where you are not about to add a domain, it now saves the detected address.
-Only a public one: your stored address is what every subscription link is built
-from, so a server behind NAT is left alone and told what is missing instead of
-being given a guess that would break links that currently work.
+**CPU and memory on the dashboard are live.** They refresh every five seconds
+while the dashboard is on screen, so you can watch a load spike as it happens
+instead of reloading. They stop when you go to another page and pause when the
+browser tab is in the background, so a panel left open does not keep asking your
+node for numbers nobody is reading.
 
-## The manual and the search cover it
+## Upgrading
 
-The manual section "Telegram proxy, mieru and AmneziaWG" now has a paragraph, in
-all three languages, saying that none of the three needs a domain, exactly which
-address each one uses and in what order, and what happens behind a CDN. Typing
-"no domain", "ip" or "address" into the panel search now finds all three cards.
+Nothing to do beyond updating, and nothing changes for any existing customer.
+Both new features are off until you switch them on, and both of our own servers
+produce byte-for-byte identical subscriptions on this release in the raw, Clash,
+sing-box, Hiddify, Karing and Xray JSON formats.
