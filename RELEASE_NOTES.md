@@ -1,65 +1,94 @@
-# Nova Server v1.50.0
-## The container install shows you what it is doing, and works on Podman
+# Nova Server v1.51.0
+## Four things operators asked for, two of them on the page your customers open
 
-If you installed a node with Docker, you saw the container start and then
-nothing. `docker compose logs -f nova-node`, the command the setup script tells
-you to run, printed no output at all: no progress, no panel URL, no admin
-password. The container was not broken. It installed the node correctly every
-time. But the only copy of the generated password and the secret panel path went
-somewhere you could not see, so a finished install and a dead container looked
-exactly alike, and there was no way in from either.
+### The Telegram proxy button now opens Telegram
 
-The cause is that the container runs systemd, and systemd keeps its services'
-output in its own journal, inside the container, where `docker logs` never
-looks. The image now starts a small relay before systemd takes over, and the
-first boot writes through it. So the install streams live where you were always
-told to look:
+A customer with their own Telegram proxy has a button for it on their
+subscription page. On a phone it was landing them in a web browser, looking at a
+page about a proxy they could not add.
 
-```bash
-docker compose logs -f nova-node
-```
+There are two forms of a Telegram proxy link. `tg://` is the one both the
+Telegram apps and Telegram Desktop claim as their own, so it hands the proxy
+straight to the app. `https://t.me/proxy` is a web page, and a phone browser
+that has not been told Telegram owns those links simply shows it. The button was
+using the second one.
 
-The setup script no longer walks away either. It used to say "the container is
-starting" and hand you back your prompt. It now follows the first boot to the
-end and tells you whether it worked, with your panel URL and password in front
-of you. If the first boot produces nothing at all, it says so, with the
-diagnostics, instead of leaving you to guess.
+**Open in Telegram** is now the first form, so it goes to the app wherever one
+is installed. **Open through t.me** sits beside it for a device with no Telegram
+app at all, and the copy button is unchanged. If a customer tells you the button
+took them to a website, they pressed the second one, or that device has no
+Telegram installed.
 
-Three smaller things came with it:
+### Your customers can now get the JSON configuration themselves
 
-- **Podman works.** It is picked up automatically when it is the runtime you
-  have, and `NOVA_CONTAINER_RUNTIME=podman` forces it on a host with both. The
-  reason it did not work before is that `podman-compose` quietly drops one line
-  of the compose file, which left systemd inside the container unable to start
-  and, once again, unable to say so. The image now sorts that out for itself.
-- **The setup script refuses what cannot work, instead of half doing it.**
-  Docker Desktop on Mac or Windows, and rootless Podman, cannot give a container
-  the host's port 443, so a node started there would look healthy and serve
-  nobody. Both are now refused with the reason.
-- **A blocked or rate-limited GitHub API no longer kills the install.** Fetching
-  one of the optional tunnel backends could fail in a way that ended the whole
-  install on the spot, without printing a word, which in a container turned into
-  a first boot that restarted forever. A backend that cannot be downloaded is
-  now skipped with a warning, which is what it was always meant to do.
+1.48.0 added an **Xray JSON** subscription for the people using v2rayN and
+v2rayNG, who import a "custom config" rather than a link. It went on the
+Distribution page, which is the panel, so you could find it and your customer
+could not. That is the wrong way round for this one in particular: the
+client-side fragment operators went looking for only exists in that format,
+because a `vless://` link has nowhere to put one.
 
-One honest limit, now written down in the manual: **a container node cannot run
-the AmneziaWG server**, because that needs a kernel module and a container
-cannot build one for the host. Everything else works, including Reality,
-Hysteria2, TUIC, the Telegram MTProto proxy, mieru and the tunnel backends. And
-because a container node takes the host's real ports, there can only be one node
-per host: a second container, or a native install next to one, fights over port
-443 and neither comes up.
+It is on the customer's own page now, under **JSON configuration**, with copy
+naming the two apps it is for. It appears only for a customer who actually holds
+something Xray can dial, so a customer whose access is Hysteria2 is not handed a
+link that would serve them an empty list.
 
+### Bulk days go both ways
+
+The bulk toolbar could add days to a selection and never take any off. If you
+had given a batch a month too much, the only route back was one customer at a
+time. Worse, sending it a reduction reported success and changed nothing.
+
+**Days** now asks which direction, exactly as **Change data** does, and shows
+you a summary before it writes anything:
+
+- **Adding is unchanged.** For anybody already expired it starts from today, so
+  "add 30" still means thirty days of service.
+- **Taking days off stops one day from now.** Cutting a batch of customers off
+  in the middle of a month is what **Disable** is for, and Disable can be undone
+  where an overwritten date cannot. Everyone the floor stops is counted for you.
+- **A customer who never expires is left alone** on the way down, because
+  subtracting from "never" would have to invent a date you never typed. So is a
+  customer whose date has already gone: they are not revived and not pushed
+  further back. Both are counted separately in the preview.
+- **A customer who has not connected yet is left alone in both directions.** An
+  account created from a plan carries the plan's length and gets no date at all
+  until its first byte, so one you have sold and not handed out looks exactly
+  like one that never expires. Writing a date to it would start the month before
+  the customer had used a minute of it, replace the plan's own length with
+  whatever you typed, and switch off the count-from-first-use rule permanently.
+  They get their own line in the preview.
+- **Adding a date to a customer who genuinely never expires is now reported**,
+  because it quietly turns an unlimited customer into a limited one. It still
+  happens, it just no longer happens silently.
+
+Taking days off is free for a reseller. What adding them costs follows the
+renewal pricing on the Settings page, as every other reseller renewal does.
+
+### Enable and disable moved into the access window too
+
+They were one press each in the toolbar with no summary, so you could see
+exactly what taking a protocol away would do and nothing at all about switching
+fifty customers off, including how many of them were already off.
+
+**Give or take away access** now starts with **the account itself**, above the
+protocols. Taking it away switches the customer off, giving it back switches
+them on, and the preview says how many actually change. It also says how many
+stay cut off anyway because their expiry date has already passed, which the
+switch does not undo. The one-press buttons in the toolbar are still there.
 
 ## Upgrading
 
-Nothing changes on its own. The two new bulk operations are buttons you have to
-press, and the health-check change only ever removes a report this panel could
-not stand behind. No customer's configuration, subscription or allowance is
-altered by taking this release.
+Nothing changes on its own, and no customer's configuration, subscription or
+allowance is altered by taking this release. Two changes are worth knowing about
+before you use the buttons:
 
-If you run a node in a container, rebuild it to get the log fix: re-run the
-setup command, or `docker compose up -d --build` in the directory it created.
-Your users, settings and certificate live on volumes and are not touched. A
-rebuilt container prints its panel URL again, and the admin password line will
-say it is unchanged from your first install, because it is.
+- A bulk **Days** request with no number, or an unreadable one, is now refused.
+  It used to be treated as zero days, and zero days was not harmless: for a
+  customer with no expiry date it set one to the current moment, which expired
+  them on the spot.
+- Bulk **enable**, **disable** and **days** now report only the customers that
+  actually changed. A selection where nothing was going to happen used to report
+  every row as affected. If you drive `POST /admin/users.json` from a script and
+  check that the affected count equals the number of ids you sent, it will now
+  be lower whenever some of them were already in that state.
