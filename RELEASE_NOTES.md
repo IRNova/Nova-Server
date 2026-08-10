@@ -1,92 +1,103 @@
-# Nova Server v1.52.0
-## AmneziaWG 2.0, off by default, and the panel tells you what it costs
+# Nova Server v1.53.0
+## AmneziaWG on your nodes, and it reaches the customer's own page
 
-AmneziaWG can now speak protocol 2.0 on a node you choose. It is **off**, it is
-**per node**, and turning it on or off is one press with nothing to repair by
-hand.
+Until now the AmneziaWG tunnel ran on the panel server only. It can now run on
+any node in your fleet, and each customer's own subscription page carries that
+node's configuration beside their other ones, the way a protocol placed on a
+node already reaches them.
 
-If you never open the AmneziaWG card, nothing on your node changes. Both of the
-servers this release was tested against produce byte-identical subscriptions,
-byte-identical Clash and sing-box documents, and byte-identical AmneziaWG files
-before and after the update.
+If you do not switch it on for a node, nothing changes. Both of the servers this
+release was tested against produce byte-identical subscriptions, Clash documents,
+sing-box documents and node pushes before and after the update.
 
-### What 2.0 actually is
+### How to switch it on
 
-Version 1.0 pads the two handshake packets. Version 2.0 pads the cookie packet
-and **every data packet** as well, so a censor watching packet lengths has less
-to work with.
+Nodes page, a new card called **AmneziaWG on nodes**. Press **Turn on** for a
+node, and every customer you have already granted AmneziaWG gets a tunnel there.
+They see it on their own subscription page as **AmneziaWG (node name)**, with a
+QR code, a copy button and a download, exactly like the one they may already
+have from the panel server.
 
-You choose it on the AmneziaWG card, on the Inbounds page, in a new **Protocol
-version** picker beside the obfuscation strength.
+You can set the UDP port, the obfuscation strength, the protocol version and the
+address customers dial. Leave the address empty to use the node's own address,
+which is the one this panel already reaches it on.
 
-### Read this before you press it
+### The two limits, said here rather than found later
 
-**2.0 and 1.0 cannot carry traffic to each other, and the failure is silent.**
-The handshake still succeeds. Your customer's app connects, shows a tunnel, and
-then nothing loads, and there is no error message for them to send you.
+**253 customers per node.** Each node addresses its tunnels inside a single /24,
+so that is the ceiling, and the card says it. Past it, granting AmneziaWG to one
+more customer takes the address of the customer whose access was withdrawn
+longest ago and deletes their tunnel with it. The health check reports the node
+once you are over.
 
-So switching in either direction means **every customer has to be sent their
-configuration file again**, from their own subscription page. The panel asks you
-to confirm before it changes, and says this in the dialog.
+**A node installed with Docker or Podman cannot run it at all.** The AmneziaWG
+server needs a kernel module that is not available inside a container. Such a
+node now says so instead of accepting the setting and doing nothing: the panel
+shows it as not serving, the health check names the reason, and no customer is
+ever offered a file for it.
 
-**Nobody is re-keyed.** Every peer keeps the same keys and the same tunnel
-address. What changes is the padding written into the file, not who the customer
-is. That is also what makes going back real: switch to 1.0 and anybody still
-holding the 1.0 file they had before you switched works again immediately.
+### Nothing is offered for a node that is not really serving it
 
-### Which apps can use 2.0
+This is the part worth knowing. A configuration file for a tunnel that is not up
+is worse than no file at all: the customer's app connects, shows a tunnel, loads
+nothing, and has no error to report.
 
-Nova hands AmneziaWG out as a `.conf` file. The apps that import one and
-understand 2.0 are:
+So a node's configuration reaches a customer only after that node has confirmed
+it is carrying it. If the node cannot run AmneziaWG, or its interface did not
+come up, or it already runs an AmneziaWG server of its own, or it has not
+answered yet, the customer is offered nothing and the health check tells you
+which of those it is.
 
-- the official **AmneziaVPN** app, from version **4.8.12.9**,
-- the standalone **AmneziaWG** app, from version **2.0**,
-- **Nova's own Android app**.
+### Nobody is re-keyed, and turning it off keeps everything
 
-Nova's iPhone, Windows, macOS and Linux apps cannot use AmneziaWG at either
-version, so 2.0 takes nothing away from them. Karing, v2rayNG and the ordinary
-WireGuard app have never been able to use AmneziaWG at all.
+Existing tunnels keep their keys and their addresses. Turning a node's AmneziaWG
+**off** keeps them too, so turning it back on later hands out the identical
+files and nobody has to import anything again.
 
-If you cannot tell which app your customers are using, 1.0 is the safer answer.
+The one setting that does change what your customers hold is the **obfuscation
+strength**: changing it regenerates the junk headers written into every file, so
+every customer on that node has to be sent theirs again. The card says so.
+
+### If a node already has an AmneziaWG of its own
+
+Nothing is overwritten. A server that was a standalone Nova panel before you
+enrolled it can already have AmneziaWG set up with configurations in your
+customers' hands, and replacing it would destroy every one of them. The panel
+leaves it alone and tells you why on the health page.
+
+Switching that server off on the node does not change this, and that is
+deliberate: turning AmneziaWG off keeps its keys so its own files keep working.
+If you do want this panel to take it over, the node's row has a **Replace**
+button. It asks first, because it destroys the keys behind every configuration
+that node has already handed out and there is no way back.
 
 ### Where it is explained
 
-- The **manual**, under "Telegram proxy, mieru and AmneziaWG", in English,
-  Persian and Russian.
-- The **panel search**: type "2.0", "protocol version", or "connects but nothing
-  loads".
-- The **health check** carries a note while 2.0 is on, so whoever picks this
-  node up later can find out why an old app stopped working. It is a note, not a
-  warning: nothing is wrong.
-- **Your customer's own subscription page** now says, under their AmneziaWG
-  configuration, which app version it needs.
+- The **manual**, under Nodes, in English, Persian and Russian.
+- The **panel search**: type "AmneziaWG on node", "kernel module", "253", or
+  "not serving".
+- The **health check**, with a row per node that is switched on and not serving,
+  and one for a full subnet.
+- The **support bundle** carries each node's AmneziaWG state, so a bundle you
+  send is enough to see what happened without you describing it.
 
-### If the panel says 2.0 and the node is serving 1.0
+### Fronts on a node: still not offered, and here is why
 
-A settings document restored from a backup taken before this release can name
-2.0 without carrying the values to write it with. Nova serves **1.0** in that
-case, which keeps every customer connected, and the health check says so. Open
-the AmneziaWG card and press **Re-apply** to generate them, then send your
-customers their file again.
+An operator asked for the shared :443 front to be creatable on a node from this
+panel. It is not, and it is deliberate rather than pending.
 
-### What Nova deliberately does not write
+A front terminates TLS for a specific hostname, so it only works if the machine
+running it holds a certificate covering that name. This panel cannot know
+another machine's certificate state reliably: what it stores is the certificate
+that node presented for this panel's own calls, which says nothing about any
+other name, and a node's certificate can lapse or be removed months after the
+front is created. Offering the control anyway would produce configurations that
+look right on this page and cannot connect, with nothing reporting it.
 
-2.0 also defines special junk packets (I1 to I5) and magic headers given as a
-range. Nova writes neither. The junk-packet syntax is not the same in the Linux
-kernel module your node runs and in the client library, so there is no value
-that is certainly readable by both; and a magic-header range on a node whose
-kernel module is too old is rejected along with the whole configuration, which
-stops the interface and takes every other customer with it. What Nova writes is
-what was confirmed working on a real node first.
-
-### One more thing, if your server has an IPv6 address
-
-Version 2.0 adds a few bytes to every data packet, and over IPv6 there is no
-room left for them. If AmneziaWG hands out an IPv6 address, customers will
-connect, small pages will load, and anything large will stall with no error. The
-health check now says so and names the address. Publish the server's IPv4
-address on the AmneziaWG card instead, or stay on 1.0.
+The route that does work is unchanged: give the node its own domain and
+certificate from the Nodes page (or when it joins), and its own front records
+are kept exactly as they are.
 
 ### Upgrading
 
-Nothing to do. The switch is off on every existing node and on every new one.
+Nothing to do. Every node starts with this switched off.
