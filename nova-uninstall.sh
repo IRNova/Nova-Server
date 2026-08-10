@@ -110,12 +110,23 @@ if owned awg-config; then
   rm -f /etc/amnezia/amneziawg/awg0.conf
   rmdir /etc/amnezia/amneziawg /etc/amnezia 2>/dev/null || true
 fi
-for artifact in sing-box-nova grpcurl backhaul backpack rathole wstunnel mtg mita; do
+# `mtg-multi` replaced `mtg` in 1.45.0, and `mtg` stays in this list so a node
+# enrolled before then still has its old binary removed. The loop assumes the
+# ownership marker is named after the binary, which stopped being true when the
+# pin key became `mtgMulti`, so that one is handled explicitly below.
+for artifact in sing-box-nova grpcurl backhaul backpack rathole wstunnel mtg mtg-multi mita; do
   if owned "$artifact"; then rm -f "/usr/local/bin/$artifact"; fi
 done
 # The two service accounts, but only the ones Nova created. `userdel` refuses
 # while a process is still running, which is why the units are stopped above.
-if owned mtg; then userdel nova-mtg >/dev/null 2>&1 || true; fi
+# Either marker: `mtg` on a node enrolled before 1.45.0, `mtgMulti` after it.
+if owned mtg || owned mtgMulti; then
+  rm -f /usr/local/bin/mtg-multi /usr/local/bin/mtg
+  rm -f /var/lib/nova/.owned/mtgMulti
+  # The quota-state directory systemd creates for the service.
+  rm -rf /var/lib/nova-mtproto
+  userdel nova-mtg >/dev/null 2>&1 || true
+fi
 if owned mita; then userdel mita >/dev/null 2>&1 || true; fi
 rm -f /usr/local/bin/nova-passwd /usr/local/bin/nova-access /usr/local/bin/nova-unlock
 rm -f /usr/local/bin/nova-tgbot /usr/local/bin/nova-uninstall

@@ -1,103 +1,120 @@
-# Nova Server v1.53.0
-## AmneziaWG on your nodes, and it reaches the customer's own page
+# Nova Server v1.54.0
+## Any port you like, a one-tap import that works, and a long list of things that were quietly telling you the wrong thing
 
-Until now the AmneziaWG tunnel ran on the panel server only. It can now run on
-any node in your fleet, and each customer's own subscription page carries that
-node's configuration beside their other ones, the way a protocol placed on a
-node already reaches them.
+This release has one new control and a lot of corrections. Most of the
+corrections are cases where the panel said something confident and wrong, which
+is worse than saying nothing: a health page you learn to ignore is a health page
+that cannot warn you when it matters.
 
-If you do not switch it on for a node, nothing changes. Both of the servers this
-release was tested against produce byte-identical subscriptions, Clash documents,
-sing-box documents and node pushes before and after the update.
+Both live servers produce byte-identical health findings and byte-identical
+subscription output before and after this update, checked against their real
+settings documents.
 
-### How to switch it on
+### Put a CDN transport on any port
 
-Nodes page, a new card called **AmneziaWG on nodes**. Press **Turn on** for a
-node, and every customer you have already granted AmneziaWG gets a tunnel there.
-They see it on their own subscription page as **AmneziaWG (node name)**, with a
-QR code, a copy button and a download, exactly like the one they may already
-have from the panel server.
+XHTTP and HTTPUpgrade used to offer a fixed list of ports, because Cloudflare
+forwards only a set of HTTPS ports and anything else produces a listener the
+edge never reaches. Operators kept asking for the rest, and they were right to:
+**the server never restricted the port at all.** The list was a recommendation
+living in a dropdown.
 
-You can set the UDP port, the obfuscation strength, the protocol version and the
-address customers dial. Leave the address empty to use the node's own address,
-which is the one this panel already reaches it on.
+The dropdown now ends in **Custom port**, which opens a box for anything from 1
+to 65535. Use it where traffic reaches your server directly rather than through
+Cloudflare: a grey-cloud domain, a bare address, or another CDN. A port another
+Nova service already holds is refused when you save, and the box tells you as
+you type it.
 
-### The two limits, said here rather than found later
+An inbound already sitting on a port outside the list now opens on **Custom
+port** with its number filled in, so opening the editor never moves it.
 
-**253 customers per node.** Each node addresses its tunnels inside a single /24,
-so that is the ceiling, and the card says it. Past it, granting AmneziaWG to one
-more customer takes the address of the customer whose access was withdrawn
-longest ago and deletes their tunnel with it. The health check reports the node
-once you are over.
+### One-tap import into v2rayNG
 
-**A node installed with Docker or Podman cannot run it at all.** The AmneziaWG
-server needs a kernel module that is not available inside a container. Such a
-node now says so instead of accepting the setting and doing nothing: the panel
-shows it as not serving, the health check names the reason, and no customer is
-ever offered a file for it.
+The import button on a customer's page answered **"1 skipped"** while copying
+the same link and pasting it worked. The page was handing v2rayNG its
+*config-import* entry point with a *subscription* URL in it, so the app parsed
+one item, matched no config scheme, and skipped it. That counter was v2rayNG's
+own, which is why the symptom was so specific.
 
-### Nothing is offered for a node that is not really serving it
+All three places that build that link now use the subscription entry point, and
+the imported subscription arrives with your brand name on it instead of blank.
 
-This is the part worth knowing. A configuration file for a tunnel that is not up
-is worse than no file at all: the customer's app connects, shows a tunnel, loads
-nothing, and has no error to report.
+### AmneziaWG on a node that does not have it installed
 
-So a node's configuration reaches a customer only after that node has confirmed
-it is carrying it. If the node cannot run AmneziaWG, or its interface did not
-come up, or it already runs an AmneziaWG server of its own, or it has not
-answered yet, the customer is offered nothing and the health check tells you
-which of those it is.
+If you switched AmneziaWG on for a node and the health page told you the node
+needed a kernel module "which a container install does not have", and your node
+was not a container, that message was wrong.
 
-### Nobody is re-keyed, and turning it off keeps everything
+"Cannot run it" has two causes and the node has always reported which. A
+container genuinely cannot, and now says so on its own. Far more often the
+AmneziaWG packages simply are not installed: **the node installer adds them on a
+best-effort basis and carries on when it cannot**, which happens on Debian (the
+packages come from an Ubuntu repository) and on any server with no kernel
+headers for the kernel it is running. That case now says so, gives you the exact
+command, and puts a **Push configuration to this node now** button on the row so
+you can clear it the moment you have run it.
 
-Existing tunnels keep their keys and their addresses. Turning a node's AmneziaWG
-**off** keeps them too, so turning it back on later hands out the identical
-files and nobody has to import anything again.
+### Health findings that were telling you the wrong thing
 
-The one setting that does change what your customers hold is the **obfuscation
-strength**: changing it regenerates the junk headers written into every file, so
-every customer on that node has to be sent theirs again. The card says so.
+- **Your server address in customer configurations** was invisible in the
+  commonest setup there is. The check looked for a proxied *additional domain*
+  and never for a proxied *primary*, which is the only state Nova's own domain
+  setup produces. So the operator most likely to be leaking their origin was the
+  one least likely to be told. Worse, it punished following this page's own
+  advice: it tells you to add a grey-cloud domain, that domain is published to
+  every customer, and nothing here noticed.
+- **An IPv6 address is not a domain.** The panel-visibility check treated
+  `2a01:4f8:...` as a domain name because it contains letters, accused the
+  operator, offered a fix, and cleared the red row while a scan of the bare
+  address still got the sign-in page. The decoy site had the same bug, in the
+  same direction: it hid the panel from your real names and kept serving it to
+  scanners. Both now share one rule, and a node whose primary is an address but
+  which has additional domains is handled properly in both.
+- **"Move the inbound to the main server"** was the advice given, in resilience
+  mode, about an inbound that was already on the main server, with no button to
+  press. Resilience mode copies every standalone inbound to every node, so the
+  main copy works and only the node copies drop traffic. It now says that, and
+  offers **Send this inbound out directly**, which is the one remedy that always
+  works.
+- **The AmneziaWG address ceiling** produced one identical red row per node for a
+  single fleet-wide number, and advised moving customers to another node, which
+  cannot help when every node carries every granted customer. One row now, and
+  it names the only lever that exists.
+- **Empty sing-box, Hiddify, Karing and Clash documents went unreported** for
+  customers holding only mieru, or only NaiveProxy on a self-signed node. The
+  check carried its own copy of the renderers' rule and the copy had gone stale.
+  It asks the renderers now.
+- **The Reality button** was offered on WebSocket, gRPC and XHTTP inbounds, where
+  the conversion refuses, so the button existed to explain why it did not apply.
+  It is no longer offered there and the text tells you to change the transport
+  first.
 
-### If a node already has an AmneziaWG of its own
+### Fixes you will not see, which is the point
 
-Nothing is overwritten. A server that was a standalone Nova panel before you
-enrolled it can already have AmneziaWG set up with configurations in your
-customers' hands, and replacing it would destroy every one of them. The panel
-leaves it alone and tells you why on the health page.
+- **A node could be locked out of its own settings.** Granting one customer
+  AmneziaWG without placing an inbound on that node made every settings save and
+  every backup restore on that node fail, with an error mentioning nothing about
+  AmneziaWG. Its host, protocols, domain and wsPath became unchangeable.
+- **A customer with no id could have their full credentials pushed to a rented
+  node**, bypassing the redaction that exists to stop exactly that.
+- **A node that already had its own AmneziaWG could be silently re-keyed on
+  enrolment**, dropping every client it already served. The guard read Nova's own
+  records and never the machine; it now asks the machine.
+- **The AmneziaWG server key file** is written atomically and its permissions are
+  enforced rather than requested. On a node where that file predated Nova, the
+  private key could sit world-readable.
+- **A one-shot "replace this node's AmneziaWG" press behaved as a standing
+  permission**, surviving indefinitely and invisibly until it destroyed that
+  node's own customers' files much later.
+- The mieru, MTProto and AmneziaWG address pickers offered names Nova knew were
+  behind a CDN, producing links that connect to nothing.
+- Three Persian strings rendered with their numbers and units reversed.
 
-Switching that server off on the node does not change this, and that is
-deliberate: turning AmneziaWG off keeps its keys so its own files keep working.
-If you do want this panel to take it over, the node's row has a **Replace**
-button. It asks first, because it destroys the keys behind every configuration
-that node has already handed out and there is no way back.
+### For operators upgrading
 
-### Where it is explained
+Nothing to do. No setting changes meaning, no configuration is rewritten, and no
+customer's link changes. If you have never switched AmneziaWG on for a node,
+most of the above was never reachable for you.
 
-- The **manual**, under Nodes, in English, Persian and Russian.
-- The **panel search**: type "AmneziaWG on node", "kernel module", "253", or
-  "not serving".
-- The **health check**, with a row per node that is switched on and not serving,
-  and one for a full subnet.
-- The **support bundle** carries each node's AmneziaWG state, so a bundle you
-  send is enough to see what happened without you describing it.
-
-### Fronts on a node: still not offered, and here is why
-
-An operator asked for the shared :443 front to be creatable on a node from this
-panel. It is not, and it is deliberate rather than pending.
-
-A front terminates TLS for a specific hostname, so it only works if the machine
-running it holds a certificate covering that name. This panel cannot know
-another machine's certificate state reliably: what it stores is the certificate
-that node presented for this panel's own calls, which says nothing about any
-other name, and a node's certificate can lapse or be removed months after the
-front is created. Offering the control anyway would produce configurations that
-look right on this page and cannot connect, with nothing reporting it.
-
-The route that does work is unchanged: give the node its own domain and
-certificate from the Nodes page (or when it joins), and its own front records
-are kept exactly as they are.
-
-### Upgrading
-
-Nothing to do. Every node starts with this switched off.
+**Still owed and stated plainly:** the v2rayNG deep link was verified against the
+app's published source, not driven on a physical Android handset. The Streisand
+and NekoBox links were not driven either and are deliberately unchanged.
