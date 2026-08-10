@@ -1,94 +1,92 @@
-# Nova Server v1.51.0
-## Four things operators asked for, two of them on the page your customers open
+# Nova Server v1.52.0
+## AmneziaWG 2.0, off by default, and the panel tells you what it costs
 
-### The Telegram proxy button now opens Telegram
+AmneziaWG can now speak protocol 2.0 on a node you choose. It is **off**, it is
+**per node**, and turning it on or off is one press with nothing to repair by
+hand.
 
-A customer with their own Telegram proxy has a button for it on their
-subscription page. On a phone it was landing them in a web browser, looking at a
-page about a proxy they could not add.
+If you never open the AmneziaWG card, nothing on your node changes. Both of the
+servers this release was tested against produce byte-identical subscriptions,
+byte-identical Clash and sing-box documents, and byte-identical AmneziaWG files
+before and after the update.
 
-There are two forms of a Telegram proxy link. `tg://` is the one both the
-Telegram apps and Telegram Desktop claim as their own, so it hands the proxy
-straight to the app. `https://t.me/proxy` is a web page, and a phone browser
-that has not been told Telegram owns those links simply shows it. The button was
-using the second one.
+### What 2.0 actually is
 
-**Open in Telegram** is now the first form, so it goes to the app wherever one
-is installed. **Open through t.me** sits beside it for a device with no Telegram
-app at all, and the copy button is unchanged. If a customer tells you the button
-took them to a website, they pressed the second one, or that device has no
-Telegram installed.
+Version 1.0 pads the two handshake packets. Version 2.0 pads the cookie packet
+and **every data packet** as well, so a censor watching packet lengths has less
+to work with.
 
-### Your customers can now get the JSON configuration themselves
+You choose it on the AmneziaWG card, on the Inbounds page, in a new **Protocol
+version** picker beside the obfuscation strength.
 
-1.48.0 added an **Xray JSON** subscription for the people using v2rayN and
-v2rayNG, who import a "custom config" rather than a link. It went on the
-Distribution page, which is the panel, so you could find it and your customer
-could not. That is the wrong way round for this one in particular: the
-client-side fragment operators went looking for only exists in that format,
-because a `vless://` link has nowhere to put one.
+### Read this before you press it
 
-It is on the customer's own page now, under **JSON configuration**, with copy
-naming the two apps it is for. It appears only for a customer who actually holds
-something Xray can dial, so a customer whose access is Hysteria2 is not handed a
-link that would serve them an empty list.
+**2.0 and 1.0 cannot carry traffic to each other, and the failure is silent.**
+The handshake still succeeds. Your customer's app connects, shows a tunnel, and
+then nothing loads, and there is no error message for them to send you.
 
-### Bulk days go both ways
+So switching in either direction means **every customer has to be sent their
+configuration file again**, from their own subscription page. The panel asks you
+to confirm before it changes, and says this in the dialog.
 
-The bulk toolbar could add days to a selection and never take any off. If you
-had given a batch a month too much, the only route back was one customer at a
-time. Worse, sending it a reduction reported success and changed nothing.
+**Nobody is re-keyed.** Every peer keeps the same keys and the same tunnel
+address. What changes is the padding written into the file, not who the customer
+is. That is also what makes going back real: switch to 1.0 and anybody still
+holding the 1.0 file they had before you switched works again immediately.
 
-**Days** now asks which direction, exactly as **Change data** does, and shows
-you a summary before it writes anything:
+### Which apps can use 2.0
 
-- **Adding is unchanged.** For anybody already expired it starts from today, so
-  "add 30" still means thirty days of service.
-- **Taking days off stops one day from now.** Cutting a batch of customers off
-  in the middle of a month is what **Disable** is for, and Disable can be undone
-  where an overwritten date cannot. Everyone the floor stops is counted for you.
-- **A customer who never expires is left alone** on the way down, because
-  subtracting from "never" would have to invent a date you never typed. So is a
-  customer whose date has already gone: they are not revived and not pushed
-  further back. Both are counted separately in the preview.
-- **A customer who has not connected yet is left alone in both directions.** An
-  account created from a plan carries the plan's length and gets no date at all
-  until its first byte, so one you have sold and not handed out looks exactly
-  like one that never expires. Writing a date to it would start the month before
-  the customer had used a minute of it, replace the plan's own length with
-  whatever you typed, and switch off the count-from-first-use rule permanently.
-  They get their own line in the preview.
-- **Adding a date to a customer who genuinely never expires is now reported**,
-  because it quietly turns an unlimited customer into a limited one. It still
-  happens, it just no longer happens silently.
+Nova hands AmneziaWG out as a `.conf` file. The apps that import one and
+understand 2.0 are:
 
-Taking days off is free for a reseller. What adding them costs follows the
-renewal pricing on the Settings page, as every other reseller renewal does.
+- the official **AmneziaVPN** app, from version **4.8.12.9**,
+- the standalone **AmneziaWG** app, from version **2.0**,
+- **Nova's own Android app**.
 
-### Enable and disable moved into the access window too
+Nova's iPhone, Windows, macOS and Linux apps cannot use AmneziaWG at either
+version, so 2.0 takes nothing away from them. Karing, v2rayNG and the ordinary
+WireGuard app have never been able to use AmneziaWG at all.
 
-They were one press each in the toolbar with no summary, so you could see
-exactly what taking a protocol away would do and nothing at all about switching
-fifty customers off, including how many of them were already off.
+If you cannot tell which app your customers are using, 1.0 is the safer answer.
 
-**Give or take away access** now starts with **the account itself**, above the
-protocols. Taking it away switches the customer off, giving it back switches
-them on, and the preview says how many actually change. It also says how many
-stay cut off anyway because their expiry date has already passed, which the
-switch does not undo. The one-press buttons in the toolbar are still there.
+### Where it is explained
 
-## Upgrading
+- The **manual**, under "Telegram proxy, mieru and AmneziaWG", in English,
+  Persian and Russian.
+- The **panel search**: type "2.0", "protocol version", or "connects but nothing
+  loads".
+- The **health check** carries a note while 2.0 is on, so whoever picks this
+  node up later can find out why an old app stopped working. It is a note, not a
+  warning: nothing is wrong.
+- **Your customer's own subscription page** now says, under their AmneziaWG
+  configuration, which app version it needs.
 
-Nothing changes on its own, and no customer's configuration, subscription or
-allowance is altered by taking this release. Two changes are worth knowing about
-before you use the buttons:
+### If the panel says 2.0 and the node is serving 1.0
 
-- A bulk **Days** request with no number, or an unreadable one, is now refused.
-  It used to be treated as zero days, and zero days was not harmless: for a
-  customer with no expiry date it set one to the current moment, which expired
-  them on the spot.
-- Bulk **enable**, **disable** and **days** now report only the customers that
-  actually changed. A selection where nothing was going to happen used to report
-  every row as affected. If you drive `POST /admin/users.json` from a script and
-  check that the affected count equals the number of ids you sent, it will now
-  be lower whenever some of them were already in that state.
+A settings document restored from a backup taken before this release can name
+2.0 without carrying the values to write it with. Nova serves **1.0** in that
+case, which keeps every customer connected, and the health check says so. Open
+the AmneziaWG card and press **Re-apply** to generate them, then send your
+customers their file again.
+
+### What Nova deliberately does not write
+
+2.0 also defines special junk packets (I1 to I5) and magic headers given as a
+range. Nova writes neither. The junk-packet syntax is not the same in the Linux
+kernel module your node runs and in the client library, so there is no value
+that is certainly readable by both; and a magic-header range on a node whose
+kernel module is too old is rejected along with the whole configuration, which
+stops the interface and takes every other customer with it. What Nova writes is
+what was confirmed working on a real node first.
+
+### One more thing, if your server has an IPv6 address
+
+Version 2.0 adds a few bytes to every data packet, and over IPv6 there is no
+room left for them. If AmneziaWG hands out an IPv6 address, customers will
+connect, small pages will load, and anything large will stall with no error. The
+health check now says so and names the address. Publish the server's IPv4
+address on the AmneziaWG card instead, or stay on 1.0.
+
+### Upgrading
+
+Nothing to do. The switch is off on every existing node and on every new one.
