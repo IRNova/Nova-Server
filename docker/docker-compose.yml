@@ -54,6 +54,9 @@ services:
       - NOVA_DOMAIN_EMAIL=${NOVA_DOMAIN_EMAIL:-}
       - NOVA_PANEL_PATH=${NOVA_PANEL_PATH:-}
       - NOVA_PANEL_PORT=${NOVA_PANEL_PORT:-}
+      # Set to 1 to keep this node out of the install count on novaproxy.online.
+      # NOVA_-prefixed because entry.sh forwards only NOVA_* into the unit.
+      - NOVA_STATS_OPTOUT=${NOVA_STATS_OPTOUT:-}
 
 volumes:
   nova-data:

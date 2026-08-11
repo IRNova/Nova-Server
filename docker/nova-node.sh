@@ -672,6 +672,26 @@ sysctl -p /etc/sysctl.d/99-nova-net.conf >/dev/null 2>&1 || true
 
 # ---- env + systemd -----------------------------------------------------------
 say "Configuring services"
+# This is a truncating write, and re-running the installer is the documented way
+# to repair or update a node, so anything the operator added here by hand is
+# about to be lost. STATS_OPTOUT is a promise ("nothing is ever sent"), and the
+# panel tells them to set it here, so silently dropping it on the next repair
+# would quietly reverse that promise. Carry it across.
+#
+# Both writes below are VALIDATED. agent.env is the EnvironmentFile of a root
+# service, and the agent reads NOVA_TARBALL_URL and NOVA_VERSION_URL out of that
+# environment to decide what the self-updater downloads. A newline inside a value
+# appends attacker-chosen KEY=value lines to it, which is why NOVA_VERSION_URL
+# and NOVA_TARBALL_URL are already newline-checked further down and why
+# docker/entry.sh does the same. STATS_OPTOUT is a boolean, so it is checked as
+# one, and the carried-over line must match the shape it was written in. A
+# trailing backslash matters too: systemd treats it as a line continuation and it
+# would swallow the next setting.
+case "${STATS_OPTOUT:-}" in
+  ""|0|1|true|false|yes|no|on|off|TRUE|FALSE|YES|NO|ON|OFF) ;;
+  *) die "STATS_OPTOUT must be 1 or 0." ;;
+esac
+KEEP_OPTOUT="$(grep -hE '^STATS_OPTOUT=[A-Za-z0-9]+$' "$CERT_DIR/agent.env" 2>/dev/null | tail -n 1 || true)"
 cat > "$CERT_DIR/agent.env" <<ENV
 NOVA_DB=$DB_DIR/nova.db
 NOVA_PORT=8088
@@ -680,6 +700,8 @@ NOVA_POLL_MS=30000
 NOVA_XRAY_API=127.0.0.1:10085
 NOVA_XRAY_BIN=$XRAY_BIN
 ENV
+[ -n "${STATS_OPTOUT:-}" ] && printf 'STATS_OPTOUT=%s\n' "$STATS_OPTOUT" >> "$CERT_DIR/agent.env"
+[ -z "${STATS_OPTOUT:-}" ] && [ -n "$KEEP_OPTOUT" ] && printf '%s\n' "$KEEP_OPTOUT" >> "$CERT_DIR/agent.env"
 # Custom front port (443 was taken): the agent fronts xray here and every link uses it.
 [ "${FRONT_PORT:-443}" != 443 ] && printf 'NOVA_FRONT_PORT=%s\n' "$FRONT_PORT" >> "$CERT_DIR/agent.env"
 
