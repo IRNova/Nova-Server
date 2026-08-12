@@ -312,14 +312,43 @@ fi
 # that survives DPI where plain WireGuard/WARP is blocked. Best-effort: a failed
 # install just leaves the "AmneziaWG server" panel card showing "not installed".
 if ! command -v awg >/dev/null 2>&1; then
-  say "Installing AmneziaWG (obfuscated WireGuard)"
-  if add-apt-repository -y ppa:amnezia/ppa >/dev/null 2>&1 && apt-get update >/dev/null 2>&1 \
-     && apt-get install -y linux-headers-"$(uname -r)" amneziawg amneziawg-tools >/dev/null 2>&1; then
-    modprobe amneziawg 2>/dev/null || true
-    ok "AmneziaWG installed"
-  else
-    warn "Could not install AmneziaWG; the node will run without the AmneziaWG server."
-  fi
+	echo "Installing AmneziaWG (obfuscated WireGuard)" >&2
+
+	repo_success=false
+
+	if [ -f /etc/os-release ] && grep -qi "debian" /etc/os-release; then
+		. /etc/os-release
+		if [ -z "$VERSION_ID" ] || [ "${VERSION_ID%%.*}" -lt 12 ]; then
+			echo "Error: Debian version ${VERSION_ID:-unknown} is not supported. Debian 12 or newer is required." >&2
+			exit 1
+		fi
+
+		if mkdir -p /etc/apt/keyrings /etc/apt/sources.list.d >/dev/null 2>&1 &&
+			curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x75C9DD72C799870E310542E24166F2C257290828" 2>/dev/null |
+			gpg --dearmor -o /etc/apt/keyrings/amnezia-ppa.gpg >/dev/null 2>&1; then
+
+			cat <<EOF >/etc/apt/sources.list.d/amnezia.sources
+Types: deb
+URIs:  https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu
+Suites: noble
+Components: main
+Signed-By: /etc/apt/keyrings/amnezia-ppa.gpg
+EOF
+			repo_success=true
+		fi
+	else
+		if add-apt-repository -y ppa:amnezia/ppa >/dev/null 2>&1; then
+			repo_success=true
+		fi
+	fi
+
+	if [ "$repo_success" = true ] && apt-get update >/dev/null 2>&1 &&
+		apt-get install -y linux-headers-"$(uname -r)" amneziawg amneziawg-tools dkms >/dev/null 2>&1; then
+		modprobe amneziawg 2>/dev/null || true
+		echo "AmneziaWG installed" >&2
+	else
+		echo "Could not install AmneziaWG; the node will run without the AmneziaWG server." >&2
+	fi
 fi
 
 # ---- Tor + Psiphon exits (optional egress paths) -----------------------------
