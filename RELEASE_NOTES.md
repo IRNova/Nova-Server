@@ -1,46 +1,32 @@
-# Nova Server 1.58.1
+# Nova Server 1.58.2
 
-The reseller allowance now stops traffic, not just sales.
+SOCKS and HTTP access now tells the customer how to connect.
 
 ## What changed
 
-In 1.58.0 a volume reseller could sell past their allowance and was told to buy
-more, which is what operators asked for: nobody should be stopped part-way
-through serving a customer who has already paid. But nothing stopped the traffic
-either, so a reseller with a 100 GB allowance could sell 130 GB and keep
-delivering all of it. The owner was carrying the difference.
+A SOCKS or HTTP inbound could be created, assigned to a customer, and enforced
+by the server, while the username and password it required were written down
+nowhere: not in the panel, not on the customer's own page. The access worked and
+nobody could use it, because nobody could be told what it was.
 
-Selling past the allowance is still allowed, and still only a warning. The
-allowance is now where that debt comes due:
+These protocols have no share link, so no subscription carries them and no app
+imports them. They are typed in by hand, which means the details have to be
+readable somewhere, and now they are.
 
-- A reseller with 100 GB can still create 130 GB of customers. Everyone keeps
-  working, and the reseller is told they have sold 30 GB more than they bought.
-- Once their customers have used 100 GB **between them**, every customer of that
-  reseller stops sending and receiving until the owner sells them more volume.
-- Buying more volume brings all of them back immediately.
+The customer's subscription page lists every SOCKS and HTTP proxy they hold,
+with the address, the port, the username and the password, each with its own
+copy button, since these get entered one box at a time into a browser's proxy
+settings or a phone's network options.
 
-The reseller sees which of the two states they are in, because they are very
-different situations: one is a bill, the other is an outage they will get calls
-about. The owner sees the same thing on the resellers list, as used-of-bought
-with a Suspended badge, since the owner is the only person who can lift it.
-
-Traffic already charged for deleted or reset customers counts toward the stop,
-so deleting a customer does not reset the meter.
+The details come from the same place the server's own configuration does, so
+what a customer is shown is what the node accepts. A proxy that carries no UDP
+is marked, because a client expecting it fails in a way the customer cannot
+diagnose.
 
 ## Notes
 
-Nothing is written to the customers themselves. The suspension is recalculated
-from live usage, which is why a top-up restores service at once, and why a
-customer the reseller switched off by hand stays off afterwards.
+The address shown is the one the customer can actually reach: the node's
+address, or a per-inbound public address when the operator has set one.
 
-A reseller with no allowance set is unlimited and never stops. Plan resellers are
-unaffected: they hold a credit balance, not a volume allowance.
-
-You are alerted once per reseller when this happens, not once per customer, and
-the activity log records both the suspension and the top-up that lifts it.
-
-## Upgrading
-
-No action required. If a reseller has already delivered more than they bought,
-their customers stop on the first run after the update, which is the point. Top
-them up and everyone resumes.
+Nothing else changes. Existing inbounds, users and subscriptions are untouched,
+and the credentials were always these; they were simply never displayed.
