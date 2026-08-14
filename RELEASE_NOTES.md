@@ -1,32 +1,38 @@
-# Nova Server 1.58.2
+# Nova Server 1.59.0
 
-SOCKS and HTTP access now tells the customer how to connect.
+The tunnel can now carry one inbound instead of all of them.
 
-## What changed
+## Choosing which inbounds use the tunnel
 
-A SOCKS or HTTP inbound could be created, assigned to a customer, and enforced
-by the server, while the username and password it required were written down
-nowhere: not in the panel, not on the customer's own page. The access worked and
-nobody could use it, because nobody could be told what it was.
+"Point all client links at the bridge" moves everything at once: every inbound
+on a forwarded port starts advertising the Iran bridge. That is the right
+default and it was the only option, so an operator who wanted one inbound
+through the tunnel and the rest direct had no way to say it.
 
-These protocols have no share link, so no subscription carries them and no app
-imports them. They are typed in by hand, which means the details have to be
-readable somewhere, and now they are.
+Two changes make that possible.
 
-The customer's subscription page lists every SOCKS and HTTP proxy they hold,
-with the address, the port, the username and the password, each with its own
-copy button, since these get entered one box at a time into a browser's proxy
-settings or a phone's network options.
+**The bridge is now a public address you can choose.** When an exit tunnel is
+enabled, the inbound editor offers the bridge alongside your domains: its domain
+if it has one, otherwise its IP. Pick it for a single inbound and only that
+inbound hands out configurations pointing at the bridge. Everything else keeps
+connecting to this server directly.
 
-The details come from the same place the server's own configuration does, so
-what a customer is shown is what the node accepts. A proxy that carries no UDP
-is marked, because a client expecting it fails in a way the customer cannot
-diagnose.
+**"Take all links off the bridge"** sits beside the original button and undoes
+it. Every inbound goes back to advertising this server, except any whose own
+public address is the bridge, which is how you end up with exactly the set you
+chose. It tells you how many of those there are, so nothing disappears quietly.
+
+Turning it off runs no probe and no health check, unlike turning it on. Pointing
+users at the tunnel needs the path proven first; bringing them back to the
+server they are already talking to does not, and refusing to undo because the
+tunnel is unhealthy would be the worst possible moment to refuse.
 
 ## Notes
 
-The address shown is the one the customer can actually reach: the node's
-address, or a per-inbound public address when the operator has set one.
+Choosing the bridge as an inbound's address never moves its SNI. The
+certificate presented at the far end is this server's, so the handshake still
+asks for your domain; only the address the client dials changes. That is the
+same split the tunnel uses everywhere else.
 
-Nothing else changes. Existing inbounds, users and subscriptions are untouched,
-and the credentials were always these; they were simply never displayed.
+Nothing changes for existing setups. If you have pointed all links at the
+bridge, they stay there until you press the new button.
