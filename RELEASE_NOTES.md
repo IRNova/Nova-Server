@@ -1,38 +1,51 @@
-# Nova Server 1.59.0
+# Nova Server 1.60.0
 
-The tunnel can now carry one inbound instead of all of them.
+Four things operators reported about resellers.
 
-## Choosing which inbounds use the tunnel
+## Selling a customer without any xray inbound
 
-"Point all client links at the bridge" moves everything at once: every inbound
-on a forwarded port starts advertising the Iran bridge. That is the right
-default and it was the only option, so an operator who wanted one inbound
-through the tunnel and the rest direct had no way to say it.
+Unticking every inbound gave the customer every inbound. The list was read as
+"no opinion" and quietly replaced with the reseller's whole allowlist, so a
+reseller selling access that is only AmneziaWG, or only a country exit, saved
+the form and got all of them back.
 
-Two changes make that possible.
+An empty list now means empty. A request that never mentions inbounds at all,
+applying a plan, renaming a customer, still gets the reseller's allowlist as
+before.
 
-**The bridge is now a public address you can choose.** When an exit tunnel is
-enabled, the inbound editor offers the bridge alongside your domains: its domain
-if it has one, otherwise its IP. Pick it for a single inbound and only that
-inbound hands out configurations pointing at the bridge. Everything else keeps
-connecting to this server directly.
+## Taking an inbound back now reaches the customers already sold
 
-**"Take all links off the bridge"** sits beside the original button and undoes
-it. Every inbound goes back to advertising this server, except any whose own
-public address is the bridge, which is how you end up with exactly the set you
-chose. It tells you how many of those there are, so nothing disappears quietly.
+Withdrawing an inbound from a reseller only affected the next customer they
+created. Every customer they already had kept it in their subscription until
+somebody opened and saved each account by hand, so on a reseller with a hundred
+customers the withdrawal had effectively not happened.
 
-Turning it off runs no probe and no health check, unlike turning it on. Pointing
-users at the tunnel needs the path proven first; bringing them back to the
-server they are already talking to does not, and refusing to undo because the
-tunnel is unhealthy would be the worst possible moment to refuse.
+It now applies the moment you save, to all of that reseller's customers, and
+the running core is reloaded with them. It only ever removes: widening a
+reseller's allowlist never silently grants their existing customers more.
 
-## Notes
+## A reseller can carry their own brand
 
-Choosing the bridge as an inbound's address never moves its SNI. The
-certificate presented at the far end is this server's, so the handshake still
-asks for your domain; only the address the client dials changes. That is the
-same split the tunnel uses everywhere else.
+Grant "Manage own branding" and the reseller gets a My brand page with the same
+name and logo form you use, applied to the subscription pages their own
+customers open. Nobody else's customers see it.
 
-Nothing changes for existing setups. If you have pointed all links at the
-bridge, they stay there until you press the new button.
+They set only what they want to change: a reseller who sets a name but no logo
+keeps yours. Withdrawing the capability puts all their customers back on your
+brand at once, and their setting is kept in case you grant it again.
+
+## The reseller mode is chosen once
+
+Switching an existing reseller between plan and volume looked like it worked
+and did not. The two are backed by different fields, and a reseller's
+customers, plans and ledger are all keyed to the mode they were sold under, so
+a flipped record showed figures that measured nothing.
+
+The mode is now chosen when the reseller is created and shown as a fact
+afterwards. Existing resellers keep the mode they have.
+
+## Upgrading
+
+No action required. Nothing changes for existing resellers except that a
+withdrawn inbound now takes effect immediately, which is what it was always
+meant to do.
