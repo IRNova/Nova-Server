@@ -647,11 +647,32 @@ json_error() {
 
 if [ ! -s "$CERT_DIR/origin.pem" ] || [ ! -s "$CERT_DIR/origin.key" ]; then
   say "Generating a TLS certificate for $HOST"
+  # A SubjectAltName, always. Every current TLS stack rejects a certificate that
+  # has only a CN, so a cert generated without one still gets SERVED and the
+  # panel still answers with -k, while every client refuses the subscription
+  # link. The old fallback here dropped the SAN silently, which is how a node
+  # ended up in that state with nothing in the output to say so: if $PUBIP was
+  # empty, `IP:` was invalid, the first command failed, and the second produced
+  # exactly the certificate no client accepts.
+  #
+  # So the fallback keeps a SAN and only changes what goes in it: the detected
+  # address, else whatever HOST is, as an IP or a name depending on its shape.
+  case "$HOST" in
+    *[!0-9.]*) SAN_HOST="DNS:$HOST" ;;
+    *)         SAN_HOST="IP:$HOST" ;;
+  esac
+  [ -n "${PUBIP:-}" ] && SAN_TRY="IP:$PUBIP" || SAN_TRY="$SAN_HOST"
   openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
     -keyout "$CERT_DIR/origin.key" -out "$CERT_DIR/origin.pem" \
-    -subj "/CN=$HOST" -addext "subjectAltName=IP:$PUBIP" >/dev/null 2>&1 \
+    -subj "/CN=$HOST" -addext "subjectAltName=$SAN_TRY" >/dev/null 2>&1 \
     || openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
-       -keyout "$CERT_DIR/origin.key" -out "$CERT_DIR/origin.pem" -subj "/CN=$HOST" >/dev/null 2>&1
+       -keyout "$CERT_DIR/origin.key" -out "$CERT_DIR/origin.pem" \
+       -subj "/CN=$HOST" -addext "subjectAltName=$SAN_HOST" >/dev/null 2>&1
+  # And say so if it still has no SAN, rather than leaving the operator to find
+  # out from a customer whose client will not import the link.
+  if ! openssl x509 -in "$CERT_DIR/origin.pem" -noout -ext subjectAltName >/dev/null 2>&1; then
+    warn "the certificate has no SubjectAltName; clients will refuse it. Reissue it from Settings > Domain."
+  fi
 fi
 # xray runs as user 'nobody' (group nogroup); let it read the key.
 chgrp nogroup "$CERT_DIR/origin.pem" "$CERT_DIR/origin.key" 2>/dev/null || true
