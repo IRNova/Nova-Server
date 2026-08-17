@@ -1,61 +1,79 @@
-# Nova Server 1.63.1
+# Nova Server 1.64.0
 
-One fix, and it is worth updating for: an inbound you create today may be
-serving nobody.
+Two things that were dead and said nothing about it: an inbound routed through
+WARP, and the per-country exits.
 
-## New inbounds served nobody, silently
+## An inbound routed through WARP carried nothing
 
-Create an inbound, hand out its link, and every connection opens and then hangs.
-Not refused, not an error, just nothing back. It looked like a broken server, a
-bad certificate, or a client problem, and it was none of those.
+Pick WARP as an inbound's egress, save, hand out the link, and every connection
+opens and then sits there. Not refused, no error, just nothing back. It looks
+like a broken server, a bad certificate, or a problem with the app.
 
-Which customers an inbound serves is decided per customer, and a customer's own
-list of inbounds is checked before the inbound's own "serve everyone" setting.
-Nova is built so that a customer with no list is served by everything, including
-inbounds that do not exist yet, and that is what almost every customer should
-have.
+Which traffic goes to WARP is decided by a routing rule written from the
+inbound's own setting. The WARP connection behind that rule was only built if a
+WARP account already existed on the server, and an account only ever existed if
+somebody had pressed Register on the WARP card. So choosing WARP anywhere else
+produced a rule pointing at something the proxy core does not have, and
+everything matching it was dropped.
 
-The panel was not saving it that way. When you left every inbound ticked, which
-is the default, it saved a list naming each one instead of saving no list at
-all. That froze the customer at the moment you last saved them. Any inbound
-created afterwards was in nobody's list, so it started with an empty client
-list, and an inbound with no clients rejects every handshake on purpose, which
-is what produced the hang.
+The account is free and takes one request to Cloudflare, which is what that
+button always did. **Now the server gets one by itself** whenever the
+configuration asks for WARP: when you pick it on an inbound, when you save a
+routing rule that uses it, and on the next restart for a server that is already
+in this state. So existing servers repair themselves.
 
-Anyone who added an inbound after their customers existed hit this. The only way
-out was to open and re-save every customer, one at a time, and nothing said so.
+If the server cannot reach Cloudflare, the health check now says so in plain
+terms, names the inbound that is affected, and carries a button that tries
+again. It used to say only "WARP: enabled but no account registered", in a list
+you had to go and open, with nothing connecting it to the inbound that was dead.
 
-**Fixed in three places.** The user form and the plan template now save "no
-list" when everything is selected. And on the first start after this update, any
-customer whose stored list already covers every inbound has it removed, so
-existing nodes repair themselves.
+## Country exits could not start, on every country at once
 
-A customer you deliberately restricted to some inbounds keeps that restriction.
-That is a choice, and it still means they will not be on inbounds you add later,
-which is what choosing a subset has always meant.
+Every per-country Tor exit showed Stopped, all of them together, with "nothing
+is listening on this exit's local port", while Tor itself was installed and
+running fine. The natural conclusion is that the country has no exit relays.
+That was wrong.
 
-## Country exits would not start
+Nova wrote each country's configuration into a folder Tor is not allowed to
+open. Tor runs as its own user, that folder belongs to the certificate
+directory, and the certificate directory is deliberately closed to everyone but
+the proxy. So Tor could not read its own configuration and quit in a fraction of
+a second, on every country, from the day the feature shipped. The panel could
+only report the symptom.
 
-Every per-country Tor exit showed as Stopped, on every country at once, with
-"nothing is listening on this exit's local port". Tor itself was installed and
-running fine.
+The configuration now lives in its own folder, owned by root and readable by
+Tor, and deliberately not inside the folder Tor itself owns. **1.63.1 announced
+this fix and did not deliver it**: the folder it moved to is closed on any server
+where Tor was installed from the panel, which is most of them.
 
-The service Nova writes for each country named /usr/bin/tor, and current Debian
-and Ubuntu ship the binary at /usr/sbin/tor. So each one failed the instant it
-started and sat retrying. The panel could only report the symptom, which reads
-like a problem with that country rather than a wrong path, and the natural
-conclusion (that country has no exit relays) was wrong.
+Three more things around it:
 
-Nova now resolves tor when the service starts rather than naming a directory, so
-a package update that moves it cannot break the exits either. If tor is genuinely
-missing you will now see `env: 'tor': No such file or directory` in the journal
-instead of a bare failure.
+- **The repair now tells the truth.** "Repair all exits" reported success as
+  long as it could write the files, so it could report five countries repaired
+  while all five were still dead. Failures to enable or start a country are
+  reported now, per country, and a country whose files could not be written is
+  no longer started on top of that.
+- **Adding a country no longer restarts the others.** Every reconcile restarted
+  every exit, so adding a sixth country dropped every customer on the five that
+  were working, and Tor then needed minutes to rebuild circuits. Only exits that
+  actually changed, or are not running, are restarted.
+- **The health check covers them.** Each enabled country exit is checked, and
+  when one is down it says why where it can: never installed, failed so often
+  systemd gave up, or starts and dies immediately. A button on the health check
+  reinstalls and restarts them all.
+
+## Also
+
+- The health check no longer spends four commands per stopped country exit. On a
+  server with many of them, and especially on one where systemd is itself
+  unwell, that was a slow page at the worst moment.
+- Registering a free WARP account no longer warns you that customer
+  configurations will change and everyone needs to resubscribe. Nothing about
+  your customers changes.
 
 ## Upgrading
 
-Update and restart. The customer repair runs once, by itself, and the activity
-log says how many customers it applied to. Country exits are rewritten and
-restarted on the same boot.
-
-If you created inbounds recently and some customers could never connect through
-them, they should work now without any change on the customer's side.
+Update and restart. A server whose configuration routes traffic through WARP
+registers an account on that first start, and the activity log says so. Country
+exits are rewritten and restarted on the same boot, and any that still cannot
+start are named in the log rather than passed over.
