@@ -62,7 +62,15 @@ ok "services stopped"
 # ---- remove xray (official uninstaller if present, else manual) -------------
 if owned xray; then
   say "Removing Nova-installed xray"
-  if command -v curl >/dev/null 2>&1 && bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh 2>/dev/null)" @ remove --purge >/dev/null 2>&1; then
+  # Same URL fix as the installer: the github.com/raw form began 404ing, and
+  # `curl -L` without -f hands the error page to bash. Here the consequence was
+  # milder (the uninstall falls through to its manual path) but the cause is
+  # identical, so it must not be left as the one place still doing it.
+  if command -v curl >/dev/null 2>&1 \
+     && curl -fsSL --max-time 60 -o /tmp/nova-xray-rm.sh "https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh" 2>/dev/null \
+     && head -c 2 /tmp/nova-xray-rm.sh | grep -q '#!' \
+     && bash /tmp/nova-xray-rm.sh remove --purge >/dev/null 2>&1; then
+    rm -f /tmp/nova-xray-rm.sh
     ok "xray removed"
   else
     systemctl disable --now xray >/dev/null 2>&1 || true

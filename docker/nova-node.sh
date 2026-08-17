@@ -226,11 +226,75 @@ json_body() { # key type value ... ; type = string|boolean|number|json
 }
 
 # ---- xray-core ---------------------------------------------------------------
+# Fetch XTLS's installer to a file, CHECK it, then run it.
+#
+# It used to be `bash -c "$(curl -L https://github.com/.../raw/main/...)"`, and
+# that URL began returning a 404 HTML page. curl -L without -f exits 0 on a 404,
+# so the page was handed to bash, which died on "<!DOCTYPE html>", and the only
+# thing anybody saw was "xray-core install failed" with the real error swallowed
+# by >/dev/null. Every new install failed at that line.
+#
+# Three changes, each of which would have caught it on its own: the canonical
+# raw.githubusercontent.com host (which serves it correctly), `-f` so an error
+# response is a failure rather than a payload, and a look at what arrived before
+# executing it. Piping an unverified download straight into a root shell is
+# worth not doing regardless of who is serving it.
+xray_installer() {
+  local out="$1" u
+  for u in \
+    "https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh" \
+    "https://github.com/XTLS/Xray-install/raw/main/install-release.sh"
+  do
+    if curl -fsSL --max-time 60 -o "$out" "$u" 2>/dev/null \
+       && [ -s "$out" ] && head -c 2 "$out" | grep -q '#!' ; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Which version to install, resolved HERE rather than by XTLS's script.
+#
+# Their script asks GitHub for the full release LIST, and that endpoint began
+# answering `200 []` for Xray-core -- an empty array, not an error -- so it
+# concluded there were no releases and stopped with "Failed to get the latest
+# release version". Every fresh install died there. The `/releases/latest`
+# endpoint answers correctly throughout, so Nova asks that one and hands the
+# answer over with --version, which skips the list entirely.
+#
+# Empty is not fatal: without --version the script does what it always did, so
+# if GitHub starts answering again nothing here has to change.
+xray_latest_tag() {
+  curl -fsSL --max-time 30 -H "Accept: application/vnd.github.v3+json" \
+    "https://api.github.com/repos/XTLS/Xray-core/releases/latest" 2>/dev/null \
+    | sed 'y/,/\n/' | grep '"tag_name"' | awk -F '"' '{print $4}' | head -1
+}
+
 if ! command -v xray >/dev/null 2>&1 && [ ! -x /usr/local/bin/xray ]; then
   say "Installing xray-core"
-  if bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install >/dev/null 2>&1; then
+  XRAY_SH="$(mktemp)"
+  if ! xray_installer "$XRAY_SH"; then
+    rm -f "$XRAY_SH"
+    die "could not download the xray-core installer (checked raw.githubusercontent.com and github.com). Check the server's connectivity to GitHub and try again."
+  fi
+  XRAY_TAG="$(xray_latest_tag || true)"
+  # An array, not `set --`: this script has its own positional parameters and
+  # overwriting them here would be a nasty thing to leave behind.
+  XRAY_ARGS=(install)
+  case "$XRAY_TAG" in
+    v[0-9]*) XRAY_ARGS=(install --version "$XRAY_TAG") ;;
+  esac
+  # Kept out of the log on success, shown on failure: the message this replaces
+  # said only "install failed" and hid the reason, which is how a broken URL
+  # went unnoticed.
+  XRAY_LOG="$(mktemp)"
+  if bash "$XRAY_SH" "${XRAY_ARGS[@]}" >"$XRAY_LOG" 2>&1; then
     mark_owned xray
+    rm -f "$XRAY_SH" "$XRAY_LOG"
   else
+    echo "--- xray-core installer output ---" >&2
+    tail -20 "$XRAY_LOG" >&2
+    rm -f "$XRAY_SH" "$XRAY_LOG"
     die "xray-core install failed."
   fi
 fi
