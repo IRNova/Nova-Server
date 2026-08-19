@@ -1,65 +1,34 @@
-# Nova Server 1.67.1
+# Nova Server 1.68.0
 
-Two reliability fixes for reports that AmneziaWG and WARP are unstable. Both
-turned out to be real, both were reproduced, and neither was about the tunnel
-or the account.
+The panel tells you what an update changed.
 
-## AmneziaWG connected, then nothing loaded
+## A note after an update, once
 
-Nova never told the tunnel how large a packet it could carry, so the tunnel
-worked it out from the server's own network card: 1420 bytes. That is right
-only when every hop between the server and the customer also carries 1500, and
-for a lot of customers it does not. Home connections over PPPoE carry 1492, and
-mobile networks are commonly 1400 or less.
+When a node updates, the next time you open its panel a short note says what
+changed. It appears once for you and never again, and each administrator gets
+their own: one person dismissing it does not dismiss it for everybody else on
+the node.
 
-The result is the worst kind of failure, because the tunnel comes up. The
-handshake is small, so it succeeds. A ping is small, so it works. Then anything
-that fills a packet gets thrown away silently, and pages hang half-loaded. The
-customer says it connects but nothing works, and the operator sees a tunnel
-that looks perfectly healthy.
+A fresh install shows nothing. Somebody who has just installed Nova has not
+lived through a change, and being told about one is noise.
 
-Measured on a test tunnel over a 1400-byte path, changing nothing but this
-number: at 1420 a 3 MB download stopped after 24 kB and never recovered. At
-1280 the same 3 MB arrived in a twentieth of a second.
+## Every release, kept
 
-Nova now writes 1280 into both the server and the customer's configuration.
-It also tells the server to fit each connection to the path automatically,
-which repairs customers whose configuration Nova did not write: an old file
-they downloaded months ago, or a configuration they imported into some other
-app. Those keep working without anyone re-downloading anything.
+What's new in the menu lists the releases, newest first, so the note is not the
+only chance to read it. It goes back several versions, and each release adds to
+it.
 
-## WARP dialled the one address most likely to be blocked
+It is written in English, Persian and Russian, and it follows whichever language
+the panel is set to.
 
-WARP connects to Cloudflare through an address, and Nova used the published
-default: a name that resolves into a small range that is widely blocked and
-throttled on the networks this product exists for. Nova has always had the
-alternative, dialling a clean Cloudflare address directly, and it was switched
-off unless somebody went looking for it. So the setting most likely to work was
-the one you had to know about.
+## It works on a node that cannot reach the internet
 
-It is on by default now. If you had deliberately switched it off, that is left
-alone.
-
-There was a second problem underneath. The clean address was picked at random
-every time the configuration was written, which means every reload. A node that
-was working could stop because you saved an unrelated setting, and a node that
-was broken might fix itself for no visible reason. That is a coin toss repeated
-for ever, and it is exactly what "sometimes it works" looks like from the
-outside.
-
-Each node now keeps one address of its own. Different nodes still get different
-ones, so a single blocked address cannot take a whole fleet with it, but a node
-that works keeps working across reloads, restarts and updates. If a node's
-address is blocked, set the endpoint by hand and that still wins.
+The text ships inside the update itself rather than being fetched from
+anywhere. A node behind a filter, or one with no route out at all, still
+answers "what did this update do", which is a normal condition for these
+servers rather than an unusual one.
 
 ## Upgrading
 
-Update the nodes together with the panel, or before it. A panel on this version
-hands customers the corrected setting while a node still on the previous one
-answers with the old one, and that combination breaks downloads specifically.
-
-Update and restart. Nodes running AmneziaWG hand out the corrected setting from
-then on; customers already connected are repaired by the server without any
-action from them. Nodes using WARP move to their own clean address on the next
-restart. If a node's address turns out to be blocked, set the endpoint by hand
-on the WARP card; that still takes priority over everything else.
+Update and restart. The note appears the next time you open the panel, and the
+page is there whenever you want it.
