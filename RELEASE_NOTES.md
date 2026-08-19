@@ -1,50 +1,40 @@
-# Nova Server 1.68.2
+# Nova Server 1.69.0
 
-Choosing Tor or Psiphon as an exit installs it for you, and Psiphon is verified
-before it is allowed to run.
+Three things that were decided for you and are now yours to set.
 
-## The exit you chose is a service, and nothing installed it
+## Move WARP off an address that is blocked for you
 
-Tor and Psiphon exits hand traffic to a service running on the node itself.
-Nova installed neither, so an operator could pick one, be told the setting was
-saved, and get silence. The thing that would have fixed it, a one-click install,
-lived on a different page with no reason to visit it.
+Each node picks one clean Cloudflare address and keeps it. That is deliberate:
+it used to be redrawn every time the configuration was written, so saving an
+unrelated setting could move a working node onto a blocked address, which is
+what "sometimes it works" looked like from the outside.
 
-Choosing one of those exits now installs it. If it is already there but stopped,
-it is started. Either way it happens in the background, so the choice itself is
-never left waiting on a package manager, and a node that already has the service
-does nothing at all.
+Holding one address took the accidental escape with it. A node whose address
+happened to be blocked stayed blocked, and the only way out was knowing to type
+an endpoint by hand.
 
-WARP needs none of this. The node registers its own account.
+Try another address, on the WARP card, moves the node to a different address in
+the pool and holds that one just as firmly. It appears only when it can do
+something: with clean addresses switched on and no endpoint set by hand.
 
-## The health check has the button it was missing
+## Set the tunnel's packet size
 
-A service that is not installed, or installed and not running, can now be fixed
-from the row that reports it. That matters for the nodes that were already stuck
-in that state, and for an inbound routed through one of those exits, which never
-passes the AmneziaWG card at all.
+The AmneziaWG card has a packet size box. Leave it blank unless you know the
+whole path to your customers carries full-size packets. 1280 is the safe value
+and the one that fixed tunnels that connect and then load nothing, which is what
+home and mobile connections do to a larger number.
 
-## Psiphon is checked before it runs
+Raising it can add throughput on a clean network, and breaks large downloads on
+a narrow one. Blank means the default, so a later release can move that default
+without leaving your node pinned to today's.
 
-It was downloaded from a location that could change at any time, with nothing
-verifying what arrived, and then run as a service with full privileges. It is
-now fixed to one known version, checked against a known fingerprint, and refused
-if it does not match. Its configuration file travels inside the update rather
-than being fetched separately.
+## A blocked route says so
 
-An interrupted download is also no longer mistaken for a finished one. The old
-behaviour left a half-written file that counted as installed, so nothing ever
-tried again.
-
-## Psiphon on ARM servers says so
-
-There is no ARM build of Psiphon. Nova asked for one anyway, saved the error
-page the server returned, marked it executable and enabled a service that could
-never start, while reporting the install as successful. On an ARM machine it now
-declines and says why. Tor is unaffected and works on both.
+When a routing rule points at an exit this node does not have, the traffic is
+blocked rather than sent out of this server's own address. That is the right
+answer, and it is a change in what your customers can reach, so it now appears
+in the activity log. It used to happen with no trace anywhere.
 
 ## Upgrading
 
-Update and restart. Nothing changes for a node that does not use these exits. If
-you had chosen Tor or Psiphon and it never worked, choose it again after
-updating and the install starts by itself.
+Update and restart. Nothing changes unless you use one of these.
