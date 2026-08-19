@@ -1,49 +1,59 @@
-# Nova Server 1.70.0
+# Nova Server 1.70.1
 
-## Removing a reseller left their customers behind
+Two things the installer said that were not true. Both were found by watching a
+real update of a live node to 1.70.0 finish successfully and then describe
+itself wrongly.
 
-The confirmation said "their users are not deleted", which read like a decision.
-The state it actually left was not one anybody had chosen: every customer that
-reseller had sold to stayed on the node with `ownerId` still naming an admin
-that no longer existed.
+## It told a node with a domain that it had none
 
-Two things followed from that pointer. Scoping matches a customer's owner
-against a live admin, so those customers appeared in no reseller's list and
-nobody was looking at them. And the volume allowance is rebuilt from
-`settings.admins` on every pass, so once the reseller was gone the allowance
-stopped existing with them: a reseller who had exhausted their volume could be
-deleted, and every customer that allowance had suspended came straight back,
-uncapped.
+Re-running the install command on a node that already had a domain printed the
+machine's bare IP as the panel address, and then:
 
-That second one is why this is not tidying. Deleting an exhausted volume
-reseller quietly handed all of their customers unlimited data.
+```
+No domain: this uses a self-signed certificate.
+  - In the Nova app: Connect your VPS, turn ON "My server has no domain".
+  - In a browser: accept the certificate warning once.
+```
 
-Removal now says how many customers are involved and asks. Keeping them, which
-is what happens if you do nothing, makes them the owner's own with their access,
-their credentials and their links untouched. Ticking the box removes them with
-the reseller, and only an explicit tick does: nothing else counts as yes. The
-activity log records which of the two happened and for how many people, because
-"Reseller admin removed" no longer tells those two apart.
+The node was correct throughout. Its stored settings said the domain and
+`insecure: false`, and the panel was answering on that domain with a valid
+certificate at the moment those lines were printed.
 
-The health check finds the customers earlier releases already stranded, names
-them, and offers to take them over. That fix is deliberately kept out of "fix
-everything": it widens no access, but it decides who owns a paying customer, and
-an operator may want them handed to a different reseller instead.
+`HOST` and `INSECURE` start every run holding the first-install defaults, the
+public IP and a self-signed certificate, and are only corrected when a
+certificate is issued in that same run. A re-install issues no certificate, so
+nothing ever corrected them and the summary could only ever describe a first
+install. It reads the node's own stored settings now, and a certificate issued
+in the current run still wins over them.
 
-Reported by an operator who deleted a test reseller and found its customers
-still on the node.
+This is the same mistake as the readiness poll fixed in 1.69.1: believing the
+run's own local variables over what the node actually persisted. The advice was
+the harmful part, since switching a domain node's app into no-domain mode is
+wrong, and the Telegram installer bot runs this command over ssh, so its users
+saw the same banner.
 
-## The panel search knows the symptoms
+Reporting a domain node that genuinely does serve a self-signed certificate is
+unchanged: the fix only stops the summary claiming to know something it had not
+looked up.
 
-1.69.0 added the AmneziaWG packet size field and the WARP "Try another address"
-button, both with their labels in all three languages and nothing in the search
-index pointing at either. The words somebody types are the symptom, not the
-setting: "connects but nothing loads", "downloads stop halfway", "warp stopped
-working". Those reach the two controls now, in English, Persian and Russian, and
-the guide answers the same two as questions.
+## It printed three errors during a healthy install
+
+Updating over ssh emitted `/dev/tty: No such device or address` three times, once
+per question the installer asks.
+
+Asking used `[ -r /dev/tty ]` to decide whether anyone was there to answer. That
+tests permissions on the device node, which succeed even when the process has no
+controlling terminal; opening it then fails with ENXIO, and the shell prints
+that line before the prompt can run. The check is now whether the device can be
+opened, which is the thing actually being asked, and its failure is silent.
+
+The record the installer reads its state from is also split positionally now
+instead of by last field. The old form took whichever field happened to be last,
+which is how a previous release came to read the hostname as the node mode, and
+adding a field this release would have repeated it.
 
 ## Upgrading
 
-Update and restart. Existing customers, resellers and settings are untouched. If
-you have removed a reseller in the past, run the health check afterwards: it will
-list anybody left stranded by it and offer to take them over.
+Update and restart. Nothing about how the node runs changes. If a previous
+re-install left you believing a domain node had no domain, it did not; run the
+installer again and the summary will say so.

@@ -68,7 +68,13 @@ mark_owned() {
 ask() { # prompt  ->  REPLY
   REPLY=""
   [ "${NOVA_NO_PROMPT:-0}" = 1 ] && return 0
-  [ -r /dev/tty ] || return 0
+  # Whether /dev/tty can actually be OPENED, not whether the device node is
+  # readable. A process with no controlling terminal (the installer bot's ssh,
+  # or `ssh host 'bash <(curl ...)'`) still passes `[ -r /dev/tty ]`, because
+  # that only checks permissions on the node, and then open() fails with ENXIO
+  # and bash prints "/dev/tty: No such device or address" for every prompt. The
+  # install was always fine; it just looked like it had errored three times.
+  { : > /dev/tty; } 2>/dev/null || return 0
   printf '%s' "${c_cyn}?${c_rst} $1 " > /dev/tty 2>/dev/null || return 0
   IFS= read -r REPLY < /dev/tty || REPLY=""
 }
@@ -897,17 +903,25 @@ LOCAL_STATE="$(
          * NOTE: no apostrophes in here, the whole block is single-quoted. */
         const h = String(s.host || "").replace(/:\d+$/, "").trim();
         const host = /^[A-Za-z0-9.\-]{1,253}$/.test(h) ? h : "";
-        process.stdout.write(safe + "|" + (s.nodeMode === true ? "1" : "0") + "|" + host);
+        /* Whether this node serves a real certificate. Needed because HOST and
+         * INSECURE below still hold their first-run defaults on a re-install,
+         * and only a certificate issued in THIS run corrects them. */
+        const insec = s.insecure === false ? "0" : "1";
+        process.stdout.write(safe + "|" + (s.nodeMode === true ? "1" : "0") + "|" + host + "|" + insec);
       } finally {
         kv.close();
       }
-    }).catch(() => process.stdout.write("|0|"));
+    }).catch(() => process.stdout.write("|0||"));
   ' 2>/dev/null || true
 )"
-LOCAL_PANEL_PATH="${LOCAL_STATE%%|*}"
-LOCAL_STATE_REST="${LOCAL_STATE#*|}"
-PERSISTED_NODE_MODE="${LOCAL_STATE_REST%%|*}"
-LOCAL_HOST="${LOCAL_STATE##*|}"
+# Split positionally. NOT with ${VAR##*|}, which takes whatever field happens to
+# be LAST: that is how PERSISTED_NODE_MODE came to read the hostname when the
+# host field was appended, and appending `insecure` here would have done the
+# same to LOCAL_HOST. `read` cannot fail the `set -e` here because the here-doc
+# always supplies the trailing newline it wants.
+IFS='|' read -r LOCAL_PANEL_PATH PERSISTED_NODE_MODE LOCAL_HOST LOCAL_INSECURE <<LOCAL_STATE_EOF
+$LOCAL_STATE
+LOCAL_STATE_EOF
 # Ask as the panel's own hostname; without it the agent serves the decoy and the
 # loop below never sees "configured", however healthy the agent is.
 HOSTARG=""
@@ -1199,6 +1213,19 @@ EFF_PORT="${EFF##*|}"
 # Carry the custom front port into every printed link so they point where the
 # node actually serves (not the default 443 the box could not use).
 PORT_SFX=""; [ "${FRONT_PORT:-443}" != 443 ] && PORT_SFX=":$FRONT_PORT"
+# Report the node as it actually is, not as this run left its own variables.
+# HOST and INSECURE are seeded with the first-run defaults (the public IP, a
+# self-signed certificate) and are only corrected when a certificate is issued
+# in THIS run. Re-running the installer on an already configured node with a
+# domain therefore printed its IP and told the operator "No domain: this uses a
+# self-signed certificate", followed by instructions to switch the app to
+# no-domain mode and to accept a certificate warning that does not exist. The
+# install was correct every time; only the summary was wrong. Same failure as
+# the 1.69.1 readiness poll: believing this run's local state over the node's.
+if [ "${DOMAIN_FINISHED:-0}" != 1 ] && [ -n "$LOCAL_HOST" ]; then
+  HOST="$LOCAL_HOST"
+  [ "$LOCAL_INSECURE" = 0 ] && INSECURE=false
+fi
 URL_HOST="$(url_host "$HOST")"
 PANEL_URL="https://$URL_HOST$PORT_SFX/"
 [ -n "$EFF_PATH" ] && PANEL_URL="https://$URL_HOST$PORT_SFX/$EFF_PATH/"
