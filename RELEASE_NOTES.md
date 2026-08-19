@@ -1,40 +1,26 @@
-# Nova Server 1.69.0
+# Nova Server 1.69.1
 
-Three things that were decided for you and are now yours to set.
+Updating a node reported a failure that had not happened.
 
-## Move WARP off an address that is blocked for you
+## "The agent did not respond in time", on a node that was fine
 
-Each node picks one clean Cloudflare address and keeps it. That is deliberate:
-it used to be redrawn every time the configuration was written, so saving an
-unrelated setting could move a working node onto a blocked address, which is
-what "sometimes it works" looked like from the outside.
+Every update on a node with a domain configured ended with that line, in red,
+after the agent had already restarted and was serving customers. Three updates
+in a row said it on a node whose panel answered normally the whole time.
 
-Holding one address took the accidental escape with it. A node whose address
-happened to be blocked stayed blocked, and the only way out was knowing to type
-an endpoint by hand.
+The cause is a decoy. A Nova node answers a request whose address it does not
+recognise with an ordinary "welcome" page, so a scanner cannot tell there is a
+panel here. The installer asked the agent for its status over the machine's own
+loopback address, which is not a name the agent recognises, so it received the
+decoy page and kept looking for a word the decoy does not contain. Forty
+attempts later it gave up and said the agent had not responded, while the agent
+had been answering correctly the entire time.
 
-Try another address, on the WARP card, moves the node to a different address in
-the pool and holds that one just as firmly. It appears only when it can do
-something: with clean addresses switched on and no endpoint set by hand.
-
-## Set the tunnel's packet size
-
-The AmneziaWG card has a packet size box. Leave it blank unless you know the
-whole path to your customers carries full-size packets. 1280 is the safe value
-and the one that fixed tunnels that connect and then load nothing, which is what
-home and mobile connections do to a larger number.
-
-Raising it can add throughput on a clean network, and breaks large downloads on
-a narrow one. Blank means the default, so a later release can move that default
-without leaving your node pinned to today's.
-
-## A blocked route says so
-
-When a routing rule points at an exit this node does not have, the traffic is
-blocked rather than sent out of this server's own address. That is the right
-answer, and it is a change in what your customers can reach, so it now appears
-in the activity log. It used to happen with no trace anywhere.
+It now asks under the hostname the panel actually answers on. Nothing about the
+update itself changed, only whether it tells you the truth when it finishes.
 
 ## Upgrading
 
-Update and restart. Nothing changes unless you use one of these.
+Update and restart, and this time the last line should be the summary rather
+than an error. If you saw that message on an earlier update, nothing was wrong
+and nothing needs redoing.

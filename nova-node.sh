@@ -890,15 +890,28 @@ LOCAL_STATE="$(
         const s = JSON.parse(await kv.get("network-settings.json") || "{}");
         const p = String(s.panelPath || "").replace(/^\/+|\/+$/g, "");
         const safe = /^[A-Za-z0-9_-]{3,64}$/.test(p) ? p : "";
-        process.stdout.write(safe + "|" + (s.nodeMode === true ? "1" : "0"));
+        /* The hostname the panel answers on. The agent serves the decoy page
+         * to a request whose Host it does not recognise, so polling loopback
+         * without this is how a perfectly healthy update came to report "The
+         * agent did not respond in time" on every run.
+         * NOTE: no apostrophes in here, the whole block is single-quoted. */
+        const h = String(s.host || "").replace(/:\d+$/, "").trim();
+        const host = /^[A-Za-z0-9.\-]{1,253}$/.test(h) ? h : "";
+        process.stdout.write(safe + "|" + (s.nodeMode === true ? "1" : "0") + "|" + host);
       } finally {
         kv.close();
       }
-    }).catch(() => process.stdout.write("|0"));
+    }).catch(() => process.stdout.write("|0|"));
   ' 2>/dev/null || true
 )"
 LOCAL_PANEL_PATH="${LOCAL_STATE%%|*}"
-PERSISTED_NODE_MODE="${LOCAL_STATE##*|}"
+LOCAL_STATE_REST="${LOCAL_STATE#*|}"
+PERSISTED_NODE_MODE="${LOCAL_STATE_REST%%|*}"
+LOCAL_HOST="${LOCAL_STATE##*|}"
+# Ask as the panel's own hostname; without it the agent serves the decoy and the
+# loop below never sees "configured", however healthy the agent is.
+HOSTARG=""
+[ -n "$LOCAL_HOST" ] && HOSTARG="-H Host:$LOCAL_HOST"
 B=http://127.0.0.1:8088
 [ -n "$LOCAL_PANEL_PATH" ] && B="$B/$LOCAL_PANEL_PATH"
 
@@ -909,7 +922,7 @@ B=http://127.0.0.1:8088
 # the installer skip configuring a fresh node.
 CONFIGURED=""
 for i in $(seq 1 40); do
-  RESP="$(curl -fsS "$B/install/status" 2>/dev/null || true)"
+  RESP="$(curl -fsS $HOSTARG "$B/install/status" 2>/dev/null || true)"
   case "$RESP" in
     *'"configured"'*)
       case "$RESP" in *'"configured":true'*) CONFIGURED=true;; *) CONFIGURED=false;; esac
