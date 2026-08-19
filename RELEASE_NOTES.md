@@ -1,26 +1,31 @@
-# Nova Server 1.69.1
+# Nova Server 1.69.2
 
-Updating a node reported a failure that had not happened.
+Two things an operator reported, both about the panel saying something untrue.
 
-## "The agent did not respond in time", on a node that was fine
+## The health check called a working tunnel broken
 
-Every update on a node with a domain configured ended with that line, in red,
-after the agent had already restarted and was serving customers. Three updates
-in a row said it on a node whose panel answered normally the whole time.
+If AmneziaWG was set to leave through WARP, Tor or Psiphon, the health check
+reported that the rule carrying its traffic was missing, in red, on nodes where
+that exit was working perfectly.
 
-The cause is a decoy. A Nova node answers a request whose address it does not
-recognise with an ordinary "welcome" page, so a scanner cannot tell there is a
-panel here. The installer asked the agent for its status over the machine's own
-loopback address, which is not a name the agent recognises, so it received the
-decoy page and kept looking for a word the decoy does not contain. Forty
-attempts later it gave up and said the agent had not responded, while the agent
-had been answering correctly the entire time.
+The rule changed in 1.68.1, because the old one was written in a form the
+firewall refuses. The check was left asking about the old one, so it failed on
+the same argument error every time and could only ever answer no.
 
-It now asks under the hostname the panel actually answers on. Nothing about the
-update itself changed, only whether it tells you the truth when it finishes.
+That is worse than having no check at all. A red line that is always wrong
+teaches an operator to ignore red lines. It asks about the rule that is actually
+installed now, and a test ties the two together so they cannot drift apart
+again.
+
+## The warning about shared customer ids says which customers
+
+It reported that some of your customers hold ids from the old shared "user"
+series, said how many, and would not say which. The thing it asks you to do,
+work out whether a customer went missing, cannot be done without that list.
+
+It names them now, with their ids, since customers can share a display name.
 
 ## Upgrading
 
-Update and restart, and this time the last line should be the summary rather
-than an error. If you saw that message on an earlier update, nothing was wrong
-and nothing needs redoing.
+Update and restart, then run the health check again. If it was showing the
+AmneziaWG exit in red while the exit worked, it should be green now.
