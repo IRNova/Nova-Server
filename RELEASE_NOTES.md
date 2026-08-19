@@ -1,31 +1,49 @@
-# Nova Server 1.69.2
+# Nova Server 1.70.0
 
-Two things an operator reported, both about the panel saying something untrue.
+## Removing a reseller left their customers behind
 
-## The health check called a working tunnel broken
+The confirmation said "their users are not deleted", which read like a decision.
+The state it actually left was not one anybody had chosen: every customer that
+reseller had sold to stayed on the node with `ownerId` still naming an admin
+that no longer existed.
 
-If AmneziaWG was set to leave through WARP, Tor or Psiphon, the health check
-reported that the rule carrying its traffic was missing, in red, on nodes where
-that exit was working perfectly.
+Two things followed from that pointer. Scoping matches a customer's owner
+against a live admin, so those customers appeared in no reseller's list and
+nobody was looking at them. And the volume allowance is rebuilt from
+`settings.admins` on every pass, so once the reseller was gone the allowance
+stopped existing with them: a reseller who had exhausted their volume could be
+deleted, and every customer that allowance had suspended came straight back,
+uncapped.
 
-The rule changed in 1.68.1, because the old one was written in a form the
-firewall refuses. The check was left asking about the old one, so it failed on
-the same argument error every time and could only ever answer no.
+That second one is why this is not tidying. Deleting an exhausted volume
+reseller quietly handed all of their customers unlimited data.
 
-That is worse than having no check at all. A red line that is always wrong
-teaches an operator to ignore red lines. It asks about the rule that is actually
-installed now, and a test ties the two together so they cannot drift apart
-again.
+Removal now says how many customers are involved and asks. Keeping them, which
+is what happens if you do nothing, makes them the owner's own with their access,
+their credentials and their links untouched. Ticking the box removes them with
+the reseller, and only an explicit tick does: nothing else counts as yes. The
+activity log records which of the two happened and for how many people, because
+"Reseller admin removed" no longer tells those two apart.
 
-## The warning about shared customer ids says which customers
+The health check finds the customers earlier releases already stranded, names
+them, and offers to take them over. That fix is deliberately kept out of "fix
+everything": it widens no access, but it decides who owns a paying customer, and
+an operator may want them handed to a different reseller instead.
 
-It reported that some of your customers hold ids from the old shared "user"
-series, said how many, and would not say which. The thing it asks you to do,
-work out whether a customer went missing, cannot be done without that list.
+Reported by an operator who deleted a test reseller and found its customers
+still on the node.
 
-It names them now, with their ids, since customers can share a display name.
+## The panel search knows the symptoms
+
+1.69.0 added the AmneziaWG packet size field and the WARP "Try another address"
+button, both with their labels in all three languages and nothing in the search
+index pointing at either. The words somebody types are the symptom, not the
+setting: "connects but nothing loads", "downloads stop halfway", "warp stopped
+working". Those reach the two controls now, in English, Persian and Russian, and
+the guide answers the same two as questions.
 
 ## Upgrading
 
-Update and restart, then run the health check again. If it was showing the
-AmneziaWG exit in red while the exit worked, it should be green now.
+Update and restart. Existing customers, resellers and settings are untouched. If
+you have removed a reseller in the past, run the health check afterwards: it will
+list anybody left stranded by it and offer to take them over.
