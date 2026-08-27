@@ -142,6 +142,80 @@ if [ "$NODE_MODE" = 0 ] && [ "$FRONT_PORT" = 443 ] && command -v ss >/dev/null 2
   fi
 fi
 
+# ---- ports -------------------------------------------------------------------
+# What this install will bind, said out loud before it binds anything.
+#
+# Reported because an operator running Nova alongside other services asked for
+# it: they had moved a dockerised Nova to :4443 and had no way to know what else
+# Nova was going to take. Nova asks about :443 and the extra panel port above;
+# everything else was silent until something failed to start.
+#
+# The two loopback ports are the ones this can actually FIX without asking. They
+# are internal (the agent's own HTTP port and xray's gRPC API), nothing outside
+# the box reaches them, and their numbers are written to agent.env, so moving
+# one off a collision costs nothing and needs no decision from anybody. A public
+# port is the opposite: moving it changes every link this node hands out, so
+# those are reported and left alone.
+port_busy() {
+  command -v ss >/dev/null 2>&1 || return 1
+  ss -tlnH "sport = :$1" 2>/dev/null | grep -q .
+}
+# The first free port at or after $1, giving up after 40 tries.
+free_port_from() {
+  _p="$1"; _n=0
+  while [ "$_n" -lt 40 ]; do
+    port_busy "$_p" || { printf '%s' "$_p"; return 0; }
+    _p=$((_p + 1)); _n=$((_n + 1))
+  done
+  printf '%s' "$1"
+}
+
+# An existing install KEEPS the port it already has, and that is the whole rule.
+#
+# Nova's own agent is listening on 8088 during a re-run, so probing for a free
+# port finds its own process and walks to 8089. The agent would move; xray's
+# front, which falls back to the agent by number, would not, and the panel and
+# every /sub would answer on :443 with nothing behind them. The readiness poll
+# below would still pass, because it reads the new port, so the installer would
+# print a clean success over a node whose public surface just died. Every
+# further re-run would walk it again.
+#
+# The :443 probe twenty lines up already excludes Nova's own process for exactly
+# this reason. This does it by remembering rather than by sniffing, because the
+# answer is written down: a port only gets chosen on a node that has none.
+PREV_AGENT_PORT="$(sed -n 's/^NOVA_PORT=//p' "$CERT_DIR/agent.env" 2>/dev/null | tail -n 1)"
+case "$PREV_AGENT_PORT" in ''|*[!0-9]*) PREV_AGENT_PORT="" ;; esac
+PREV_API_PORT="$(sed -n 's/^NOVA_XRAY_API=127\.0\.0\.1://p' "$CERT_DIR/agent.env" 2>/dev/null | tail -n 1)"
+case "$PREV_API_PORT" in ''|*[!0-9]*) PREV_API_PORT="" ;; esac
+
+NOVA_AGENT_PORT="${PREV_AGENT_PORT:-$(free_port_from 8088)}"
+NOVA_XRAY_API_PORT="${PREV_API_PORT:-$(free_port_from 10085)}"
+[ "$NOVA_AGENT_PORT" != 8088 ] \
+  && warn "127.0.0.1:8088 is in use, so the Nova agent will listen on 127.0.0.1:$NOVA_AGENT_PORT instead."
+[ "$NOVA_XRAY_API_PORT" != 10085 ] \
+  && warn "127.0.0.1:10085 is in use, so the xray API will listen on 127.0.0.1:$NOVA_XRAY_API_PORT instead."
+
+say "Ports this install will use"
+printf '   %-22s %s\n' "${FRONT_PORT:-443}/tcp" "panel and proxy front (public)" > /dev/tty 2>/dev/null || true
+[ -n "${NOVA_PANEL_PORT:-}" ] \
+  && { printf '   %-22s %s\n' "$NOVA_PANEL_PORT/tcp" "extra panel port (public)" > /dev/tty 2>/dev/null || true; }
+printf '   %-22s %s\n' "127.0.0.1:$NOVA_AGENT_PORT" "agent, loopback only" > /dev/tty 2>/dev/null || true
+printf '   %-22s %s\n' "127.0.0.1:$NOVA_XRAY_API_PORT" "xray API, loopback only" > /dev/tty 2>/dev/null || true
+printf '   %s\n' "Protocol ports (mieru, MTProto, Hysteria2, AmneziaWG, Tor, Psiphon) are chosen in the panel later, and the panel refuses a port another Nova service already holds." > /dev/tty 2>/dev/null || true
+
+# A public port already in use is reported and NOT changed. Nova cannot pick a
+# different one on the operator's behalf here: the front port is written into
+# every subscription and share link this node produces, so moving it silently
+# would hand customers links to a port the operator never agreed to.
+for _pp in "${FRONT_PORT:-443}" ${NOVA_PANEL_PORT:-}; do
+  # Nova's own xray holds this on every re-run; warning about it would train an
+  # operator to ignore the one message that matters. Same exclusion the :443
+  # prompt above uses.
+  if port_busy "$_pp" && ! ss -tlnpH "sport = :$_pp" 2>/dev/null | grep -qi xray; then
+    warn "Port $_pp is already in use by another service. Nova will try to bind it anyway and may fail to start; free it, or rerun with NOVA_FRONT_PORT set to a port that is free."
+  fi
+done
+
 # ---- preflight ---------------------------------------------------------------
 say "Installing prerequisites"
 export DEBIAN_FRONTEND=noninteractive
@@ -785,10 +859,10 @@ esac
 KEEP_OPTOUT="$(grep -hE '^STATS_OPTOUT=[A-Za-z0-9]+$' "$CERT_DIR/agent.env" 2>/dev/null | tail -n 1 || true)"
 cat > "$CERT_DIR/agent.env" <<ENV
 NOVA_DB=$DB_DIR/nova.db
-NOVA_PORT=8088
+NOVA_PORT=${NOVA_AGENT_PORT:-8088}
 NOVA_HOST=127.0.0.1
 NOVA_POLL_MS=30000
-NOVA_XRAY_API=127.0.0.1:10085
+NOVA_XRAY_API=127.0.0.1:${NOVA_XRAY_API_PORT:-10085}
 NOVA_XRAY_BIN=$XRAY_BIN
 ENV
 [ -n "${STATS_OPTOUT:-}" ] && printf 'STATS_OPTOUT=%s\n' "$STATS_OPTOUT" >> "$CERT_DIR/agent.env"
@@ -926,7 +1000,14 @@ LOCAL_STATE_EOF
 # loop below never sees "configured", however healthy the agent is.
 HOSTARG=""
 [ -n "$LOCAL_HOST" ] && HOSTARG="-H Host:$LOCAL_HOST"
-B=http://127.0.0.1:8088
+# The port the agent was actually given, not the default. A reinstall on a box
+# where 8088 was taken moves the agent, and a poll left on 8088 would time out
+# against a perfectly healthy node and print "the agent did not respond in
+# time", which is the exact failure test/installer-readiness.mjs exists to stop.
+# Read back from agent.env so this cannot drift from what was written there.
+AGENT_PORT="$(sed -n 's/^NOVA_PORT=//p' "$CERT_DIR/agent.env" 2>/dev/null | tail -n 1)"
+case "$AGENT_PORT" in ''|*[!0-9]*) AGENT_PORT=8088 ;; esac
+B=http://127.0.0.1:$AGENT_PORT
 [ -n "$LOCAL_PANEL_PATH" ] && B="$B/$LOCAL_PANEL_PATH"
 
 # Wait for the agent's local API to answer /install/status with a real JSON body,

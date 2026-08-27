@@ -1,102 +1,87 @@
-# Nova Server 1.72.0
+# Nova Server 1.73.0
 
-Four things an operator asked for, and two corrections to the health check.
+AmneziaWG 3.0, a picker that could hand out configurations nobody could connect
+with, and an installer that says what it is about to take.
 
-## XHTTP on an added domain behaved differently from the main one
+## AmneziaWG 3.0
 
-An XHTTP inbound pinned to one of the node's added Cloudflare domains was
-reported as erratic: one ping test answered, the next did not, with no pattern
-to it, while the same inbound on the node's own (equally proxied) domain was
-steady.
+3.0 encrypts the packet headers themselves, which is what defeats the
+statistical analysis that started catching 2.0 in mid-2026. It is on the version
+picker on the AmneziaWG card, off unless you choose it.
 
-The two cases differed in one way. A per-inbound address replaces the address
-the client dials, and the SNI and Host went on naming the panel. For a bridge
-that is correct, because the panel's certificate is the one that answers there.
-For a Cloudflare name it is not: the edge routes on the name it is GIVEN, so
-that config asked whichever edge answered for a name it might hold no route for.
-Which edge answered is the "no pattern".
+One property decides everything about how it is offered. The header key is
+shared by the whole interface, not held per peer, so a node speaks 3.0 to
+everybody or to nobody. The moment you switch, every AmneziaWG configuration
+this node has handed out stops working and each customer needs their file again.
+A client without the key is invisible to your server rather than merely refused:
+it does not appear as a failed handshake, it does not appear at all. There is no
+in-between state to sit in while customers catch up, which is why the dialog
+says so plainly and names the apps that can actually use it.
 
-A config pinned to a name Nova has established is behind a CDN now announces
-that name throughout. A bridge IP, and a direct domain Nova holds no certificate
-for, keep the split they were built for.
+Nova refuses the switch outright if this server's AmneziaWG packages are too old
+to serve 3.0. That is not caution: writing 3.0 settings to older packages does
+not degrade to something workable, it makes the packages reject the whole
+configuration, and the interface stops with every peer on it. If a version
+change fails to apply for any other reason, the node is now restored to what it
+was, rather than left storing a version it is not serving while the health page
+points at the button that just failed.
 
-The panel's built-in Telegram bot builds these configs on its own path, and a
-security pass on this release caught that it had not been told which domains are
-fronted. A customer taking their links from the bot would have kept the old
-behaviour while the same customer importing their subscription URL was fixed,
-with nothing to tell the two apart. The bot is now on the same list, and a test
-fails if any future subscription builder is left off it.
+What is written is 2.0 plus the header key. The other 3.0 parameters, the
+content padding, the randomised timings and the two new switches, are
+deliberately left out: none is needed to be 3.0, each widens the surface where
+the two ends can disagree, and the timing ones change when a tunnel gives up
+rather than what it looks like on the wire.
 
-## mieru and AmneziaWG can be pointed at this server's address
+Two details are worth recording because the upstream announcement gets both
+wrong, in the direction that costs an operator their interface. The key is
+base64, not the hex the announcement describes. And the padding floor is 12, not
+8: below it the configuration is rejected and the interface is deleted, with the
+error naming no field. Nova's own light preset wrote 8. It writes 12 on 3.0 now,
+and the 2.0 presets are untouched, since raising those would invalidate files
+2.0 customers hold for a rule that does not apply to them.
 
-Neither protocol survives a CDN, so both have an address picker that offers only
-names a CDN is not in front of. On a node whose every domain is behind
-Cloudflare that list was empty, and on a node with a direct domain there was no
-way to say "use the IP instead", even though the chooser has always honoured a
-literal address once something managed to set one.
+Everything above was measured against a real AmneziaWG 3.0 build rather than
+read: Nova's configurations carry traffic on all three strength presets, a 3.0
+build still serves the 2.0 configurations Nova has always written, and a 3.0
+server with a 2.0 client fails exactly as described, with no handshake recorded.
 
-The picker now ends with this server's own address, marked as such, on the
-AmneziaWG card and the mieru and Telegram-proxy pickers alike. It is the origin
-whenever anything in front of the node is proxied, which is why it is offered on
-the owner-only settings cards and labelled rather than slipped in.
+## A CDN-fronted address is no longer offered
 
-## A switch for the Nova app's SNI-block bypass
+AmneziaWG is UDP and no CDN carries UDP, so choosing a Cloudflare-fronted domain
+on the AmneziaWG card produced configurations that could not connect, for every
+customer, with nothing on either end reporting why.
 
-The Nova app carries a bypass for networks that block the domain rather than the
-server, and turns it on by itself once nothing on a subscription is getting
-through. That is the right default and it costs the customer one failed session
-to reach.
+Those entries were labelled. The label was the whole guard, and it was at the
+end of the line, so a long domain pushed it out of the box: the more room a name
+took, the less warning there was about it. They are shown and unselectable now.
+An address already stored stays visible, because that state is reachable and
+hiding it would show you something other than what your node is using.
 
-"In your customers' configs" now has a switch that starts the app with it
-already on, for a network an operator already knows is doing this. It rides the
-`?target=nova` document under the `nova` key, absent rather than false when it
-is off, so every client in the field reads it as off and nothing else even sees
-it.
+## The installer says which ports it takes
 
-## The Telegram proxy said which kind of link, not which one to use
+Before it binds anything, the installer lists the ports this install will use and
+where the protocol ports get decided later.
 
-Both forms of a customer's proxy travelled under names describing their scheme
-(`tg`, `tme`). A client shipped the `t.me` one, which lands the customer in a
-browser looking at a proxy they cannot add. They are `url` and `webUrl` now. No
-operator-visible change, and the customer page is unaffected.
+The ports Nova keeps to itself, its own agent and the xray API, both loopback,
+move themselves off a collision and say so. A port your customers reach is
+reported and left alone: that one is written into every link this node hands
+out, so moving it would hand customers links to a port you never agreed to.
 
-## It was telling you to undo a working setup
+## The AmneziaWG card reads properly
 
-A customer whose only inbounds are XHTTP or HTTPUpgrade was reported as a
-failure, with the advice to grant them another transport or move one of these to
-WebSocket or gRPC.
-
-That was right for as long as it was true. The Nova app now carries both: XHTTP
-on the second core it ships for exactly that, and HTTPUpgrade on its first. So
-such a customer has two working paths, the raw link list and the Nova app, and
-the advice would have undone a setup that works. XHTTP is also what an operator
-reaches for when a domain is being filtered, which makes it the worst thing to
-be steered away from.
-
-It is a warning now rather than a failure, and it says which client carries
-them, so an operator handing out a Hiddify or Clash link still learns that those
-four will be empty. It stays a failure when nothing structured can carry the
-customer at all, which is mieru and a NaiveProxy inbound on a self-signed node.
-
-## A tunnel that could not start said nothing
-
-1.71.3 changed what happens when a tunnel is saved and fails to start: what you
-typed is kept and the tunnel is left switched off, so the form comes back filled
-in and you can correct it. That is the honest state, and it was silent. Nothing
-on the health page read a disabled tunnel, and the Tunnel card is a click away
-rather than in front of you, so a bridge you believed was carrying traffic could
-sit like that until somebody happened to look.
-
-The health check now reports it, names the address it was configured for, and
-points at the page where what you entered is still waiting.
+Both dropdowns were cutting off their own options and the explanation under the
+address picker ran to fourteen lines in a narrow column. Each control now sits
+beside its explanation, and the dropdowns size themselves to their longest
+option in whichever language you are reading rather than to a width picked in
+English.
 
 ## Upgrading
 
-Update and restart. Existing configurations keep working: the XHTTP fix changes
-what a config pinned to an added Cloudflare domain announces, so hand those
-customers their subscription again (or let the app refresh it) and they will
-pick it up. The new switch and the new address choice are both off and unpicked
-until you set them.
+Update and restart. Nothing changes for anyone until you choose it: AmneziaWG
+stays on the version it is on, and the new address choice is unpicked.
 
-If a customer of yours has been showing as a health failure for being on XHTTP,
-that row will turn amber and explain itself.
+If you are considering 3.0, the thing to check first is what your customers run.
+Nova's own app carries it from v1.20.15-beta on every platform. Amnezia's
+standalone Android app is still a preview at 3.0.1, their Windows client cannot,
+and routers cannot. Switching disconnects everyone who is not already on
+something that speaks it, all at once.
