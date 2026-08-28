@@ -195,13 +195,23 @@ NOVA_XRAY_API_PORT="${PREV_API_PORT:-$(free_port_from 10085)}"
 [ "$NOVA_XRAY_API_PORT" != 10085 ] \
   && warn "127.0.0.1:10085 is in use, so the xray API will listen on 127.0.0.1:$NOVA_XRAY_API_PORT instead."
 
+# Plain stdout, like say/ok/warn. This is a REPORT, not a prompt.
+#
+# It was written to /dev/tty, copied from `ask`, which needs a terminal because
+# it reads an answer. Nothing here reads anything. Over ssh there is no
+# controlling terminal, so every line printed
+# `/dev/tty: No such device or address` instead of the report, and the
+# `2>/dev/null || true` could not stop it: bash reports a failed redirection
+# itself, before the command runs, so the command's own stderr redirect never
+# sees it. That made the ports report unreadable on exactly the path most
+# updates take, including the installer bot.
 say "Ports this install will use"
-printf '   %-22s %s\n' "${FRONT_PORT:-443}/tcp" "panel and proxy front (public)" > /dev/tty 2>/dev/null || true
+printf '   %-22s %s\n' "${FRONT_PORT:-443}/tcp" "panel and proxy front (public)"
 [ -n "${NOVA_PANEL_PORT:-}" ] \
-  && { printf '   %-22s %s\n' "$NOVA_PANEL_PORT/tcp" "extra panel port (public)" > /dev/tty 2>/dev/null || true; }
-printf '   %-22s %s\n' "127.0.0.1:$NOVA_AGENT_PORT" "agent, loopback only" > /dev/tty 2>/dev/null || true
-printf '   %-22s %s\n' "127.0.0.1:$NOVA_XRAY_API_PORT" "xray API, loopback only" > /dev/tty 2>/dev/null || true
-printf '   %s\n' "Protocol ports (mieru, MTProto, Hysteria2, AmneziaWG, Tor, Psiphon) are chosen in the panel later, and the panel refuses a port another Nova service already holds." > /dev/tty 2>/dev/null || true
+  && printf '   %-22s %s\n' "$NOVA_PANEL_PORT/tcp" "extra panel port (public)"
+printf '   %-22s %s\n' "127.0.0.1:$NOVA_AGENT_PORT" "agent, loopback only"
+printf '   %-22s %s\n' "127.0.0.1:$NOVA_XRAY_API_PORT" "xray API, loopback only"
+printf '   %s\n' "Protocol ports (mieru, MTProto, Hysteria2, AmneziaWG, Tor, Psiphon) are chosen in the panel later, and the panel refuses a port another Nova service already holds."
 
 # A public port already in use is reported and NOT changed. Nova cannot pick a
 # different one on the operator's behalf here: the front port is written into

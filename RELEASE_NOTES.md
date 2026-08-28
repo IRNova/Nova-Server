@@ -1,83 +1,39 @@
-# Nova Server 1.75.0
+# Nova Server 1.75.1
 
-Calls did not work for anyone on a Tor, Psiphon or country exit.
+Updating over SSH printed four errors instead of the ports list.
 
-## What was wrong
+## What you saw
 
-A customer routed through Tor, Psiphon or one of the country exits had web and
-apps working and no voice or video calls at all. Clubhouse, WhatsApp calls,
-Telegram voice and games all need UDP, and none of those exits carry it: Tor is
-TCP-only, with no UDP support at any layer, and every country exit is a dialer
-to a local Tor or Psiphon.
+```
+==> Ports this install will use
+/dev/tty: No such device or address
+/dev/tty: No such device or address
+/dev/tty: No such device or address
+/dev/tty: No such device or address
+```
 
-Nothing reported it. Not to the customer, whose call simply never connected, and
-not to you. It arrived here as a customer complaint, which is the only way it
-could have.
+Nothing was wrong with the install. Nothing was skipped, no port was moved, and
+the node came up exactly as it should have. The list of ports simply never
+printed, and four errors printed in its place.
 
-## The part that makes it worse
+## Why
 
-Nova already had the fix. "Route UDP through WARP" on the WARP card exists for
-exactly this, and it could not work.
+1.75.0 added that list and wrote it to the terminal device rather than to normal
+output. A command run over SSH, which is how most updates happen and how the
+installer bot works, has no controlling terminal, so every line failed.
 
-Routing rules are matched in order, first match wins, and the exit rules were
-emitted before it. So for anyone on an exit, the rule sending their UDP to WARP
-was never reached. The one setting that would have fixed calls was being skipped
-for precisely the customers who needed it, and turning it on looked like it did
-nothing.
+The redirect carried a `2>/dev/null || true` that looked like it covered this
+and could not: the shell reports a failed redirection itself, before the command
+runs, so the command's own error handling never sees it.
 
-It is checked first now. Turning it on routes UDP through WARP even when that
-customer's inbound is pinned to an exit.
+The list is ordinary output now, like every other line the installer prints.
 
-## The trade, stated plainly
-
-Their UDP then leaves through WARP rather than the country they chose, so a
-customer on a German exit makes calls from Cloudflare's address instead. That is
-why this stays a switch rather than becoming the default: a working call from
-the wrong country beats a call that cannot connect, but only you can decide that
-for your customers.
-
-It is never this server's own address, so the de-anonymisation that the country
-exits are careful about does not apply here.
-
-## What a block still means
-
-Rules are matched in order, so moving the UDP redirect up put it above the
-blocks below it: the QUIC block, the ad, adult and bittorrent blocks, and any
-block you wrote yourself. That would have left your filters enforced over TCP
-and quietly skipped over UDP, with both switches still showing green. HTTP/3 is
-UDP, so a "blocked" site would simply have loaded.
-
-Blocks are checked first now, ahead of the UDP redirect and everything else.
-Refuse what must be refused, then decide where the rest goes. One consequence
-worth knowing: a content block now also applies to customers on an exit, which
-was not always true before, and is the honest reading of a block being on.
-
-A rule that ROUTES rather than blocks is still below the UDP redirect. So if you
-have written something like "keep Iranian destinations direct" and you turn this
-switch on, that traffic's UDP goes through WARP while its TCP stays direct.
-Fixing that properly means reordering more than this release should, so it is
-written down here rather than left to be discovered.
-
-## When the switch is off
-
-That is still a silent failure, so the health page now names it: an exit that
-cannot carry UDP, with nothing else carrying it, raises a note saying what the
-customer actually experiences and the one press that changes it.
-
-The note goes quiet only when UDP genuinely has somewhere to go, which means
-WARP is set up and not merely switched on. With the switch on and no WARP
-account, the rule resolves to a block and every customer on the node loses UDP,
-not only the ones on an exit, so falling quiet there would have hidden a worse
-version of the thing it was written to report.
-
-It also only fires when something is actually routed through such an exit.
-Having Tor installed with nothing pointed at it is not that.
-
-A note, not a failure. Routing an inbound through Tor is a deliberate choice and
-everything except UDP works exactly as intended.
+There is a note in the installer, written the last time this happened to the
+setup questions, saying that a shell with no terminal still passes the obvious
+check and that "the install was always fine; it just looked like it had errored
+three times". The same mistake was made again twenty lines below it. There is a
+test now, since the note was not enough.
 
 ## Upgrading
 
-Update and restart. Nothing changes on its own: if the switch was off it stays
-off, and if it was on your customers' calls start working, which is what it
-said it would do all along.
+Update and restart. Nothing else changed.
