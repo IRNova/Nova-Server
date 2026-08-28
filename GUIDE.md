@@ -546,6 +546,6 @@ bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova
 <details>
 <summary><b>مشکل دارم، چطور کمک بگیرم؟</b></summary>
 
-اول راهنمای «راه‌اندازی گام‌به‌گام» داخل خود پنل را ببینید (به هر سه زبان موجود است). اگر حل نشد، در گروه تلگرام بپرسید: ⁦https://t.me/irnovaproxy_group⁩ و کانال رسمی: ⁦https://t.me/irnova_proxy⁩
+اول راهنمای «راه‌اندازی گام‌به‌گام» داخل خود پنل را ببینید (به هر سه زبان موجود است). اگر حل نشد، در گروه تلگرام بپرسید: ⁦https://t.me/irnovaproxy_group⁩ و کانال رسمی: ⁦https://t.me/irnova⁩
 
 </details>

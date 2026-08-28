@@ -52,7 +52,7 @@ execute remote code at runtime beyond the updates you trigger.
 Please report security issues privately first, so users are not exposed before a
 fix ships:
 
-- Telegram: **[@irnova_proxy](https://t.me/irnova_proxy)**
+- Telegram: **[@irnova](https://t.me/irnova)**
 - Or open a **private security advisory** on this repository (Security tab).
 
 We aim to acknowledge reports quickly and to credit reporters who want it. We do
