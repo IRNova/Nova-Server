@@ -183,9 +183,25 @@ free_port_from() {
 # The :443 probe twenty lines up already excludes Nova's own process for exactly
 # this reason. This does it by remembering rather than by sniffing, because the
 # answer is written down: a port only gets chosen on a node that has none.
-PREV_AGENT_PORT="$(sed -n 's/^NOVA_PORT=//p' "$CERT_DIR/agent.env" 2>/dev/null | tail -n 1)"
+# Read only when the file is THERE, and never let its absence end the install.
+#
+# `set -o pipefail` is on. On a fresh machine agent.env does not exist, so sed
+# exits non-zero, pipefail hands that status to the whole pipeline, the
+# assignment inherits it, and `set -e` kills the script. Silently, because the
+# 2>/dev/null that hides sed's complaint hides the only clue too: the installer
+# asked its questions and returned to the prompt with no output at all.
+#
+# That is every FIRST install, which is the one case the re-run logic above was
+# never exercised against. `|| true` on each read, and an existence check, so a
+# missing or unreadable file simply means "no previous port", which is exactly
+# what a fresh machine has.
+prev_env_val() {
+  [ -r "$CERT_DIR/agent.env" ] || return 0
+  sed -n "$1" "$CERT_DIR/agent.env" 2>/dev/null | tail -n 1 || true
+}
+PREV_AGENT_PORT="$(prev_env_val 's/^NOVA_PORT=//p' || true)"
 case "$PREV_AGENT_PORT" in ''|*[!0-9]*) PREV_AGENT_PORT="" ;; esac
-PREV_API_PORT="$(sed -n 's/^NOVA_XRAY_API=127\.0\.0\.1://p' "$CERT_DIR/agent.env" 2>/dev/null | tail -n 1)"
+PREV_API_PORT="$(prev_env_val 's/^NOVA_XRAY_API=127\.0\.0\.1://p' || true)"
 case "$PREV_API_PORT" in ''|*[!0-9]*) PREV_API_PORT="" ;; esac
 
 NOVA_AGENT_PORT="${PREV_AGENT_PORT:-$(free_port_from 8088)}"

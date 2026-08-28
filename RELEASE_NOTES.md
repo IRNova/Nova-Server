@@ -1,39 +1,52 @@
-# Nova Server 1.75.1
+# Nova Server 1.75.2
 
-Updating over SSH printed four errors instead of the ports list.
+Installing on a fresh server stopped after the questions.
 
 ## What you saw
 
-```
-==> Ports this install will use
-/dev/tty: No such device or address
-/dev/tty: No such device or address
-/dev/tty: No such device or address
-/dev/tty: No such device or address
-```
+The installer asked its questions, and then the shell prompt came back. No
+output, no error, nothing installed.
 
-Nothing was wrong with the install. Nothing was skipped, no port was moved, and
-the node came up exactly as it should have. The list of ports simply never
-printed, and four errors printed in its place.
+It was not your server, your domain, your email or your connection. Retrying,
+using a different domain, or running it through the bot all did the same thing,
+because the failure had nothing to do with any of that.
 
-## Why
+## What was happening
 
-1.75.0 added that list and wrote it to the terminal device rather than to normal
-output. A command run over SSH, which is how most updates happen and how the
-installer bot works, has no controlling terminal, so every line failed.
+1.73.0 added code that remembers which internal port an existing install uses,
+so re-running the installer never moves it. That code reads a settings file
+which, by definition, only exists on a machine Nova has already been installed
+on.
 
-The redirect carried a `2>/dev/null || true` that looked like it covered this
-and could not: the shell reports a failed redirection itself, before the command
-runs, so the command's own error handling never sees it.
+On a new machine the read failed, and because the installer stops on any
+unexpected failure, it stopped. The message that would have explained it was
+suppressed, because a missing file there is normal and worth ignoring; what was
+not intended was that the read itself would end the script.
 
-The list is ordinary output now, like every other line the installer prints.
+So it broke exactly one case: the first install on a clean server. Every node
+that already had Nova kept updating correctly, which is why it took until now to
+surface.
 
-There is a note in the installer, written the last time this happened to the
-setup questions, saying that a shell with no terminal still passes the obvious
-check and that "the install was always fine; it just looked like it had errored
-three times". The same mistake was made again twenty lines below it. There is a
-test now, since the note was not enough.
+## Fixed
+
+The read now treats a missing settings file as what it is on a fresh machine:
+no previous port, carry on.
+
+**If you hit this, just run the installer again.** Nothing was left behind and
+nothing needs cleaning up first.
+
+## Why no test caught it
+
+Every installer test in this project reads the script as text and checks it says
+the right things. None of them ran it. A check that reads cannot see a script
+that exits.
+
+There is now a test that executes the actual port-reading lines under the same
+shell options the installer uses, against a directory that does not exist. Its
+first version passed against the broken code, because it wrote its own version
+of the call instead of using the installer's, so it is written to slice the real
+lines out of the script.
 
 ## Upgrading
 
-Update and restart. Nothing else changed.
+Update and restart. Existing installs were never affected by this.
