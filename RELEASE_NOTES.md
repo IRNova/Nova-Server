@@ -1,55 +1,41 @@
-# Nova Server 1.74.0
+# Nova Server 1.74.1
 
-AmneziaWG 3.0 can be set on a node, not only on this panel.
+Updating a node looked like it did nothing.
 
 ## What was wrong
 
-The AmneziaWG card for a node offered 1.0 and 2.0 and nothing else. A node
-updated alongside its panel still could not be put on the newest protocol, and
-nothing said why, because there was nothing to say: three separate places
-refused version 3 for a node, and the picker simply never listed it.
+Pressing Update on a node left the row exactly as it had been: the old version,
+still offering the update, with nothing to say anything was happening.
 
-## Why it was not a one-line change
+The update was running the whole time. A node downloads the published release,
+checks it against its checksum, extracts it and restarts, then reports its new
+version on its next sync. For the minute or two that takes, the row had nothing
+to show, so the only signal was a toast, which disappears, and the row is what
+you keep looking at.
 
-Before letting an operator choose 3.0 for this panel's own interface, Nova
-checks the AmneziaWG packages on this machine. It cannot run that check on a
-node, which it only reaches over HTTP.
+That was reported as an update that does not work, on a node that had finished
+updating about a minute after the screenshot was taken.
 
-That check is not a nicety. Writing a 3.0 configuration to older packages does
-not fall back to something workable: `awg setconf` refuses the whole document
-and the interface stops, taking every peer on that node down with it, and the
-error names no field.
+## What it does now
 
-So the node reports which generation its own packages are, in the check-in it
-already makes, and this panel gates the option on that answer. A node whose
-packages are positively identified as the older line is refused, with a message
-saying to update them, and one that cannot be identified is allowed, because an
-unreadable version string is far more often a packaging variant than an old box.
+The row says "Updating" in place of the update-available badge, from the press
+until the node comes back with its new version.
 
-There is a second question, and it is the one that matters on the day this
-ships. A node running an older Nova does not refuse a 3.0 configuration: it
-keeps the version field only when it says 2, so a 3.0 push is stored as nothing
-and that node serves 1.0 while this panel hands its customers 3.0 files. They
-connect and carry nothing, with no error on either end, and the node reports
-success. So 3.0 is offered for a node only once that node is itself on 1.74.0 or
-newer. Unlike the package question, a node that has never reported a version is
-refused rather than allowed: it cannot report one because it is too old, which
-is the answer.
+It clears in exactly two ways and deliberately not a third. The version changing
+ends it, which is the real signal. Six minutes ends it, which covers an update
+that failed, a node that never came back, and a stamp restored from a backup. A
+state that only something remembers to clear is how a row starts lying, which is
+the problem this fixes.
 
-## What it costs, unchanged
+The state is stored on the node's record rather than in your browser, so it
+survives a reload and another admin looking at the same fleet sees it too.
 
-Switching a node to 3.0 is the same flag day switching this panel is. The header
-key is shared by the whole interface, so every configuration that node has
-handed out stops working the moment you press it, and each of its customers
-needs their file again. The same confirmation appears, with the same warning.
+## Worth knowing
+
+Auto-update covers this panel only, never its nodes. A node is always a manual
+press, so if you have been waiting for nodes to follow the panel on their own,
+they will not.
 
 ## Upgrading
 
-Update and restart. Nothing changes for anyone until you choose it: every node
-stays on the version it is on. The 3.0 option appears on a node's card once that
-node has checked in after updating, which is the first poll after its own
-update.
-
-If a node shows the option and refuses it on save, that node's packages are the
-older line and the message says so; update AmneziaWG on that machine and try
-again.
+Update and restart. Nothing about how any node serves traffic changes.
