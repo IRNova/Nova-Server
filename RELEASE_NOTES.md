@@ -1,7 +1,23 @@
-# Nova Server 1.73.0
+# Nova Server 1.73.1
 
-AmneziaWG 3.0, a picker that could hand out configurations nobody could connect
-with, and an installer that says what it is about to take.
+A correction to 1.73.0, plus everything 1.73.0 carried.
+
+## The AmneziaWG 3.0 note named an app version that could not connect
+
+1.73.0 said, on this page and on every customer's own page, that AmneziaWG 3.0
+needs the Nova app from v1.20.15-beta. That version shipped 3.0 support that
+could not start a tunnel on any platform: the header key reached the core in the
+wrong encoding, so the app set up the tunnel and then stopped before any traffic
+passed. A customer following that advice would have updated to an app that still
+could not connect, and had no way to tell why.
+
+The fixed app is v1.20.16-beta, and that is what every one of those messages
+names now. Nothing about how this node serves traffic changed. If you are on
+AmneziaWG 2.0, none of this ever applied to you.
+
+Everything below shipped in 1.73.0 and is unchanged.
+
+## AmneziaWG 3.0
 
 ## AmneziaWG 3.0
 
@@ -81,7 +97,7 @@ Update and restart. Nothing changes for anyone until you choose it: AmneziaWG
 stays on the version it is on, and the new address choice is unpicked.
 
 If you are considering 3.0, the thing to check first is what your customers run.
-Nova's own app carries it from v1.20.15-beta on every platform. Amnezia's
+Nova's own app carries it from v1.20.16-beta on every platform. Amnezia's
 standalone Android app is still a preview at 3.0.1, their Windows client cannot,
 and routers cannot. Switching disconnects everyone who is not already on
 something that speaks it, all at once.
