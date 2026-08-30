@@ -46,6 +46,18 @@ VERSION_URL="${NOVA_VERSION_URL:-$PUBLIC_VERSION_URL}"
 PERSIST_CHANNEL=0
 AGENT_DIR=/opt/nova-node-agent
 CERT_DIR=/etc/nova
+
+# Verify a downloaded archive against a pinned SHA-256. Fails CLOSED: a host
+# with no sha256 tool refuses rather than installing something unchecked, which
+# is the rule the self-updater learned the hard way in 1.34.1.
+sha_is() { # file expected
+  _got=""
+  if command -v sha256sum >/dev/null 2>&1; then _got="$(sha256sum "$1" | awk '{print $1}')"
+  elif command -v shasum >/dev/null 2>&1; then _got="$(shasum -a 256 "$1" | awk '{print $1}')"
+  else return 1; fi
+  [ "$_got" = "$2" ]
+}
+
 DB_DIR=/var/lib/nova
 
 c_grn=$'\033[0;32m'; c_red=$'\033[0;31m'; c_yel=$'\033[1;33m'; c_cyn=$'\033[0;36m'; c_bld=$'\033[1m'; c_rst=$'\033[0m'
@@ -60,6 +72,41 @@ mark_owned() {
 }
 
 [ "$(id -u)" = 0 ] || die "Please run as root (sudo)."
+
+# Is another package manager holding apt's locks?
+#
+# A freshly created cloud VPS runs its own apt on boot (cloud-init, and
+# unattended-upgrades right behind it). An installer that starts during that
+# window does not get a clean error: apt-get update fails to take the lock, the
+# package list stays stale, and the next `apt-get install` quietly resolves
+# against whatever the distro already knew about. That is not hypothetical, it
+# is how a node ended up running Ubuntu's Node 18 when this script asked for 24.
+apt_busy() {
+  for _p in apt apt-get dpkg unattended-upgrade; do
+    if pgrep -x "$_p" >/dev/null 2>&1; then return 0; fi
+  done
+  if pgrep -f 'unattended-upgrade' >/dev/null 2>&1; then return 0; fi
+  return 1
+}
+
+# Wait for it, rather than racing it and installing the wrong thing. Bounded, so
+# a stuck package manager delays the install instead of hanging it forever, and
+# announced, so five silent minutes do not look like a frozen script.
+wait_for_apt() {
+  if ! apt_busy; then return 0; fi
+  say "Waiting for another package manager to finish (a freshly booted VPS updates itself on boot)"
+  _waited=0
+  while apt_busy; do
+    if [ "$_waited" -ge 300 ]; then
+      warn "Package manager still busy after 5 minutes; continuing anyway."
+      return 0
+    fi
+    sleep 5
+    _waited=$((_waited + 5))
+  done
+  ok "package manager free after ${_waited}s"
+}
+
 
 # ---- setup questions ---------------------------------------------------------
 # Asked up front so the rest of the install runs unattended. Reads /dev/tty so
@@ -243,6 +290,7 @@ for _pp in "${FRONT_PORT:-443}" ${NOVA_PANEL_PORT:-}; do
 done
 
 # ---- preflight ---------------------------------------------------------------
+wait_for_apt
 say "Installing prerequisites"
 export DEBIAN_FRONTEND=noninteractive
 if command -v apt-get >/dev/null 2>&1; then
@@ -300,9 +348,38 @@ if command -v node >/dev/null 2>&1; then
 fi
 if [ "$need_node" = 1 ]; then
   say "Installing Node.js 24"
+  # The NodeSource script runs its own apt-get update, which we cannot pass
+  # options to, so the lock has to be clear before it starts rather than during.
+  wait_for_apt
   curl -fsSL https://deb.nodesource.com/setup_24.x | bash - >/dev/null 2>&1 \
     || die "Could not add the NodeSource repository."
   apt-get install -y nodejs >/dev/null 2>&1 || die "Could not install Node.js."
+fi
+
+# Check what we ACTUALLY got, not that some node exists.
+#
+# Both commands above can succeed and still leave Node 18 installed: if the
+# package list was not refreshed, `apt-get install nodejs` resolves against the
+# distro's own nodejs and exits 0. This line used to be `ok "node $(node -v)"`,
+# which printed a green OK for v18.19.1 and let the install continue. The agent
+# then crash-looped forever on `No such built-in module: node:sqlite` (added in
+# Node 22, and src/kv/sqlite.mjs is the KV store, so nothing works without it),
+# restarting every two seconds with an error no operator can be expected to map
+# back to a package resolution that happened ten minutes earlier.
+#
+# The version test above already knows what "good enough" means. Applying it
+# only BEFORE the install and never after is what let the wrong version through.
+node_maj="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+case "$node_maj" in ''|*[!0-9]*) node_maj=0 ;; esac
+if [ "$node_maj" -lt 24 ]; then
+  die "Node 24+ is required, but $(node -v 2>/dev/null || echo 'no node') is installed.
+    The Nova agent uses node:sqlite, which does not exist before Node 22, so it
+    cannot start on this version.
+    This usually means another package manager held apt's lock while Node was
+    installed, so the NodeSource package list was never picked up. Wait for it to
+    finish, then re-run this installer:
+      pgrep -a apt-get unattended-upgrade
+      bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)"
 fi
 ok "node $(node -v)"
 
@@ -426,15 +503,120 @@ done
 HAS_SINGBOX=0
 SINGBOX_BIN=/usr/local/bin/sing-box-nova
 SINGBOX_URL="${NOVA_SINGBOX_URL:-https://github.com/IRNova/Tools/releases/download/sing-box/sing-box-nova.gz}"
+SINGBOX_SHA_URL="${NOVA_SINGBOX_SHA_URL:-${SINGBOX_URL}.sha256}"
+# What we installed last time, so a re-run can tell "already current" from
+# "never updated". Lives beside the other node state in /etc/nova.
+SINGBOX_STAMP="$CERT_DIR/singbox.sha256"
+
+# Until now this was `if [ ! -x "$SINGBOX_BIN" ]`, so a node installed the
+# binary once and then kept it forever. Publishing a rebuilt sing-box reached
+# fresh installs only, and every existing node stayed on whatever it first got.
+# That is the wrong shape for a component whose updates are mostly leak and
+# hang fixes: those matter most on the nodes that have been up longest, which
+# were exactly the ones that never received them.
+#
+# The published .sha256 sidecar is the version signal. It is a few dozen bytes,
+# so asking for it on every run is free, and comparing it to the stamp says
+# whether this node is current without downloading 13MB to find out.
+# Normalised before it is validated, not after. sha256sum and shasum both print
+# lowercase, and sha_is compares verbatim, so an uppercase sidecar would pass
+# this check and then never match anything: on an existing node that is a
+# skipped update, but on a fresh one sing-box is never installed at all and
+# Hysteria2 goes missing fleet-wide for that release. A CRLF sidecar is worse
+# still, because the stray \r fails the hex test and silently clears the
+# checksum. runSelfUpdate in src/server.mjs already lowercases for exactly this
+# reason; this path did not inherit it.
+#
+# --proto-redir keeps an https-to-http downgrade from being followed, and
+# --max-filesize keeps a hostile body from being read unbounded into awk.
+sb_want="$(curl -fsSL --max-time 20 --max-filesize 4096 --proto-redir '=https' "$SINGBOX_SHA_URL" 2>/dev/null \
+  | tr -d '\r' | awk 'NR==1 {print $1}' | tr 'A-F' 'a-f' || true)"
+case "$sb_want" in
+  *[!0-9a-f]* | "") sb_want="" ;;
+  *) [ "${#sb_want}" -eq 64 ] || sb_want="" ;;
+esac
+sb_have=""
+if [ -r "$SINGBOX_STAMP" ]; then
+  sb_have="$(head -n 1 "$SINGBOX_STAMP" 2>/dev/null | awk '{print $1}' || true)"
+fi
+
+sb_need=0
+sb_replacing=0
 if [ ! -x "$SINGBOX_BIN" ]; then
-  say "Installing sing-box (Hysteria2)"
+  sb_need=1
+elif [ -n "$sb_want" ] && [ "$sb_want" != "$sb_have" ]; then
+  # Only ever REPLACE a working binary against a checksum we actually fetched.
+  # With no sidecar reachable we cannot tell "newer" from "the release moved or
+  # the network lied", and swapping a binary that works for unverified bytes is
+  # a worse outcome than staying a version behind.
+  sb_need=1
+  sb_replacing=1
+fi
+
+if [ "$sb_need" = 1 ]; then
+  if [ "$sb_replacing" = 1 ]; then
+    say "Updating sing-box (Hysteria2)"
+  else
+    say "Installing sing-box (Hysteria2)"
+  fi
+  if [ -z "$sb_want" ]; then
+    # Say it out loud. An unreachable sidecar downgrades a fresh install to no
+    # verification at all, and for nodes behind Iran's filtering a blocked or
+    # 404'd request is an ordinary event, not an exotic one.
+    warn "sing-box checksum unavailable; installing without verifying the download."
+  fi
   for attempt in 1 2 3; do
-    if curl -fsSL "$SINGBOX_URL" -o /tmp/sb.gz && gunzip -f /tmp/sb.gz \
-       && mv -f /tmp/sb "$SINGBOX_BIN" && chmod +x "$SINGBOX_BIN"; then
+    # Two different temp locations, for two different reasons.
+    #
+    # The download goes in a private 0700 directory. /tmp/sb.gz was fixed and
+    # world-predictable, and the checksum was taken there and then the file
+    # re-read from the same path, so any local unprivileged account (xray runs
+    # as nobody) could pass verification and swap the bytes before gunzip read
+    # them, ending with attacker code at /usr/local/bin/sing-box-nova which the
+    # unit runs as root. This file's own comment 200 lines down already states
+    # that rule; this path had not followed it.
+    #
+    # The final staging file goes next to the target, because /usr/local/bin is
+    # often a different filesystem where mv degrades to a copy, and copying onto
+    # a running executable fails with ETXTBSY. A rename within the directory
+    # always works, and the running process keeps its old inode until restart.
+    # That directory is root-owned 0755, so the predictable suffix is not a risk.
+    sb_dir="$(mktemp -d)"
+    sb_tmp="$SINGBOX_BIN.new.$$"
+    if curl -fsSL --max-time 300 --proto-redir '=https' "$SINGBOX_URL" -o "$sb_dir/sb.gz" \
+       && { [ -z "$sb_want" ] || sha_is "$sb_dir/sb.gz" "$sb_want"; } \
+       && gunzip -f "$sb_dir/sb.gz" \
+       && install -m 0755 "$sb_dir/sb" "$sb_tmp" \
+       && mv -f "$sb_tmp" "$SINGBOX_BIN"; then
       mark_owned sing-box-nova
+      rm -rf "$sb_dir"
+      if [ -n "$sb_want" ]; then
+        # /etc/nova does not exist yet on a fresh install: it is created much
+        # later, with the agent directories. Without this mkdir the redirection
+        # below fails, and under `set -euo pipefail` that ends the script, so
+        # every first install would die here having installed nothing else. That
+        # is the same shape as the 1.73.0 regression this release exists to fix.
+        mkdir -p "$CERT_DIR"
+        printf '%s\n' "$sb_want" > "$SINGBOX_STAMP"
+        chmod 0600 "$SINGBOX_STAMP"
+      fi
+      # A replaced binary is not in use until the service is bounced, and a node
+      # that silently kept running the old one would make this whole change a
+      # no-op wearing a success message.
+      if [ "$sb_replacing" = 1 ] && systemctl is-active --quiet sing-box 2>/dev/null; then
+        systemctl restart sing-box >/dev/null 2>&1 || warn "sing-box restart failed; the old binary is still running"
+      fi
       break
     fi
-    warn "sing-box download failed (try $attempt), retrying..."; sleep 3
+    rm -rf "$sb_dir"
+    rm -f "$sb_tmp"
+    if [ "$attempt" = 3 ] && [ "$sb_replacing" = 1 ]; then
+      # The existing binary is untouched, so this is a skipped update and not a
+      # broken node. Say which, so the operator does not go hunting.
+      warn "sing-box update failed after 3 tries; keeping the working binary already installed"
+    else
+      warn "sing-box download failed (try $attempt), retrying..."; sleep 3
+    fi
   done
 fi
 if [ -x "$SINGBOX_BIN" ]; then
@@ -461,7 +643,35 @@ UNIT
   systemctl daemon-reload
   systemctl enable sing-box >/dev/null 2>&1 || true
   HAS_SINGBOX=1
-  ok "sing-box installed"
+  # Report WHICH sing-box this is, and prove it can load what Nova writes.
+  #
+  # The box may carry an unrelated sing-box from a distro package, and
+  # `command -v sing-box` finds that one, not this one. Reading a version or a
+  # config check off the wrong binary is how an afternoon gets spent diagnosing
+  # a bug that does not exist. So this names the path it actually installed.
+  #
+  # The check itself is the useful half: Nova generates a config that needs
+  # specific build tags (the v2ray stats API for Hysteria2 accounting, quic for
+  # Hysteria2 itself). A binary missing one of those refuses the whole config,
+  # the service never starts, and nothing says so, because a stopped unit with
+  # no journal entry looks exactly like a unit that was never needed. Running
+  # the check here turns that into a line at install time.
+  singbox_ver="$("$SINGBOX_BIN" version 2>/dev/null | head -1 || true)"
+  ok "sing-box installed at $SINGBOX_BIN${singbox_ver:+ ($singbox_ver)}"
+  if [ -s /etc/sing-box/config.json ]; then
+    if "$SINGBOX_BIN" check -c /etc/sing-box/config.json >/dev/null 2>&1; then
+      ok "sing-box accepts the current config"
+    else
+      # The command is deliberately truncated with `head -3`, and deliberately
+      # carries the warning. sing-box decode errors quote the offending JSON,
+      # and that file is mode 0600 because it holds every user's UUID, Trojan
+      # and Hysteria2 passwords, and the salamander obfs password. Operators
+      # routinely paste installer output straight into the support chat.
+      warn "sing-box will NOT start: it rejects /etc/sing-box/config.json. Hysteria2 stays unavailable until this is fixed."
+      warn "  To see why: $SINGBOX_BIN check -c /etc/sing-box/config.json 2>&1 | head -3"
+      warn "  That output can quote user credentials. Do not paste it into a chat."
+    fi
+  fi
   # grpcurl: the agent uses it to read sing-box's per-user stats for quota.
   if ! command -v grpcurl >/dev/null 2>&1; then
     garch="$(uname -m)"; case "$garch" in aarch64) garch=arm64;; x86_64) garch=x86_64;; esac
@@ -570,17 +780,6 @@ case "$(uname -m)" in
     MITA_SHA256="a07d5afc5e1353ab346bb3ddbe95c7f960828204be529f4a88d688dfe83e252d"
     ;;
 esac
-
-# Verify a downloaded archive against a pinned SHA-256. Fails CLOSED: a host
-# with no sha256 tool refuses rather than installing something unchecked, which
-# is the rule the self-updater learned the hard way in 1.34.1.
-sha_is() { # file expected
-  _got=""
-  if command -v sha256sum >/dev/null 2>&1; then _got="$(sha256sum "$1" | awk '{print $1}')"
-  elif command -v shasum >/dev/null 2>&1; then _got="$(shasum -a 256 "$1" | awk '{print $1}')"
-  else return 1; fi
-  [ "$_got" = "$2" ]
-}
 
 # A private directory per download. A fixed /tmp/<name> is world-predictable,
 # and the window between `tar` and `install` is long enough for an unprivileged

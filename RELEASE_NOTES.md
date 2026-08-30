@@ -1,52 +1,70 @@
-# Nova Server 1.75.2
+# Nova Server 1.76.0
 
-Installing on a fresh server stopped after the questions.
+A brand-new server could finish installing with a dead panel. Hysteria2 gets
+its first engine update since it was added.
 
-## What you saw
+## The install that looked like it worked
 
-The installer asked its questions, and then the shell prompt came back. No
-output, no error, nothing installed.
+On a server created a few minutes earlier, the installer could print
 
-It was not your server, your domain, your email or your connection. Retrying,
-using a different domain, or running it through the bot all did the same thing,
-because the failure had nothing to do with any of that.
+    ==> Installing Node.js 24
+    OK  node v18.19.1
 
-## What was happening
+and carry on to report a successful install. The panel was then unreachable,
+and behind the scenes the Nova service was starting and dying every two
+seconds.
 
-1.73.0 added code that remembers which internal port an existing install uses,
-so re-running the installer never moves it. That code reads a settings file
-which, by definition, only exists on a machine Nova has already been installed
-on.
+It was not your server, your domain or your connection. A freshly created VPS
+runs its own package updates on first boot, and those hold a lock that the
+installer needs. When the installer arrived during that window, it could not
+refresh the package list, so it installed the version of Node your distribution
+already knew about instead of the one Nova asked for. Nova needs Node 24; the
+older one is missing a component the whole settings database is built on, so
+the service could never start.
 
-On a new machine the read failed, and because the installer stops on any
-unexpected failure, it stopped. The message that would have explained it was
-suppressed, because a missing file there is normal and worth ignoring; what was
-not intended was that the read itself would end the script.
+The installer reported success because it only checked that Node was present,
+not which Node.
 
-So it broke exactly one case: the first install on a clean server. Every node
-that already had Nova kept updating correctly, which is why it took until now to
-surface.
+## What changed
 
-## Fixed
+It waits for the server's own startup updates to finish before installing
+anything, and says so while it waits, so a pause does not look like a freeze.
+The wait gives up after five minutes rather than hanging forever.
 
-The read now treats a missing settings file as what it is on a fresh machine:
-no previous port, carry on.
+It then checks the version it actually installed. On anything too old it stops
+with a plain explanation and the command to run again, instead of continuing
+and leaving you with a panel that never comes up.
 
-**If you hit this, just run the installer again.** Nothing was left behind and
-nothing needs cleaning up first.
+If you hit this, running the installer again was already the fix, and your
+server is fine.
 
-## Why no test caught it
+## Hysteria2 engine updates
 
-Every installer test in this project reads the script as text and checks it says
-the right things. None of them ran it. A check that reads cannot see a script
-that exits.
+Until now the Hysteria2 engine was installed once and never replaced. Every
+improvement to it reached brand-new servers only, and never the servers already
+running, which are the ones that had been up long enough to need them.
 
-There is now a test that executes the actual port-reading lines under the same
-shell options the installer uses, against a directory that does not exist. Its
-first version passed against the broken code, because it wrote its own version
-of the call instead of using the installer's, so it is written to slice the real
-lines out of the script.
+Existing servers now pick up the current engine the next time you run the
+installer. This version clears several connection leaks and a stall that could
+accumulate on a server left running for a long time, so Hysteria2 stays healthy
+over weeks rather than slowly degrading.
+
+The download is verified before it replaces anything. A server that already has
+the current version downloads nothing at all, and a failed update leaves the
+working engine in place rather than a broken one.
+
+## Hysteria2 settings that cannot work now say so
+
+A Hysteria2 configuration the engine refuses used to leave Hysteria2 quietly
+switched off. That looked identical to simply not having turned it on. Nova now
+checks the configuration before applying it and tells you when it will not
+start.
 
 ## Upgrading
 
-Update and restart. Existing installs were never affected by this.
+Panel: Settings, then Update. Or run the installer again over SSH:
+
+    bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
+
+Re-running the installer is what picks up the new Hysteria2 engine. The panel
+updater alone does not replace it.
