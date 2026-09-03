@@ -1,64 +1,53 @@
-# Nova Server 1.76.0
+# Nova Server 1.77.0
 
-A brand-new server could finish installing with a dead panel. Hysteria2 gets
-its first engine update since it was added.
+Your server can be running a version of AmneziaWG it no longer has installed,
+for weeks, with nothing saying so. The health page now says so.
 
-## The install that looked like it worked
+## What happens
 
-On a server created a few minutes earlier, the installer could print
+When your server installs its own package updates, a newer AmneziaWG is written
+to disk. The one already carrying your tunnel keeps running, because nothing can
+swap out a component while it is in use. The two only meet again when the server
+restarts.
 
-    ==> Installing Node.js 24
-    OK  node v18.19.1
+On a server built to stay up, that is not a few minutes. It is however long it
+has been since the last restart.
 
-and carry on to report a successful install. The panel was then unreachable,
-and behind the scenes the Nova service was starting and dying every two
-seconds.
+Every sign an operator could check said the tunnel was healthy, and it was: the
+software was installed, the tunnel was up, customers were connected. What was
+not true is that the server was running the version it had.
 
-It was not your server, your domain or your connection. A freshly created VPS
-runs its own package updates on first boot, and those hold a lock that the
-installer needs. When the installer arrived during that window, it could not
-refresh the package list, so it installed the version of Node your distribution
-already knew about instead of the one Nova asked for. Nova needs Node 24; the
-older one is missing a component the whole settings database is built on, so
-the service could never start.
+## What you will see
 
-The installer reported success because it only checked that Node was present,
-not which Node.
+A warning on the health page, on any server where the two differ:
 
-## What changed
+> The tunnel is up, but it is running on AmneziaWG kernel module 1.0.20260611
+> while 3.1.20260812 is the one installed on this server.
 
-It waits for the server's own startup updates to finish before installing
-anything, and says so while it waits, so a pause does not look like a freeze.
-The wait gives up after five minutes rather than hanging forever.
+It names both versions and gives you the command that swaps them over. Running
+it interrupts the tunnel for a few seconds and every customer reconnects on
+their own. Restarting the server does the same thing.
 
-It then checks the version it actually installed. On anything too old it stops
-with a plain explanation and the command to run again, instead of continuing
-and leaving you with a panel that never comes up.
+It is a warning, not a fault. Nothing is broken, and nothing is disconnected
+until you choose to act on it. What it costs you is that fixes in the newer
+version are not in force, and version 3.0 cannot be switched on.
 
-If you hit this, running the installer again was already the fix, and your
-server is fine.
+## The switch to 3.0 no longer fails halfway
 
-## Hysteria2 engine updates
+Turning on version 3.0 on a server in that state used to get all the way to the
+point of applying it, then fail with a message from the system that named
+nothing you could act on:
 
-Until now the Hysteria2 engine was installed once and never replaced. Every
-improvement to it reached brand-new servers only, and never the servers already
-running, which are the ones that had been up long enough to need them.
+    Unable to modify interface: Invalid argument
 
-Existing servers now pick up the current engine the next time you run the
-installer. This version clears several connection leaks and a stall that could
-accumulate on a server left running for a long time, so Hysteria2 stays healthy
-over weeks rather than slowly degrading.
+Your previous version was restored and your customers' files were never
+affected, but the tunnel dropped for a moment on the way through, and the
+message sent you to update packages that were often already up to date.
 
-The download is verified before it replaces anything. A server that already has
-the current version downloads nothing at all, and a failed update leaves the
-working engine in place rather than a broken one.
-
-## Hysteria2 settings that cannot work now say so
-
-A Hysteria2 configuration the engine refuses used to leave Hysteria2 quietly
-switched off. That looked identical to simply not having turned it on. Nova now
-checks the configuration before applying it and tells you when it will not
-start.
+Nova now checks both halves before it tries anything, and if it cannot proceed
+it tells you which of the two is wrong: packages that genuinely need updating,
+or a version that is already installed and only waiting for the server to pick
+it up. Nothing is applied and nobody is disconnected.
 
 ## Upgrading
 
@@ -66,5 +55,4 @@ Panel: Settings, then Update. Or run the installer again over SSH:
 
     bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
 
-Re-running the installer is what picks up the new Hysteria2 engine. The panel
-updater alone does not replace it.
+The panel updater is enough for this release.
