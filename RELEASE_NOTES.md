@@ -1,46 +1,33 @@
-# Nova Server 1.79.0
+# Nova Server 1.80.0
 
-The dashboard stopped getting slower as your server got older, and a reseller's
-dashboard now shows their own traffic instead of the whole server's.
+The panel got faster on servers that have been running a while.
 
-## The dashboard was doing too much work
+## What was slow
 
-To draw the traffic chart, the dashboard read every day of every customer's
-history and added it up. The panel refreshes that chart every few seconds.
+Nova looks things up in its own database by prefix constantly: one customer's
+traffic, who has been online, which servers exist, which domains are configured.
+Almost every page does several of these.
 
-On a small or new server nobody noticed. On a server with a few hundred
-customers that had been running for a year, one refresh meant reading hundreds
-of thousands of records, which took seconds of solid work and a large part of
-the memory Nova is allowed. The panel became unresponsive, and on the largest
-servers it could use enough memory to restart the agent, which made the
-dashboard unusable rather than merely slow.
+Each of those lookups was reading the entire database to find its answer, rather
+than jumping to the part that could possibly match. That is fine on a new
+server. It is not fine on one that has been running for a year, because the
+database is mostly per-day traffic records, which are kept for a long time, and
+they end up outnumbering everything else many times over.
 
-The shape of that is backwards: the servers with the most to show were the ones
-least able to show it.
+The effect was indirect and easy to misread: a page that has nothing to do with
+traffic history got slower anyway, because the lookup behind it was walking past
+all of that history to reach a few hundred rows.
 
-Nova now keeps a running daily total for the server as a whole, updated as
-traffic is counted. Drawing the chart reads fourteen small numbers instead of
-the entire history, so opening the dashboard costs the same on a year-old server
-as on one set up this morning.
+## What changed
 
-Your existing history is not lost. The first time each past day is shown, Nova
-works it out from the records it already has and stores the result, so the chart
-fills in as you use it and does the work only once. The day you update is the
-one exception: it counts from the update onwards, and corrects itself the next
-day.
+Those lookups now go straight to the range of the database they need. Same
+information, same results, found without reading everything else first.
 
-## A reseller was shown the whole server's traffic
+On a test server with 500 customers and a year of history, twenty of those
+lookups took 195ms before and 3ms after.
 
-The reseller dashboard scoped the customer count correctly and left the traffic
-figures beside it unscoped. A reseller saw the server's total, today's total,
-and a fortnight of daily figures, all of it covering the owner's own customers
-and every other reseller's.
-
-It now shows their own customers only, matching the count that was already
-right.
-
-If you run resellers on a node, they have been able to see this. Nothing else
-about their access changes.
+Nothing about your data, your settings or your customers changes. This is purely
+how Nova reaches its own records.
 
 ## Upgrading
 
