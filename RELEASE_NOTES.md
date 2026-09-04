@@ -1,58 +1,84 @@
-# Nova Server 1.77.0
+# Nova Server 1.78.0
 
-Your server can be running a version of AmneziaWG it no longer has installed,
-for weeks, with nothing saying so. The health page now says so.
+Updating Nova now updates the Hysteria2 engine too.
 
-## What happens
+## The gap this closes
 
-When your server installs its own package updates, a newer AmneziaWG is written
-to disk. The one already carrying your tunnel keeps running, because nothing can
-swap out a component while it is in use. The two only meet again when the server
-restarts.
+Hysteria2 is not served by Nova itself. It is served by a separate program on
+your server, and until now that program was installed once, when the server was
+first set up, and never replaced.
 
-On a server built to stay up, that is not a few minutes. It is however long it
-has been since the last restart.
+The practical effect was backwards. Improvements to that engine reached only
+servers built after them. A server set up last week got the current engine; a
+server that had been running for a year kept the one it was born with. Almost
+every release of that engine fixes a slow leak or a stall that builds up over
+weeks of uptime, so the servers that stood to gain the most were precisely the
+ones that could never receive it.
 
-Every sign an operator could check said the tunnel was healthy, and it was: the
-software was installed, the tunnel was up, customers were connected. What was
-not true is that the server was running the version it had.
+The Update button did not help either. It replaced Nova and nothing else, which
+is not what "update" reads like to anyone pressing it.
 
-## What you will see
+## What changed
 
-A warning on the health page, on any server where the two differ:
+Updating Nova now updates the engine in the same click, and automatic updates do
+it too. Nothing new to turn on and no new button.
 
-> The tunnel is up, but it is running on AmneziaWG kernel module 1.0.20260611
-> while 3.1.20260812 is the one installed on this server.
+It is careful about it:
 
-It names both versions and gives you the command that swaps them over. Running
-it interrupts the tunnel for a few seconds and every customer reconnects on
-their own. Restarting the server does the same thing.
+- The download is checked against its published fingerprint before anything is
+  replaced. If there is no fingerprint to check against, the update is refused
+  rather than installed unverified.
+- The new engine is asked to read your current Hysteria2 settings before it is
+  allowed to replace the working one. If it cannot, the update is refused and
+  your existing engine keeps running. This matters because a broken engine does
+  not announce itself: Hysteria2 simply stops, which looks exactly like having
+  switched it off.
+- A server already running the current engine downloads nothing.
+- If an engine update is refused, the update card says so. Previously the only
+  symptom would have been a version that quietly never changed.
 
-It is a warning, not a fault. Nothing is broken, and nothing is disconnected
-until you choose to act on it. What it costs you is that fixes in the newer
-version are not in force, and version 3.0 cannot be switched on.
+Your users, inbounds and settings are untouched, as with any update.
 
-## The switch to 3.0 no longer fails halfway
+## Seeing when a customer was last connected
 
-Turning on version 3.0 on a server in that state used to get all the way to the
-point of applying it, then fail with a message from the system that named
-nothing you could act on:
+The user list now shows when each customer last actually used their connection:
+"seen today", "seen 5d ago", or the date once it is further back than a week.
 
-    Unable to modify interface: Invalid argument
+It reads the traffic Nova already records, so there is nothing to turn on and it
+works from today rather than only for traffic from here on. A customer who has
+never transferred anything says "no traffic yet" rather than showing a blank,
+because never having connected is a real answer and a different one from "we do
+not know".
 
-Your previous version was restored and your customers' files were never
-affected, but the tunnel dropped for a moment on the way through, and the
-message sent you to update packages that were often already up to date.
+Asked for in issue #2.
 
-Nova now checks both halves before it tries anything, and if it cannot proceed
-it tells you which of the two is wrong: packages that genuinely need updating,
-or a version that is already installed and only waiting for the server to pick
-it up. Nothing is applied and nobody is disconnected.
+## Installing on a server that cannot reach GitHub
+
+Installing xray needed two GitHub hosts that are routinely unreachable from the
+places Nova is used: one for the install script, one for the version number. When
+they were blocked, the installer stopped with an SSL timeout and nothing else to
+go on, and there was nothing wrong with the server.
+
+Nova now keeps its own copy of xray on its release page and falls back to it when
+GitHub cannot be reached. That copy is checked against a fingerprint before it is
+unpacked, and GitHub stays the first choice, so a server with normal access keeps
+getting whatever xray publishes today.
+
+mieru, the Telegram proxy and the Hysteria2 engine have been kept this way for a
+long time. xray was the last piece still fetched directly.
+
+Reported in issue #21.
+
+## The REST API is in the guide now
+
+Nova has had a REST API at `/api/v1` the whole time, including a page that lists
+every route it accepts, but nothing in the guide mentioned it, which is why
+people asked. The Updating the node section now explains where it is and how to
+create a token for it.
+
+Raised in issue #8.
 
 ## Upgrading
 
-Panel: Settings, then Update. Or run the installer again over SSH:
-
-    bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
-
-The panel updater is enough for this release.
+Panel: Settings, then Update. Or turn on Automatic updates and it happens on its
+own. Re-running the installer over SSH still works and does the same thing.

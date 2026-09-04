@@ -453,13 +453,122 @@ xray_latest_tag() {
     | sed 'y/,/\n/' | grep '"tag_name"' | awk -F '"' '{print $4}' | head -1
 }
 
+# Install xray from the Nova mirror, without XTLS's script.
+#
+# Why this exists (IRNova/Nova-Server#21): the upstream path needs
+# raw.githubusercontent.com for the script and api.github.com for the version,
+# and both are commonly unreachable from exactly the networks Nova is built for.
+# An operator in Iran saw `curl: (28) SSL connection timeout` and the install
+# stopped dead, with nothing wrong with their server. mtg, mieru and sing-box
+# were already mirrored on IRNova/Tools for this reason; xray was the last piece
+# still fetched straight from upstream.
+#
+# This is a fallback, not a replacement. Upstream stays primary, so a normal
+# server keeps getting whatever XTLS publishes today; this only runs when that
+# path could not be reached at all.
+#
+# The archive is checked against a pinned hash before anything is unpacked. The
+# mirror is a copy we control, which makes it a supply-chain root, so it gets
+# the same treatment as every other pinned download in this file.
+XRAY_MIRROR_VERSION="26.3.27"
+XRAY_MIRROR_BASE="${NOVA_XRAY_MIRROR_URL:-https://github.com/IRNova/Tools/releases/download/xray}"
+xray_from_mirror() {
+  _arch="$(uname -m)"
+  case "$_arch" in
+    x86_64|amd64)  _asset="Xray-linux-64.zip"
+                   _sum="23cd9af937744d97776ee35ecad4972cf4b2109d1e0fe6be9930467608f7c8ae" ;;
+    aarch64|arm64) _asset="Xray-linux-arm64-v8a.zip"
+                   _sum="4d30283ae614e3057f730f67cd088a42be6fdf91f8639d82cb69e48cde80413c" ;;
+    *) return 1 ;;
+  esac
+  _d="$(mktemp -d)"
+  if ! curl -fsSL --max-time 300 --proto-redir '=https' "$XRAY_MIRROR_BASE/$_asset" -o "$_d/x.zip"; then
+    rm -rf "$_d"; return 1
+  fi
+  if ! sha_is "$_d/x.zip" "$_sum"; then
+    rm -rf "$_d"; return 1
+  fi
+  if ! unzip -o -q "$_d/x.zip" -d "$_d" 2>/dev/null || [ ! -f "$_d/xray" ]; then
+    rm -rf "$_d"; return 1
+  fi
+  install -m 0755 "$_d/xray" /usr/local/bin/xray || { rm -rf "$_d"; return 1; }
+  # The geo files xray refuses to start without when a rule names a code.
+  for _g in geoip.dat geosite.dat; do
+    if [ -f "$_d/$_g" ]; then
+      install -m 0644 "$_d/$_g" "/usr/local/share/xray/$_g" 2>/dev/null || true
+    fi
+  done
+  rm -rf "$_d"
+  write_xray_unit || return 1
+  return 0
+}
+
+# Write xray's systemd unit, the half that makes the mirror an install rather
+# than a file on disk.
+#
+# Split out of xray_from_mirror so it has a second caller: a node whose binary
+# landed and whose unit did not could not be repaired, because the whole xray
+# block is guarded on `[ ! -x /usr/local/bin/xray ]` and is skipped forever once
+# the binary exists. An interrupted install, a full disk or a read-only
+# /etc/systemd/system left the node permanently in the state this exists to
+# prevent, and re-running the installer did nothing.
+#
+# Every step is checked. Inside `if xray_from_mirror; then` the shell has set -e
+# suspended for the whole function body, so an unguarded failure here is silent
+# and the caller still prints OK.
+write_xray_unit() {
+  install -d -m 755 /usr/local/etc/xray || return 1
+  [ -f /usr/local/etc/xray/config.json ] || printf '%s\n' '{}' > /usr/local/etc/xray/config.json || return 1
+  # The log files, not just the directory. xray runs as nobody and cannot create
+  # a file in a root-owned 0755 directory, and the panel's Log Settings card
+  # offers these exact paths as its placeholders. Without this, an operator who
+  # accepts the placeholder gets a config that passes `xray -test` as root and
+  # then crash-loops as nobody: a working panel and no proxy, one save away.
+  install -d -m 755 -o 0 -g 0 /var/log/xray || return 1
+  for _l in access.log error.log; do
+    [ -f "/var/log/xray/$_l" ] || install -m 600 -o nobody -g nogroup /dev/null "/var/log/xray/$_l" || return 1
+  done
+  cat > /etc/systemd/system/xray.service <<'XUNIT' || return 1
+[Unit]
+Description=Xray Service
+Documentation=https://github.com/xtls
+After=network.target nss-lookup.target
+
+[Service]
+User=nobody
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ExecStart=/usr/local/bin/xray run -config /usr/local/etc/xray/config.json
+Restart=on-failure
+RestartPreventExitStatus=23
+LimitNPROC=10000
+LimitNOFILE=1000000
+
+[Install]
+WantedBy=multi-user.target
+XUNIT
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl enable xray >/dev/null 2>&1 || true
+  return 0
+}
+
 if ! command -v xray >/dev/null 2>&1 && [ ! -x /usr/local/bin/xray ]; then
   say "Installing xray-core"
+  mkdir -p /usr/local/share/xray
   XRAY_SH="$(mktemp)"
   if ! xray_installer "$XRAY_SH"; then
     rm -f "$XRAY_SH"
-    die "could not download the xray-core installer (checked raw.githubusercontent.com and github.com). Check the server's connectivity to GitHub and try again."
+    warn "Could not reach GitHub for the xray installer; trying the Nova mirror."
+    if xray_from_mirror; then
+      mark_owned xray
+      ok "xray installed from the Nova mirror (v$XRAY_MIRROR_VERSION)"
+    else
+      die "could not install xray-core. Neither GitHub nor the Nova mirror could be reached from this server. Check outbound HTTPS and try again."
+    fi
+    XRAY_SH=""
   fi
+  if [ -n "$XRAY_SH" ]; then
   XRAY_TAG="$(xray_latest_tag || true)"
   # An array, not `set --`: this script has its own positional parameters and
   # overwriting them here would be a nasty thing to leave behind.
@@ -478,8 +587,38 @@ if ! command -v xray >/dev/null 2>&1 && [ ! -x /usr/local/bin/xray ]; then
     echo "--- xray-core installer output ---" >&2
     tail -20 "$XRAY_LOG" >&2
     rm -f "$XRAY_SH" "$XRAY_LOG"
-    die "xray-core install failed."
+    # Reached when the script DOWNLOADED but its own run failed, which is the
+    # more likely shape in a censored network: it needs api.github.com for the
+    # version and release-assets.githubusercontent.com for the binary, and those
+    # are blocked independently of raw.githubusercontent.com. Falling through to
+    # `die` here meant the mirror never fired on the failure it was written for,
+    # while the release notes told operators it did.
+    warn "The xray installer ran but could not finish; trying the Nova mirror."
+    if xray_from_mirror; then
+      mark_owned xray
+      ok "xray installed from the Nova mirror (v$XRAY_MIRROR_VERSION)"
+    else
+      die "xray-core install failed, and the Nova mirror could not be reached either."
+    fi
   fi
+  fi
+fi
+# Repair a node that has the binary and no unit.
+#
+# The block above only runs when xray is ABSENT, so once the binary exists it is
+# skipped forever, unit included. An install interrupted between the two, or one
+# where /etc/systemd/system could not be written, left a node that re-running the
+# installer could not fix: `systemctl restart xray` kept failing with "Unit not
+# found" while every install summary said OK.
+#
+# Only when nothing else provides one: an upstream-installed node has its unit in
+# /lib or /etc already and must not be overwritten with ours.
+if [ -x /usr/local/bin/xray ] \
+   && [ ! -f /etc/systemd/system/xray.service ] \
+   && [ ! -f /lib/systemd/system/xray.service ] \
+   && [ ! -f /usr/lib/systemd/system/xray.service ]; then
+  warn "xray is installed but has no service unit; writing one."
+  write_xray_unit || warn "Could not write the xray service unit."
 fi
 XRAY_BIN="$(command -v xray || echo /usr/local/bin/xray)"
 ok "xray $("$XRAY_BIN" version 2>/dev/null | head -1 | awk '{print $2}')"
