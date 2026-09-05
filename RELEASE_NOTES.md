@@ -1,33 +1,48 @@
-# Nova Server 1.80.0
+# Nova Server 1.81.0
 
-The panel got faster on servers that have been running a while.
+Two health checks were telling you the wrong thing. Both are fixed.
 
-## What was slow
+## A working setup reported as broken
 
-Nova looks things up in its own database by prefix constantly: one customer's
-traffic, who has been online, which servers exist, which domains are configured.
-Almost every page does several of these.
+If an inbound was published on a domain behind a CDN, System Health called it a
+hard failure and said your customers would receive a certificate for a different
+name and refuse to connect.
 
-Each of those lookups was reading the entire database to find its answer, rather
-than jumping to the part that could possibly match. That is fine on a new
-server. It is not fine on one that has been running for a year, because the
-database is mostly per-day traffic records, which are kept for a long time, and
-they end up outnumbering everything else many times over.
+They were connecting. A CDN terminates TLS itself and presents its own valid
+certificate for the name the client asked for, so your server never needs one
+for that name and never sees the handshake at all.
 
-The effect was indirect and easy to misread: a page that has nothing to do with
-traffic history got slower anyway, because the lookup behind it was walking past
-all of that history to reach a few hundred rows.
+Nova already knew the domain was behind a CDN. It records that, and the check
+sat three lines away from the code that could have told it. It simply did not
+ask before reporting a failure.
 
-## What changed
+If your health page has been showing this, nothing was wrong with your node and
+nothing needs changing. The failure disappears after updating.
 
-Those lookups now go straight to the range of the database they need. Same
-information, same results, found without reading everything else first.
+A domain Nova cannot classify is still reported, deliberately. Not knowing that
+a name is behind a CDN is not the same as knowing it is not, and a direct name
+with no certificate is a real problem worth being told about.
 
-On a test server with 500 customers and a year of history, twenty of those
-lookups took 195ms before and 3ms after.
+## A failing node that explained nothing
 
-Nothing about your data, your settings or your customers changes. This is purely
-how Nova reaches its own records.
+When a server in your fleet could not be reached, the panel printed the raw
+error from the network library. One operator saw this:
+
+    write EPROTO 405DADBF6D7D0000:error:0A000438:SSL routines:ssl3_read_bytes:
+    tlsv1 alert internal error:.../rec_layer_s3.c:918:SSL alert number 80
+
+That is accurate and useless. It does not say whether the panel broke, the node
+is off, a certificate expired, or a firewall is in the way, and the answer took
+a manual TLS handshake from a third machine to find.
+
+The panel now says which it is, in a sentence: nothing is listening on that
+address, the certificate has expired, it cannot be verified, it did not answer
+in time, the address does not resolve, the node closed the connection and is
+probably still restarting after an update, or it accepted the connection and
+then refused to complete the secure handshake.
+
+The technical detail still appears after the explanation, because that is what
+you paste into a report when the sentence is not enough.
 
 ## Upgrading
 
