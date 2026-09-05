@@ -1,48 +1,36 @@
-# Nova Server 1.81.0
+# Nova Server 1.82.0
 
-Two health checks were telling you the wrong thing. Both are fixed.
+A button in a dialog could look like it did nothing, while it was telling you
+exactly what went wrong.
 
-## A working setup reported as broken
+## What you saw
 
-If an inbound was published on a domain behind a CDN, System Health called it a
-hard failure and said your customers would receive a certificate for a different
-name and refuse to connect.
+You pressed Apply in a confirmation dialog. The button stopped spinning. Nothing
+else happened, and the dialog stayed open.
 
-They were connecting. A CDN terminates TLS itself and presents its own valid
-certificate for the name the client asked for, so your server never needs one
-for that name and never sees the handshake at all.
+The most common way to meet this was the health page. A server in your fleet
+could not be reached, the page offered to push configuration to it, and pressing
+that button appeared to do nothing at all.
 
-Nova already knew the domain was behind a CDN. It records that, and the check
-sat three lines away from the code that could have told it. It simply did not
-ask before reporting a failure.
+## What was happening
 
-If your health page has been showing this, nothing was wrong with your node and
-nothing needs changing. The failure disappears after updating.
+When an action confirmed in a dialog fails, the dialog deliberately stays open
+so you can read the reason and try again, and the reason appears as a message
+along the bottom of the screen.
 
-A domain Nova cannot classify is still reported, deliberately. Not knowing that
-a name is behind a CDN is not the same as knowing it is not, and a direct name
-with no certificate is a real problem worth being told about.
+That message was being drawn underneath the dialog's own dark backdrop. It was
+there every time, correct every time, and invisible every time.
 
-## A failing node that explained nothing
+Nothing behind the button was broken. The failure was worked out properly and
+sent somewhere you could not see it.
 
-When a server in your fleet could not be reached, the panel printed the raw
-error from the network library. One operator saw this:
+## What changed
 
-    write EPROTO 405DADBF6D7D0000:error:0A000438:SSL routines:ssl3_read_bytes:
-    tlsv1 alert internal error:.../rec_layer_s3.c:918:SSL alert number 80
+The message now appears above the dialog, where it was always meant to be.
 
-That is accurate and useless. It does not say whether the panel broke, the node
-is off, a certificate expired, or a firewall is in the way, and the answer took
-a manual TLS handshake from a third machine to find.
-
-The panel now says which it is, in a sentence: nothing is listening on that
-address, the certificate has expired, it cannot be verified, it did not answer
-in time, the address does not resolve, the node closed the connection and is
-probably still restarting after an update, or it accepted the connection and
-then refused to complete the secure handshake.
-
-The technical detail still appears after the explanation, because that is what
-you paste into a report when the sentence is not enough.
+This was fixed as a rule about which layer sits on top rather than at the one
+button that reported it, because every action confirmed in a dialog had the same
+problem, and there are a number of them.
 
 ## Upgrading
 
