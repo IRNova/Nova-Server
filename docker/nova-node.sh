@@ -1774,3 +1774,13 @@ printf '  %s\n' "or just open the web panel URL in a browser."
 echo
 printf '  %s\n' "Uninstall anytime with:  ${c_bld}nova-uninstall${c_rst}"
 echo
+# Named here rather than run here. After this point the node already serves the
+# starter user printed above, so a throwaway trial server would be a second
+# answer to a question already answered. Where it earns its keep is on the NEXT
+# server, before anything is installed on it: an operator who learns the tool
+# exists at this moment is exactly the operator about to buy another VPS.
+printf '  %s\n' "Buying another server? Test the IP from inside Iran BEFORE installing:"
+printf '  %s\n' "  ${c_bld}bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-trial.sh)${c_rst}"
+printf '  %s\n' "  It puts up a throwaway server, prints configs to try, and deletes itself"
+printf '  %s\n' "  after an hour. SSH and ping cannot tell you whether an IP is filtered."
+echo
