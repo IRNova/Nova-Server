@@ -81,12 +81,65 @@ mark_owned() {
 # package list stays stale, and the next `apt-get install` quietly resolves
 # against whatever the distro already knew about. That is not hypothetical, it
 # is how a node ended up running Ubuntu's Node 18 when this script asked for 24.
+#
+# Ask whether the LOCK is held, not whether something is named like apt.
+#
+# The first version of this asked `pgrep -f unattended-upgrade`, and that is
+# true on an idle Ubuntu box forever: unattended-upgrades.service runs
+# `/usr/share/unattended-upgrades/unattended-upgrade-shutdown --wait-for-signal`
+# for the whole uptime of the machine, waiting for a shutdown that has not been
+# requested. It is not an upgrade. So every install waited the full five
+# minutes, twice, printed "still busy", then ran apt perfectly well, and
+# rebooting never helped because the service comes straight back. Reported from
+# a fresh VPS and reproduced in a container.
+_uu_upgrading() {
+  # An unattended upgrade that is genuinely running, never the shutdown helper.
+  for _pid in $(pgrep -f 'unattended-upgrade' 2>/dev/null); do
+    case "$(tr '\0' ' ' < "/proc/$_pid/cmdline" 2>/dev/null)" in
+      *unattended-upgrade-shutdown*) ;;
+      *) return 0 ;;
+    esac
+  done
+  return 1
+}
+
 apt_busy() {
-  for _p in apt apt-get dpkg unattended-upgrade; do
+  # The authoritative answer when we can get it: dpkg and apt hold these files
+  # open for exactly as long as they hold the lock, so this cannot be fooled by
+  # a process that merely has a similar name.
+  if command -v fuser >/dev/null 2>&1; then
+    for _l in /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock \
+              /var/cache/apt/archives/lock /var/lib/apt/lists/lock; do
+      [ -e "$_l" ] || continue
+      if fuser "$_l" >/dev/null 2>&1; then return 0; fi
+    done
+    return 1
+  fi
+  # Before the prerequisites are installed there may be no fuser, so fall back
+  # to process names, with the shutdown helper excluded.
+  for _p in apt apt-get dpkg; do
     if pgrep -x "$_p" >/dev/null 2>&1; then return 0; fi
   done
-  if pgrep -f 'unattended-upgrade' >/dev/null 2>&1; then return 0; fi
-  return 1
+  _uu_upgrading
+}
+
+# Every fetch from a third party is bounded, because an install that stops with
+# no output is indistinguishable from one that crashed.
+#
+# `curl -fsSL` with no timeout waits essentially forever. A fresh VPS reported
+# an install that stopped dead after sing-box and never reached AmneziaWG: the
+# next thing to run was an unbounded download of grpcurl, and it hung. Every
+# other optional component had the same shape, so it would have hung at the
+# next one anyway.
+#
+# --connect-timeout is the one that matters most: a host whose IPv6 route is
+# broken stalls on connect rather than failing, which is the common way this
+# presents on a cloud VPS. --max-time bounds the transfer itself, and the
+# retries cover a flaky link without turning a hang into a longer hang. Callers
+# that move more bytes pass their own --max-time; curl takes the last one given.
+dl() {
+  curl -fsSL --connect-timeout 15 --max-time 180 \
+    --retry 2 --retry-delay 3 --retry-connrefused "$@"
 }
 
 # Wait for it, rather than racing it and installing the wrong thing. Bounded, so
@@ -295,7 +348,10 @@ say "Installing prerequisites"
 export DEBIAN_FRONTEND=noninteractive
 if command -v apt-get >/dev/null 2>&1; then
   apt-get update -y >/dev/null 2>&1 || true
-  apt-get install -y curl unzip ca-certificates openssl tar >/dev/null 2>&1 \
+  # psmisc brings fuser, which is what lets apt_busy above ask whether the lock
+  # is actually held rather than guessing from process names.
+  apt-get install -y curl unzip ca-certificates openssl tar psmisc >/dev/null 2>&1 \
+    || apt-get install -y curl unzip ca-certificates openssl tar >/dev/null 2>&1 \
     || die "Could not install prerequisites via apt-get."
 else
   die "This installer targets Debian/Ubuntu (apt-get not found)."
@@ -351,7 +407,7 @@ if [ "$need_node" = 1 ]; then
   # The NodeSource script runs its own apt-get update, which we cannot pass
   # options to, so the lock has to be clear before it starts rather than during.
   wait_for_apt
-  curl -fsSL https://deb.nodesource.com/setup_24.x | bash - >/dev/null 2>&1 \
+  dl https://deb.nodesource.com/setup_24.x | bash - >/dev/null 2>&1 \
     || die "Could not add the NodeSource repository."
   apt-get install -y nodejs >/dev/null 2>&1 || die "Could not install Node.js."
 fi
@@ -630,7 +686,7 @@ ok "xray $("$XRAY_BIN" version 2>/dev/null | head -1 | awk '{print $2}')"
 GEO_DIR=/usr/local/share/xray
 mkdir -p "$GEO_DIR"
 for g in geoip geosite; do
-  curl -fsSL -o "$GEO_DIR/$g.dat.new" \
+  dl -o "$GEO_DIR/$g.dat.new" \
     "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/$g.dat" 2>/dev/null \
     && mv "$GEO_DIR/$g.dat.new" "$GEO_DIR/$g.dat" || rm -f "$GEO_DIR/$g.dat.new"
 done
@@ -814,7 +870,7 @@ UNIT
   # grpcurl: the agent uses it to read sing-box's per-user stats for quota.
   if ! command -v grpcurl >/dev/null 2>&1; then
     garch="$(uname -m)"; case "$garch" in aarch64) garch=arm64;; x86_64) garch=x86_64;; esac
-    if curl -fsSL "https://github.com/fullstorydev/grpcurl/releases/download/v1.9.1/grpcurl_1.9.1_linux_${garch}.tar.gz" -o /tmp/grpcurl.tgz 2>/dev/null \
+    if dl "https://github.com/fullstorydev/grpcurl/releases/download/v1.9.1/grpcurl_1.9.1_linux_${garch}.tar.gz" -o /tmp/grpcurl.tgz 2>/dev/null \
       && tar -xzf /tmp/grpcurl.tgz -C /usr/local/bin grpcurl 2>/dev/null \
       && chmod +x /usr/local/bin/grpcurl 2>/dev/null; then
       mark_owned grpcurl
@@ -860,8 +916,8 @@ arch="$(uname -m)"; pbin="psiphon-tunnel-core-x86_64"
 if [ ! -x "/etc/psiphon/$pbin" ]; then
   say "Installing Psiphon (local SOCKS exit on 1080)"
   mkdir -p /etc/psiphon
-  if curl -fsSL -o /etc/psiphon/"$pbin" "https://raw.githubusercontent.com/Psiphon-Labs/psiphon-tunnel-core-binaries/master/linux/$pbin" \
-     && curl -fsSL -o /etc/psiphon/psiphon.config "https://raw.githubusercontent.com/IRNova/Nova-Server/main/psiphon.config"; then
+  if dl -o /etc/psiphon/"$pbin" "https://raw.githubusercontent.com/Psiphon-Labs/psiphon-tunnel-core-binaries/master/linux/$pbin" \
+     && dl -o /etc/psiphon/psiphon.config "https://raw.githubusercontent.com/IRNova/Nova-Server/main/psiphon.config"; then
     chmod +x /etc/psiphon/"$pbin"
     mark_owned psiphon
     cat > /etc/systemd/system/psiphon.service <<PSI
@@ -936,7 +992,7 @@ btmp="$(mktemp -d)"
 # Telegram proxy with its own data limit possible. See docs/mtg-multi-adoption.md.
 if [ ! -x /usr/local/bin/mtg-multi ]; then
   say "Installing mtg-multi (Telegram MTProto proxy)"
-  if curl -fsSL --proto '=https' --proto-redir '=https' -o "$btmp/mtg.tar.gz" \
+  if dl --proto '=https' --proto-redir '=https' -o "$btmp/mtg.tar.gz" \
        "https://github.com/IRNova/Tools/releases/download/mtgMulti/mtg-multi-${MTGMULTI_VERSION}-linux-${barch}.tar.gz" \
      && sha_is "$btmp/mtg.tar.gz" "$MTGMULTI_SHA256" \
      && tar -xzf "$btmp/mtg.tar.gz" -C "$btmp" --strip-components=1 "mtg-multi-${MTGMULTI_VERSION}-linux-${barch}/mtg-multi" \
@@ -951,7 +1007,7 @@ fi
 
 if [ ! -x /usr/local/bin/mita ]; then
   say "Installing mita (mieru server)"
-  if curl -fsSL --proto '=https' --proto-redir '=https' -o "$btmp/mita.tar.gz" \
+  if dl --proto '=https' --proto-redir '=https' -o "$btmp/mita.tar.gz" \
        "https://github.com/IRNova/Tools/releases/download/mita/mita_${MITA_VERSION}_linux_${barch}.tar.gz" \
      && sha_is "$btmp/mita.tar.gz" "$MITA_SHA256" \
      && tar -xzf "$btmp/mita.tar.gz" -C "$btmp" mita \
@@ -986,14 +1042,14 @@ gh_asset() { # repo  match
   # backend, carrying on" branches below can run. In a container that turns into a
   # first-boot unit that restarts forever. An empty result is what the callers
   # already expect and handle.
-  curl -fsSL "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
+  dl --max-time 30 "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
     | grep browser_download_url | grep -i "$2" | head -1 | cut -d'"' -f4 || true
 }
 
 # Backhaul (default): widest transport set, connection pooling, self-signed OK.
 if ! command -v backhaul >/dev/null 2>&1; then
   say "Installing Backhaul tunnel backend"
-  if curl -fsSL -o /tmp/backhaul.tgz "https://github.com/Musixal/Backhaul/releases/latest/download/backhaul_linux_${garch}.tar.gz" \
+  if dl -o /tmp/backhaul.tgz "https://github.com/Musixal/Backhaul/releases/latest/download/backhaul_linux_${garch}.tar.gz" \
      && tar -xzf /tmp/backhaul.tgz -C /usr/local/bin backhaul 2>/dev/null; then
     chmod +x /usr/local/bin/backhaul && mark_owned backhaul && ok "Backhaul installed"
   else
@@ -1006,7 +1062,7 @@ if ! command -v backpack >/dev/null 2>&1; then
   say "Installing BackPack tunnel backend"
   bpurl="$(gh_asset AminMGMT/BackPack "backpack_linux_${garch}.tar.gz")"
   bpsum="$(gh_asset AminMGMT/BackPack "SHA256SUMS")"
-  if [ -n "$bpurl" ] && curl -fsSL -o /tmp/backpack.tgz "$bpurl" && curl -fsSL -o /tmp/backpack.sums "${bpsum:-/dev/null}" 2>/dev/null; then
+  if [ -n "$bpurl" ] && dl -o /tmp/backpack.tgz "$bpurl" && dl -o /tmp/backpack.sums "${bpsum:-/dev/null}" 2>/dev/null; then
     # Verify against the published SHA256SUMS before trusting the binary.
     want="$(grep -i "backpack_linux_${garch}.tar.gz" /tmp/backpack.sums 2>/dev/null | awk '{print $1}' | head -1)"
     got="$(sha256sum /tmp/backpack.tgz 2>/dev/null | awk '{print $1}')"
@@ -1025,7 +1081,7 @@ if ! command -v rathole >/dev/null 2>&1; then
   say "Installing rathole tunnel backend"
   rmatch="x86_64-unknown-linux-gnu.zip"; [ "$tarch" = "aarch64" ] && rmatch="aarch64-unknown-linux-musl.zip"
   rurl="$(gh_asset rapiz1/rathole "$rmatch")"
-  if [ -n "$rurl" ] && curl -fsSL -o /tmp/rathole.zip "$rurl" \
+  if [ -n "$rurl" ] && dl -o /tmp/rathole.zip "$rurl" \
      && unzip -o /tmp/rathole.zip -d /usr/local/bin rathole >/dev/null 2>&1; then
     chmod +x /usr/local/bin/rathole && mark_owned rathole && ok "rathole installed"
   else
@@ -1039,7 +1095,7 @@ if ! command -v wstunnel >/dev/null 2>&1; then
   say "Installing wstunnel tunnel backend"
   warch="amd64"; [ "$tarch" = "aarch64" ] && warch="arm64"
   wurl="$(gh_asset erebe/wstunnel "linux_${warch}.tar.gz")"
-  if [ -n "$wurl" ] && curl -fsSL "$wurl" -o /tmp/wstunnel.tgz \
+  if [ -n "$wurl" ] && dl "$wurl" -o /tmp/wstunnel.tgz \
      && tar -xzf /tmp/wstunnel.tgz -C /usr/local/bin wstunnel 2>/dev/null; then
     chmod +x /usr/local/bin/wstunnel && mark_owned wstunnel && ok "wstunnel installed"
   else
@@ -1109,11 +1165,11 @@ mkdir -p "$AGENT_DIR" "$DB_DIR" "$CERT_DIR"
 # that user so xray can write it (the agent also self-heals this, belt and braces).
 mkdir -p /var/log/nova && chown nobody:nogroup /var/log/nova 2>/dev/null || true
 tmp="$(mktemp -d)"
-curl -fsSL "$TARBALL_URL" -o "$tmp/agent.tar.gz" || die "Could not download the agent."
+dl --max-time 600 "$TARBALL_URL" -o "$tmp/agent.tar.gz" || die "Could not download the agent."
 # Verify a release checksum when the publisher provides one. Operators may also
 # pin it explicitly with NOVA_TARBALL_SHA256 for an out-of-band trust anchor.
 expected="${NOVA_TARBALL_SHA256:-}"
-if [ -z "$expected" ] && curl -fsSL "${TARBALL_URL}.sha256" -o "$tmp/agent.sha256" 2>/dev/null; then
+if [ -z "$expected" ] && dl --max-time 60 "${TARBALL_URL}.sha256" -o "$tmp/agent.sha256" 2>/dev/null; then
   expected="$(awk 'NR==1 {print $1}' "$tmp/agent.sha256")"
 fi
 if [ -n "$expected" ]; then
