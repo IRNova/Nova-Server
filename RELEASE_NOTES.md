@@ -1,29 +1,36 @@
-# Nova Server 1.85.1
+# Nova Server 1.85.2
 
-A fix for 1.85.0, shipped the same day.
+A bug the new tests found before an operator did.
 
-## "Never in configurations" only worked on half the outputs
+## AmneziaWG ignored your default IP on "Automatic"
 
-1.85.0 added the setting that keeps your main domain out of client
-configurations, and wired it into the ordinary subscription only.
+1.84.1 made the IP addresses you have added appear in the AmneziaWG address
+list. Picking one from that list worked. Leaving it on **Automatic** did not:
+AmneziaWG still published whichever address the operating system reported first,
+which on a server with a reserved or floating IP is usually not the one you
+want.
 
-Nova has two subscription builders. The raw one produces the ordinary
-subscription; a second, structured one produces what the Nova app, Clash,
-sing-box, Hiddify and Karing receive. Only the first honoured the new setting.
+mieru and the Telegram proxy already handled this correctly. The wiring is one
+line per protocol, two of the three had it, and the release that was
+specifically about this gap shipped without closing it.
 
-So an operator could turn it on, watch their panel domain disappear from the
-normal subscription, confirm it worked, and still be handing that domain to
-every customer using the Nova app. That is worse than not having the setting,
-because the panel reported success.
+If you set a default IP and left AmneziaWG on Automatic, its configurations were
+naming the wrong address. Update, and re-issue any AmneziaWG configuration you
+handed out since then.
 
-Both builders honour it now, with the same strict rule: a configuration no other
-domain can carry is left out rather than quietly kept on the panel domain.
+## How it was found
 
-## If you turned this on in 1.85.0
+A new test walks every surface a configuration can reach a customer through, in
+one place, and covers both publishing rules at once:
 
-Update and check a Nova app subscription. Your panel domain was still travelling
-in it until now.
+- which **domain** a configuration may name (the panel domain setting, and the
+  per-domain settings)
+- which of this server's **addresses** it leads with
+
+It drives the real subscription route with every format and every client
+User-Agent, then the three protocol pickers, then each renderer. Reintroducing
+the last four shipped bugs of this kind all fail it.
 
 ## Upgrading
 
-Update from the panel, or run the installer again. Nothing else changes.
+Update from the panel, or run the installer again.
