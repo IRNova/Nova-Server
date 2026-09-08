@@ -1,35 +1,31 @@
-# Nova Server 1.85.2
+# Nova Server 1.85.3
 
-A bug the new tests found before an operator did.
+The fourth time an option added to the subscription route was missed in the
+Telegram bot, and the first time a test found it instead of an operator.
 
-## AmneziaWG ignored your default IP on "Automatic"
+## The bot ignored "Never in configurations"
 
-1.84.1 made the IP addresses you have added appear in the AmneziaWG address
-list. Picking one from that list worked. Leaving it on **Automatic** did not:
-AmneziaWG still published whichever address the operating system reported first,
-which on a server with a reserved or floating IP is usually not the one you
-want.
+The bot builds its own subscription options. The setting that keeps your panel
+domain out of client configurations was never added there.
 
-mieru and the Telegram proxy already handled this correctly. The wiring is one
-line per protocol, two of the three had it, and the release that was
-specifically about this gap shipped without closing it.
+So an operator who switched it on saw it work on every subscription link, and
+kept handing out the panel domain to every customer who takes their configs from
+Telegram. The panel reported the setting was on the whole time.
 
-If you set a default IP and left AmneziaWG on Automatic, its configurations were
-naming the wrong address. Update, and re-issue any AmneziaWG configuration you
-handed out since then.
+If you use the bot and had this setting on, the configs it sent in that window
+name your panel domain. Update, then re-send to anyone who took a config from
+the bot since you switched it on.
 
-## How it was found
+## What else this release covers
 
-A new test walks every surface a configuration can reach a customer through, in
-one place, and covers both publishing rules at once:
+The surface sweep added in 1.85.2 now also drives:
 
-- which **domain** a configuration may name (the panel domain setting, and the
-  per-domain settings)
-- which of this server's **addresses** it leads with
+- the bot's own subscription builder, through the real builder rather than its
+  source, so a builder that names an option and ignores it cannot pass
+- the AmneziaWG `.conf` file an operator downloads and sends by hand, whose
+  `Endpoint` line is the whole config
 
-It drives the real subscription route with every format and every client
-User-Agent, then the three protocol pickers, then each renderer. Reintroducing
-the last four shipped bugs of this kind all fail it.
+Removing either fix fails the suite.
 
 ## Upgrading
 
