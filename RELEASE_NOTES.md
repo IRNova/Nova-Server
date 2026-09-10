@@ -1,32 +1,31 @@
-# Nova Server 1.85.3
+# Nova Server 1.85.4
 
-The fourth time an option added to the subscription route was missed in the
-Telegram bot, and the first time a test found it instead of an operator.
+Deleting a tunnel now deletes its domains with it.
 
-## The bot ignored "Never in configurations"
+## What was wrong
 
-The bot builds its own subscription options. The setting that keeps your panel
-domain out of client configurations was never added there.
+When you build a tunnel you can give it a domain, which gets its own
+certificate so the exit can answer that name.
 
-So an operator who switched it on saw it work on every subscription link, and
-kept handing out the panel domain to every customer who takes their configs from
-Telegram. The panel reported the setting was on the whole time.
+Deleting the tunnel cleared the tunnel and its address, and stopped there. The
+bridge domain stayed in the panel's list, and its certificate and private key
+stayed on disk, for a tunnel that no longer existed. So you deleted a domain and
+the panel went on showing it.
 
-If you use the bot and had this setting on, the configs it sent in that window
-name your panel domain. Update, then re-send to anyone who took a config from
-the bot since you switched it on.
+The code even claimed otherwise: the comment on that step said it "fully clears
+the tunnel".
 
-## What else this release covers
+## What changed
 
-The surface sweep added in 1.85.2 now also drives:
+Deleting a tunnel now removes its bridge domains and their certificate files,
+which is exactly what deleting a single one of those domains has always done.
+Deleting the whole thing should not be weaker than deleting one part of it.
 
-- the bot's own subscription builder, through the real builder rather than its
-  source, so a builder that names an option and ignores it cannot pass
-- the AmneziaWG `.conf` file an operator downloads and sends by hand, whose
-  `Endpoint` line is the whole config
-
-Removing either fix fails the suite.
+This also closes a quieter problem. A private key left on disk for a domain
+nothing references is a key nobody is watching, and re-adding that domain later
+would have silently reused it instead of issuing a fresh one.
 
 ## Upgrading
 
-Update from the panel, or run the installer again.
+Update from the panel, or run the installer again. If you have a leftover domain
+from before, delete it from the tunnel card once and it will stay deleted.
