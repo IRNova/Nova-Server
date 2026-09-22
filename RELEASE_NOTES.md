@@ -1,3 +1,20 @@
+# Nova Server 1.86.2
+
+The health page now shows what the last two releases do on their own.
+
+1.86.0 and 1.86.1 added three things that happen without a click: the
+Hysteria2 engine replaces itself on the daily check, mita updates itself when
+mieru is switched off and on, and a clean IP that does not answer is put on a
+strike and removed the next day. Each had a failure the panel showed only in
+the activity log or on a card an operator may not open. The health page now
+reports a refused engine update with its reason, a mita behind this release's
+version (as information, since it fixes itself) or whose update failed (as a
+warning, with the error), and a clean IP on its first strike. A fresh, healthy
+server sees none of these rows, and the setup assistant still produces a
+server the health page has nothing to say about.
+
+Everything below is 1.86.1 and 1.86.0, released the same day.
+
 # Nova Server 1.86.1
 
 A clean IP that does not answer is no longer published, and turning mieru off
