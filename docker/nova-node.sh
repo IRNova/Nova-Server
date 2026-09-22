@@ -1021,8 +1021,19 @@ if [ ! -x /usr/local/bin/mtg-multi ]; then
   fi
 fi
 
-if [ ! -x /usr/local/bin/mita ]; then
-  say "Installing mita (mieru server)"
+# Also on a re-run when the installed mita is older than the pin: an operator
+# asked that updating Nova bring mieru along, not only a fresh install. Never a
+# downgrade; a newer mita was put there on purpose. The agent applies the same
+# rule whenever mieru is (re)enabled, so the two agree on what "current" means.
+# `|| true` is load-bearing: with no mita yet the pipeline exits 127 and, under
+# `set -e`, that ended a FRESH install right here (caught in review, not in the
+# field). grep -Eo takes the first x.y.z the way the agent does, so the two
+# parse the same output the same way whatever mita prints around it.
+mita_have="$(/usr/local/bin/mita version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+if [ ! -x /usr/local/bin/mita ] || { [ -n "$mita_have" ] && [ "$mita_have" != "$MITA_VERSION" ] \
+     && [ "$(printf '%s\n%s\n' "$mita_have" "$MITA_VERSION" | sort -V | head -1)" = "$mita_have" ]; }; then
+  if [ -x /usr/local/bin/mita ]; then say "Updating mita (mieru server) $mita_have -> $MITA_VERSION"; else say "Installing mita (mieru server)"; fi
+  mita_was_running=0; systemctl is-active --quiet nova-mieru.service 2>/dev/null && mita_was_running=1
   if dl --proto '=https' --proto-redir '=https' -o "$btmp/mita.tar.gz" \
        "https://github.com/IRNova/Tools/releases/download/mita/mita_${MITA_VERSION}_linux_${barch}.tar.gz" \
      && sha_is "$btmp/mita.tar.gz" "$MITA_SHA256" \
@@ -1032,6 +1043,10 @@ if [ ! -x /usr/local/bin/mita ]; then
     install -d -m 750 -o mita -g mita /etc/mita /var/lib/mita /var/run/mita 2>/dev/null || true
     mark_owned mita
     ok "mita installed (checksum verified)"
+    # The file changed under a running daemon; only a restart runs the new one.
+    if [ "$mita_was_running" = 1 ]; then
+      systemctl restart nova-mieru.service >/dev/null 2>&1 && ok "mieru restarted on the new mita" || warn "mieru did not restart and is still running the old mita; run: systemctl restart nova-mieru"
+    fi
   else
     warn "Could not install mita; mieru will be unavailable."
   fi

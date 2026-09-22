@@ -1,3 +1,53 @@
+# Nova Server 1.86.1
+
+A clean IP that does not answer is no longer published, and turning mieru off
+and on now brings mita up to date.
+
+## The dead clean IP
+
+An operator reported a Cloudflare address in the clean-IP list, 172.67.18.6,
+that accepted no connection at all. Every config that drew it was dead. It was
+measured while this was written: the address is inside Cloudflare's published
+ranges, one of the sources still answers with it, and TCP 443 to it does not
+open from anywhere, while every other address the same source returned
+completed a TLS handshake in about 40 milliseconds.
+
+Nova checked the one thing the sources could not lie about, that an address is
+Cloudflare's, and never the thing they did not promise, that it serves. The
+daily refresh now dials every candidate and every address already in the
+list with a verified TLS handshake, using your own proxied domain as the name
+so the certificate has to be the one for your zone. A new address that does
+not answer is not admitted. An address already in your list is removed only
+after failing on two consecutive days, so a momentary blip at this server
+cannot delete something you chose, and an address that is dead from here but
+alive from Iran gets a second look. If most or all addresses fail in one
+round, that is this server's network rather than thirty dead addresses, and
+nothing is removed; when your own domain cannot be verified on any edge but
+Cloudflare's own can, the log says the name is the problem rather than the
+network. What was removed, and what is on its first strike, is written to the
+activity log by address.
+
+This does not judge reachability from inside Iran, which only a client can
+measure; it removes the addresses that are dead for everyone, which is what
+the report was.
+
+## mieru
+
+
+Until now the pinned mita only ever reached fresh installs, so a server that
+already had mieru stayed on whatever version it was built with, and 1.86.0
+said so. An operator asked for the obvious thing instead: switching mieru off
+and on should update it. Now each time mieru is enabled, or the agent
+reconnects it after an update or a restart, the installed version is compared
+with the pin. If it is older, the same checksum-verified download from Nova's
+mirror runs and the mieru service restarts on the new binary. A mita newer
+than the pin is left alone. A download that fails, or lands the wrong
+version, leaves the working mita in place and is noted in the agent's log.
+Re-running the installer does the same, and restarts mieru only if it was
+running.
+
+Everything below is 1.86.0, released the same day.
+
 # Nova Server 1.86.0
 
 A re-created customer starts clean, and the Hysteria2 engine moves to sing-box
