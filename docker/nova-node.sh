@@ -868,15 +868,31 @@ UNIT
     fi
   fi
   # grpcurl: the agent uses it to read sing-box's per-user stats for quota.
+  #
+  # Pinned by version AND by SHA-256, like mtg-multi and mita below, and for the
+  # same reason: the agent runs this binary as root on every metering tick, so
+  # whoever controls these bytes controls the node. Until 1.86.0 it was the one
+  # download in this file with no hash, no https-only rule and a fixed /tmp
+  # path. The hashes are upstream's own, from grpcurl_1.9.4_checksums.txt, and
+  # were re-derived from the downloaded bytes before being written here.
   if ! command -v grpcurl >/dev/null 2>&1; then
-    garch="$(uname -m)"; case "$garch" in aarch64) garch=arm64;; x86_64) garch=x86_64;; esac
-    if dl "https://github.com/fullstorydev/grpcurl/releases/download/v1.9.1/grpcurl_1.9.1_linux_${garch}.tar.gz" -o /tmp/grpcurl.tgz 2>/dev/null \
-      && tar -xzf /tmp/grpcurl.tgz -C /usr/local/bin grpcurl 2>/dev/null \
-      && chmod +x /usr/local/bin/grpcurl 2>/dev/null; then
+    garch="$(uname -m)"
+    case "$garch" in
+      aarch64|arm64) garch=arm64;  GRPCURL_SHA256="ad66227d90631da5428b4a5ccf28d63846f0f15649d8b2367df044a59edbb617" ;;
+      x86_64|amd64)  garch=x86_64; GRPCURL_SHA256="97e13d58d2733a0e62cd2571d1d5f0c02823f0d25282f08bddedf1ad9c5d1736" ;;
+      *)             garch="";     GRPCURL_SHA256="" ;;
+    esac
+    gtmp="$(mktemp -d)"
+    if [ -n "$garch" ] \
+      && dl --proto '=https' --proto-redir '=https' -o "$gtmp/grpcurl.tgz" "https://github.com/fullstorydev/grpcurl/releases/download/v1.9.4/grpcurl_1.9.4_linux_${garch}.tar.gz" 2>/dev/null \
+      && sha_is "$gtmp/grpcurl.tgz" "$GRPCURL_SHA256" \
+      && tar -xzf "$gtmp/grpcurl.tgz" -C "$gtmp" grpcurl 2>/dev/null \
+      && install -m 0755 "$gtmp/grpcurl" /usr/local/bin/grpcurl 2>/dev/null; then
       mark_owned grpcurl
     else
-      warn "grpcurl install failed; Hysteria2 usage will not be metered."
+      warn "grpcurl install failed (or its checksum did not match); Hysteria2 usage will not be metered."
     fi
+    rm -rf "$gtmp"
   fi
 else
   warn "Could not install sing-box; the node will run without Hysteria2."
@@ -958,7 +974,7 @@ fi
 # demand, because a node that already exists never re-runs this script, and
 # test/binary-pins.mjs fails if the two ever disagree.
 MTGMULTI_VERSION="1.15.0"
-MITA_VERSION="3.35.0"
+MITA_VERSION="3.37.0"
 
 # `set -e` is on, so the architecture choice is a case statement rather than a
 # `[ ... ] && var=...` one-liner: on x86_64 that pattern ends the line with a
@@ -967,12 +983,12 @@ case "$(uname -m)" in
   aarch64|arm64)
     barch="arm64"
     MTGMULTI_SHA256="9ed776b2052b95e8344896d43fbe01250014f36d7cfdd7f29f7903179bce4bed"
-    MITA_SHA256="808849223d34ccd9ad86afc0eedef4d6c827133258e96dc3f3794bd17e7d54de"
+    MITA_SHA256="3cf85a6eb70a2ad512e2d10e5c1c0a38868c8ba5291f2a43326c466a10512fe0"
     ;;
   *)
     barch="amd64"
     MTGMULTI_SHA256="f1f8763504753fb863a0ddff83eab19c856747289c376275c44b717f1747908e"
-    MITA_SHA256="a07d5afc5e1353ab346bb3ddbe95c7f960828204be529f4a88d688dfe83e252d"
+    MITA_SHA256="ebd7a4f13204ac69864a385a9841708ac17e6622c1d7ef1f4415b39502c08591"
     ;;
 esac
 

@@ -1,31 +1,76 @@
-# Nova Server 1.85.4
+# Nova Server 1.86.0
 
-Deleting a tunnel now deletes its domains with it.
+A re-created customer starts clean, and the Hysteria2 engine moves to sing-box
+1.14 with the pinned tools alongside it.
 
-## What was wrong
+## The bug operators reported
 
-When you build a tunnel you can give it a domain, which gets its own
-certificate so the exit can answer that name.
+Create a customer called A with a quota. Let A use it. Delete A. Create a new
+customer called A. The new A arrived already over cap, carrying the old A's
+traffic, last-active day and IP-limit lock.
 
-Deleting the tunnel cleared the tunnel and its address, and stopped there. The
-bridge domain stayed in the panel's list, and its certificate and private key
-stayed on disk, for a tunnel that no longer existed. So you deleted a domain and
-the panel went on showing it.
+The panel turns a name into an id, so the second A had the same id as the
+first, and deleting a customer removed their record from the user list and
+nothing else. Everything the server stores under that id stayed: the traffic
+ledger, the per-day counters, the IP-limit lock, the Telegram flag. The
+mieru and Telegram-proxy credentials are also derived from the id, so the old
+A's saved configs worked again the moment the new A existed, on the new A's
+quota.
 
-The code even claimed otherwise: the comment on that step said it "fully clears
-the tunnel".
+Deleting a customer now clears all of that, and also their registered
+devices, the last client addresses seen for them and the "already warned"
+flags, through every route that deletes: the single delete, the bulk delete,
+the whole-list save, removing a reseller together with their customers,
+restoring a backup that does not contain them, and a managed node whose
+parent stops sending them. The deleted id is remembered as retired, and a new
+customer given that name gets a numbered id (a-2) rather than the old one, so
+nothing of the old customer, traffic or credentials, can attach to the new
+one. Restoring a backup or importing a Nova export with identities preserved
+brings an id back legitimately, and clears the retired mark for it. A factory
+reset clears the retired marks too. Existing customers are not touched.
 
-## What changed
+One rule comes with this: a new customer id must be 1 to 64 characters of
+letters, digits, underscore or hyphen, which is what the panel has always
+produced. Ids of another shape that already exist keep working.
 
-Deleting a tunnel now removes its bridge domains and their certificate files,
-which is exactly what deleting a single one of those domains has always done.
-Deleting the whole thing should not be weaker than deleting one part of it.
+## What else changed
 
-This also closes a quieter problem. A private key left on disk for a domain
-nothing references is a key nobody is watching, and re-adding that domain later
-would have silently reused it instead of issuing a fresh one.
+Hysteria2 on a Nova server is served by sing-box. The engine Nova publishes
+moves from 1.13.19 to 1.14.1, the current upstream release, built exactly as
+before: unmodified upstream source, the same eight build tags, pinned to the
+upstream commit and checked tag by tag after the build.
+
+Nothing changes in how it reaches you. A server with automatic updates on
+fetches the engine's published checksum on its daily check, sees that it
+differs from the one it installed, downloads the new engine, asks it to load
+the server's current Hysteria2 settings, and only then swaps it in and restarts
+Hysteria2. Any other server does the same the next time you press Update. An
+engine that cannot read your settings is refused and the working one stays.
+
+The configuration Nova writes for Hysteria2 was run through the real 1.14.1
+binary before this was published. It loads without a warning, including the
+older form of the link-local block that keeps loading on every engine version a
+node might still have.
+
+mieru's server, mita, is pinned at 3.37.0 for new installs and for servers that
+turn mieru on from now on. 3.36 made matching a new connection to its user
+faster and cut allocation churn in the cipher; 3.37 adds an optional single-IP
+listen address that Nova does not use. Every behaviour the agent depends on was
+re-checked against the real 3.37.0 binary: a name over 64 bytes still rejects
+the whole document, applying a config still replaces the user list, an empty
+user list still fails to start, and the columns of `mita get users` are
+unchanged. A server that already has mieru keeps its current copy.
+
+grpcurl, which the agent uses to read Hysteria2 per-user statistics, is fetched
+at 1.9.4 instead of 1.9.1 on new installs, and it is now pinned the way the
+other tools are. Until now it was the one download in the installer with no
+checksum, no https-only rule and a fixed path under /tmp. The archive is now
+verified against upstream's published SHA-256 before anything is installed,
+fetched over https only, and staged in a private directory. A mismatch leaves
+the server without metering rather than with an unverified binary.
 
 ## Upgrading
 
-Update from the panel, or run the installer again. If you have a leftover domain
-from before, delete it from the tunnel card once and it will stay deleted.
+Update from the panel, or run the installer again. The Hysteria2 engine update
+happens on its own; the update card shows the engine's last attempt if you want
+to confirm it.
