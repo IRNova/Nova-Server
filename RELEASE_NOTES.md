@@ -1,3 +1,56 @@
+# Nova Server 1.89.0
+
+Telegram's web proxy, served from this server through a CDN, and the
+Distribution page back in the side menu.
+
+## The Telegram web proxy
+
+Telegram's newer proxy type is now a card on the Inbounds page, directly
+below the MTProto proxy. It travels inside ordinary HTTPS under a secret path
+on one of this server's domains, so it works through Cloudflare's orange cloud
+where MTProto cannot. Needs a recent Telegram on Android or iOS.
+
+How it is built:
+
+- Telegram's own relay (`tproxy-server`, pinned by commit, built by Nova for
+  amd64 and arm64) and a small MTProto backend (`mtprotoproxy`, pinned by
+  commit and checksum) are installed on demand from the card, both verified
+  against pinned SHA-256 sums, and run as an unprivileged service user on
+  loopback only. Nothing new is opened to the internet.
+- xray's front dispatches exactly the relay's five request paths to it, by
+  exact path match, and everything else keeps going to the panel. The relay
+  serves the panel's own pages for its public site, so the secret path is
+  the only thing that distinguishes it.
+- One secret, one path, one link per server, like the MTProto proxy's shared
+  link. The link carries the host and path in one `server=` parameter and the
+  marked secret the way Telegram's installer derives it; the bridge capability
+  derivation is pinned against the vectors Telegram publishes. New link
+  rotates path and secret together.
+- The host must be one of this server's own domains with a certificate on
+  disk; a bare IP is refused. Four carrier modes, WebSocket by default.
+- The card shows live sessions and streams from the relay's metrics, the
+  service log when a unit is down, the last install's failure, and a warning
+  when the Python `cryptography` module is missing (the backend then runs
+  slowly; `apt install python3-cryptography`).
+- The support bundle redacts the secret, the path and the host.
+- Reviewed before release. Reconciles run one at a time and restart the
+  services on an applied-state stamp, since the relay reads its config once and
+  has no reload; the backend's stdout is dropped (the stock script prints the
+  node's own `tg://` credential on every start) and its start-up public-IP
+  lookup goes nowhere; a version marker stands in for the `-version` flag the
+  relay does not have, so a later relay pin reaches existing nodes; the host
+  allowlist cannot fail open on a node without domains; the uninstaller removes
+  the secret directory and the service user.
+
+## Also
+
+- The Distribution page, where ECH lives, has a side-menu entry again. It had
+  dropped out of the menu and was only reachable through search.
+
+## Upgrading
+
+Nothing to do. The web proxy is off until you install and enable it.
+
 # Nova Server 1.88.3
 
 Fresh installs work again: xray is run as the user Nova writes its files for.

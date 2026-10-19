@@ -999,6 +999,11 @@ fi
 MTGMULTI_VERSION="1.15.0"
 MITA_VERSION="3.37.0"
 SOARNOVA_VERSION="0.1.0"
+TPROXYSERVER_VERSION="0.1.0"
+# alexbers/mtprotoproxy, one Python file, the same on every architecture: the
+# Telegram WEB proxy relay needs a plain-secret MTProto backend beside mtg-multi.
+MTPP_VERSION="0614c35"
+MTPP_SHA256="3ca3847b1632534dcd04540aa037cb538a89653ae76f25d53c243921581e5002"
 
 # `set -e` is on, so the architecture choice is a case statement rather than a
 # `[ ... ] && var=...` one-liner: on x86_64 that pattern ends the line with a
@@ -1009,12 +1014,14 @@ case "$(uname -m)" in
     MTGMULTI_SHA256="9ed776b2052b95e8344896d43fbe01250014f36d7cfdd7f29f7903179bce4bed"
     MITA_SHA256="3cf85a6eb70a2ad512e2d10e5c1c0a38868c8ba5291f2a43326c466a10512fe0"
     SOARNOVA_SHA256="944f353a27d87c045772acba2f7dbb18c75a89f1757e363c55211b9e5f27d5dc"
+    TPROXYSERVER_SHA256="c2b53f9a5bcfa29bafd743fcc68cd43d64309dba7d9a0f79973e2e04e5353c97"
     ;;
   *)
     barch="amd64"
     MTGMULTI_SHA256="f1f8763504753fb863a0ddff83eab19c856747289c376275c44b717f1747908e"
     MITA_SHA256="ebd7a4f13204ac69864a385a9841708ac17e6622c1d7ef1f4415b39502c08591"
     SOARNOVA_SHA256="1712aa78a50a1a1c2904eb7628bb8cedd3aa532af1bcccb94c51495000d43bb9"
+    TPROXYSERVER_SHA256="45dbfb2debd300eb3276c66a99228c983149222e3d79090d9244c394f20f16a8"
     ;;
 esac
 
@@ -1100,6 +1107,48 @@ if [ ! -x /usr/local/bin/soar-nova ] || { [ -n "$soar_have" ] && [ "$soar_have" 
     fi
   else
     warn "Could not install soar-nova; the Soar DNS tunnel will be unavailable."
+  fi
+fi
+
+# tproxy-server: Telegram's own WEB proxy relay, built by Nova from a pinned
+# commit and mirrored like the rest. Same never-down update rule as soar-nova.
+# Its MTProto backend is alexbers/mtprotoproxy, one Python file pinned by hash;
+# python3 and the cryptography module (speed) are installed best effort.
+# The relay has no -version flag, so the version lives in a marker this install writes.
+tproxy_have="$(cat /usr/local/lib/nova/tproxy-server.version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+if [ ! -x /usr/local/bin/tproxy-server ] || { [ -n "$tproxy_have" ] && [ "$tproxy_have" != "$TPROXYSERVER_VERSION" ] \
+     && [ "$(printf '%s\n%s\n' "$tproxy_have" "$TPROXYSERVER_VERSION" | sort -V | head -1)" = "$tproxy_have" ]; }; then
+  if [ -x /usr/local/bin/tproxy-server ]; then say "Updating tproxy-server (Telegram web proxy) -> $TPROXYSERVER_VERSION"; else say "Installing tproxy-server $TPROXYSERVER_VERSION (Telegram web proxy)"; fi
+  tproxy_was_running=0; systemctl is-active --quiet nova-tgweb-relay.service 2>/dev/null && tproxy_was_running=1
+  if dl --proto '=https' --proto-redir '=https' -o "$btmp/tproxy-server.tar.gz" \
+       "https://github.com/IRNova/Tools/releases/download/tproxy-server/tproxy-server-${TPROXYSERVER_VERSION}-linux-${barch}.tar.gz" \
+     && sha_is "$btmp/tproxy-server.tar.gz" "$TPROXYSERVER_SHA256" \
+     && tar -xzf "$btmp/tproxy-server.tar.gz" -C "$btmp" tproxy-server \
+     && install -m 0755 "$btmp/tproxy-server" /usr/local/bin/tproxy-server; then
+    install -d -m 0755 /usr/local/lib/nova
+    printf '%s\n' "$TPROXYSERVER_VERSION" > /usr/local/lib/nova/tproxy-server.version
+    id -u nova-tgweb >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin --user-group nova-tgweb >/dev/null 2>&1 || true
+    mark_owned tproxyServer
+    ok "tproxy-server installed (checksum verified)"
+    if [ "$tproxy_was_running" = 1 ]; then
+      systemctl restart nova-tgweb-relay.service >/dev/null 2>&1 && ok "Telegram web proxy restarted on the new relay" || warn "The Telegram web proxy relay did not restart and is still running the old file."
+    fi
+  else
+    warn "Could not install tproxy-server; the Telegram web proxy will be unavailable."
+  fi
+fi
+if [ ! -f /usr/local/lib/nova/mtprotoproxy.py ] || ! sha_is /usr/local/lib/nova/mtprotoproxy.py "$MTPP_SHA256" 2>/dev/null; then
+  if dl --proto '=https' --proto-redir '=https' -o "$btmp/mtprotoproxy.py" \
+       "https://github.com/IRNova/Tools/releases/download/mtprotoproxy/mtprotoproxy-${MTPP_VERSION}.py" \
+     && sha_is "$btmp/mtprotoproxy.py" "$MTPP_SHA256" \
+     && install -d -m 0755 /usr/local/lib/nova \
+     && install -m 0644 "$btmp/mtprotoproxy.py" /usr/local/lib/nova/mtprotoproxy.py; then
+    mark_owned mtprotoproxy
+    ok "mtprotoproxy installed (checksum verified)"
+    (DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3 python3-cryptography >/dev/null 2>&1) || true
+    if ! systemctl is-active --quiet nova-tgweb-mtp.service 2>/dev/null; then :; else systemctl restart nova-tgweb-mtp.service >/dev/null 2>&1 || true; fi
+  else
+    warn "Could not install mtprotoproxy; the Telegram web proxy will be unavailable."
   fi
 fi
 rm -rf "$btmp"

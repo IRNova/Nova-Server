@@ -45,7 +45,7 @@ for unit_file in /etc/systemd/system/nova-geo-*.service /etc/systemd/system/nova
       ;;
   esac
 done
-for svc in nova-agent masterdnsvpn cottendns nova-tunnel nova-mtproto nova-mieru nova-soar; do
+for svc in nova-agent masterdnsvpn cottendns nova-tunnel nova-mtproto nova-mieru nova-soar nova-tgweb-relay nova-tgweb-mtp; do
   systemctl disable --now "$svc" >/dev/null 2>&1 || true
 done
 # mieru's daemon keeps its own store, so it is told to stop serving before the
@@ -101,12 +101,16 @@ if owned psiphon; then rm -f /etc/systemd/system/psiphon.service; fi
 rm -f /etc/systemd/system/masterdnsvpn.service
 rm -f /etc/systemd/system/cottendns.service /etc/systemd/system/nova-tunnel.service
 rm -f /etc/systemd/system/nova-geo-*.service /etc/systemd/system/nova-tunnel-*.service
-rm -f /etc/systemd/system/nova-mtproto.service /etc/systemd/system/nova-mieru.service /etc/systemd/system/nova-soar.service
+rm -f /etc/systemd/system/nova-mtproto.service /etc/systemd/system/nova-mieru.service /etc/systemd/system/nova-soar.service /etc/systemd/system/nova-tgweb-relay.service /etc/systemd/system/nova-tgweb-mtp.service
 # mieru's own configuration and state live outside /etc/nova, and only ours is
 # removed: the ownership marker is what says Nova put mita there rather than the
 # operator installing the distro package for something else.
 if owned mita; then rm -rf /etc/mita /var/lib/mita /var/run/mita; fi
 if owned soarNova; then rm -rf /etc/nova-soar /var/lib/nova-soar /run/nova-soar /usr/local/bin/soar-nova; fi
+# /etc/nova-tgweb is Nova's own (it holds the web proxy secret and signing key), so it goes regardless.
+rm -rf /etc/nova-tgweb
+if owned tproxyServer; then rm -f /usr/local/bin/tproxy-server /usr/local/lib/nova/tproxy-server.version; fi
+if owned mtprotoproxy; then rm -f /usr/local/lib/nova/mtprotoproxy.py; fi
 rm -rf /opt/nova-node-agent /opt/masterdnsvpn /opt/cottendns
 if owned sing-box-config; then rm -f /etc/sing-box/config.json; fi
 rmdir /etc/sing-box 2>/dev/null || true
@@ -137,6 +141,7 @@ if owned mtg || owned mtgMulti; then
   userdel nova-mtg >/dev/null 2>&1 || true
 fi
 if owned mita; then userdel mita >/dev/null 2>&1 || true; fi
+if owned tproxyServer; then userdel nova-tgweb >/dev/null 2>&1 || true; fi
 rm -f /usr/local/bin/nova-passwd /usr/local/bin/nova-access /usr/local/bin/nova-unlock
 rm -f /usr/local/bin/nova-tgbot /usr/local/bin/nova-uninstall
 rm -f /etc/sysctl.d/99-nova-net.conf
