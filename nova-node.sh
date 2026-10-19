@@ -676,6 +676,29 @@ if [ -x /usr/local/bin/xray ] \
   warn "xray is installed but has no service unit; writing one."
   write_xray_unit || warn "Could not write the xray service unit."
 fi
+# ---- xray runs as nobody, whatever wrote its unit ----------------------------
+# Nova writes everything xray reads or writes for nobody:nogroup: the config
+# (root:nogroup 0640), the certificate (root:nogroup 0640 under /etc/nova, which
+# is 0750) and the access log (nobody:nogroup). The upstream XTLS installer ran
+# xray as nobody too, until 2026-10-17, when its unit switched to a dedicated
+# `xray` user and group. From that day every fresh install crash-looped on
+# "open /usr/local/etc/xray/config.json: permission denied": the summary said
+# "xray failed", :443 never came up and no certificate could be issued, because
+# the challenge rides on xray's :443. A drop-in pins the user Nova's files are
+# written for; it outranks the unit's own User= and survives upstream reruns.
+# The agent writes the same drop-in whenever it finds the unit on another user.
+xray_unit_user="$(systemctl show xray -p User --value 2>/dev/null || true)"
+if [ -n "$xray_unit_user" ] && [ "$xray_unit_user" != "nobody" ]; then
+  say "Pinning the xray service user to nobody (its unit runs it as $xray_unit_user)"
+  install -d -m 0755 "${NOVA_SYSTEMD_DIR:-/etc/systemd/system}/xray.service.d"
+  printf '[Service]\nUser=nobody\nGroup=nogroup\n' > "${NOVA_SYSTEMD_DIR:-/etc/systemd/system}/xray.service.d/10-nova-user.conf"
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  if systemctl is-active --quiet xray 2>/dev/null || systemctl is-failed --quiet xray 2>/dev/null; then
+    systemctl reset-failed xray >/dev/null 2>&1 || true
+    systemctl restart xray >/dev/null 2>&1 || true
+  fi
+  ok "xray service user pinned to nobody"
+fi
 XRAY_BIN="$(command -v xray || echo /usr/local/bin/xray)"
 ok "xray $("$XRAY_BIN" version 2>/dev/null | head -1 | awk '{print $2}')"
 

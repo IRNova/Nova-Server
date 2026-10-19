@@ -1,3 +1,46 @@
+# Nova Server 1.88.3
+
+Fresh installs work again: xray is run as the user Nova writes its files for.
+
+## What was wrong
+
+On 2026-10-17 the upstream XTLS installer (`install-release.sh`, which a fresh
+Nova install runs when GitHub is reachable) switched its systemd unit from
+`User=nobody` to a dedicated `xray` user and group. Nova hands xray a config
+(`root:nogroup 0640`), a certificate (`root:nogroup 0640` under a `0750`
+`/etc/nova`) and an access log (`nobody:nogroup`), all written for `nobody`.
+From that day every fresh install crash-looped on
+
+```
+open /usr/local/etc/xray/config.json: permission denied
+```
+
+while the summary line said `panel configured; xray failed`, :443 never came
+up, and a domain could not get a certificate because the challenge rides on
+xray's :443. The agent's self-heal restarted xray every two minutes to the same
+end. Reported by an operator after three fresh servers and several domains;
+reproduced in a container on 2026-10-19. Servers installed before 17 October
+kept their `User=nobody` unit and were not affected.
+
+## What changed
+
+- The installer asks systemd which user the xray unit runs as and, when it is
+  not `nobody`, writes `/etc/systemd/system/xray.service.d/10-nova-user.conf`
+  pinning `User=nobody` and `Group=nogroup`, reloads, and restarts xray if it
+  was running or failed. A drop-in outranks the unit's own `User=` and
+  survives a later upstream rerun.
+- The agent does the same (`ensureXrayServiceUser`) before every xray
+  restart and inside the self-heal, so a node broken in the last two days
+  fixes itself on the next apply or within two minutes of getting this build.
+- `test/xray-service-user.mjs` executes the installer block under a fake
+  `systemctl` and drives the agent helper and self-heal with a mocked exec.
+
+## Upgrading
+
+A server installed since 17 October that never came up: re-run the install
+command from the site; it pins the user and the panel comes up on the same
+address and password. Everything else: nothing to do.
+
 # Nova Server 1.88.2
 
 The Soar service starts on servers with a domain, and the card says why when
