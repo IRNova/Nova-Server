@@ -1,3 +1,55 @@
+# Nova Server 1.88.0
+
+ECH on your fronted configurations, and an SSH terminal inside the panel.
+
+## ECH
+
+Encrypted Client Hello hides the one thing a TLS handshake still shows a
+filter: the server name. A switch on the Distribution page adds the same
+lookup Nova Proxy writes, `ech=cloudflare-ech.com+udp://1.1.1.1`, plus the
+Chrome fingerprint, to every share link and Xray JSON entry whose name is
+behind Cloudflare. The lookup text is editable and validated; plain DNS at
+1.1.1.1 is the default because it is what works from inside Iran, where the
+DoH form did not.
+
+It is written only where TLS ends at Cloudflare. A client told to use ECH
+against a server with no key does not fall back, it fails, so entries that
+dial the node directly, Reality entries, bridge mirrors and fleet-node
+entries are left as they were. Clean-IP copies inherit it from their source.
+sing-box and Clash documents are not changed: they need the key bytes rather
+than a lookup, and Cloudflare rotates the key. The health page reports ECH
+switched on with no proxied domain to carry it, and the Telegram bot's own
+subscription builder carries the option too.
+
+## SSH terminal
+
+Under System, owner only. A terminal to any server from inside the panel,
+several at once in tabs, with a file browser (list, download, upload, new
+folder, rename, delete, edit text files up to 512 KB in place) and saved
+commands that run in one session or in every open session at once.
+
+What protects it, since a shell on a server is the whole server:
+- the upgrade is gated four times: session cookie, owner level, an Origin
+  header naming this panel (cookies ride on cross-site WebSocket upgrades),
+  and a single-use ticket minted seconds earlier;
+- remembered connections are encrypted in the browser (AES-GCM) under a key
+  derived from a per-admin secret only a signed-in session can fetch; the
+  node stores nothing about them;
+- the first connection to a server remembers its host key; a changed key is
+  refused and reported, never silently accepted;
+- credentials go to the SSH library and are dropped; the activity log
+  records host, port and user only; sessions idle for thirty minutes close.
+
+ssh2 1.17.0 and xterm.js 5.5.0 are vendored as pinned single files
+(`src/vendor/VENDOR.md`); the agent still ships with no node_modules. An
+in-process sshd built from the same bundle drives the end-to-end test.
+
+## Upgrading
+
+Nothing to do beyond the update. ECH is off until you switch it on. The
+terminal needs the panel open on an https address for remembering
+connections; on a bare http address it still works, it just cannot save them.
+
 # Nova Server 1.87.1
 
 The Soar engine installs again, and a failed install now says so.
