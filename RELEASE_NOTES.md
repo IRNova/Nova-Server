@@ -1,3 +1,37 @@
+# Nova Server 1.87.1
+
+The Soar engine installs again, and a failed install now says so.
+
+## What was wrong
+
+Enabling Soar on 1.87.0 never finished. The card said "installing" for as
+long as you watched, and Install again did nothing. Reported by an operator
+ten minutes in.
+
+The agent downloads every pinned engine from Nova's own release page under
+the pin's internal name, and for Soar that name (`soarNova`) is not the name
+the release was published under (`soar-nova`). The download got a 404, the
+install script died, and because the card had no failure state, "not
+installed yet" looked like "still installing". The installer script used the
+right name all along, which is why the release checks passed.
+
+## What changed
+
+- A pin can now name its release tag separately from its internal name, and
+  `test/binary-pins.mjs` holds the agent's download address to the exact URL
+  the installer uses. That test fails on 1.87.0.
+- A detached install writes its output and exit status to
+  `/var/lib/nova/install-<name>.log`. The DNS Tunnel card reads it back: a
+  failure shows the last lines the install printed and stops polling, and an
+  install that never finished (a reboot in the middle) is reported as such
+  rather than as progress.
+
+## Upgrading
+
+Nothing to do beyond the update. If Soar is enabled, open the DNS Tunnel card
+and press Install again; the engine is on the server a few seconds later and
+the tunnel starts on its own.
+
 # Nova Server 1.87.0
 
 Soar, Lantern's DNS tunnel, as a third engine, per customer if you want.
