@@ -1,3 +1,32 @@
+# Nova Server 1.88.2
+
+The Soar service starts on servers with a domain, and the card says why when
+it does not.
+
+## What was wrong
+
+The Soar unit was given `-listen <panel domain>:53`. On a server whose panel
+has a domain, that is a name rather than this machine's address, and when the
+domain is behind Cloudflare it resolves to the edge, so the bind failed and the
+service crash-looped while the card showed "? active account(s)" with nothing
+else to go on. Reported by an operator on the first real enable.
+
+## What changed
+
+- The service binds this server's own IP, read locally the way MasterDnsVPN
+  does (`soarBindHost`: the panel host only when it is itself an IP, otherwise
+  the node's primary address). Pinned by test.
+- When the engine is installed but the service is not active, the status
+  carries the last lines of the unit's journal and the card shows them with a
+  Start again button, which rewrites the unit from current settings and starts
+  it.
+- A small layout fix on one panel page.
+
+## Upgrading
+
+If Soar is enabled, open the DNS Tunnel card after the update and press Start
+again once; the unit is rewritten with the corrected address.
+
 # Nova Server 1.88.1
 
 Panel polish. A round of small refinements across the panel's newest pages:
