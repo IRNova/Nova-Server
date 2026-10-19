@@ -45,7 +45,7 @@ for unit_file in /etc/systemd/system/nova-geo-*.service /etc/systemd/system/nova
       ;;
   esac
 done
-for svc in nova-agent masterdnsvpn cottendns nova-tunnel nova-mtproto nova-mieru; do
+for svc in nova-agent masterdnsvpn cottendns nova-tunnel nova-mtproto nova-mieru nova-soar; do
   systemctl disable --now "$svc" >/dev/null 2>&1 || true
 done
 # mieru's daemon keeps its own store, so it is told to stop serving before the
@@ -101,11 +101,12 @@ if owned psiphon; then rm -f /etc/systemd/system/psiphon.service; fi
 rm -f /etc/systemd/system/masterdnsvpn.service
 rm -f /etc/systemd/system/cottendns.service /etc/systemd/system/nova-tunnel.service
 rm -f /etc/systemd/system/nova-geo-*.service /etc/systemd/system/nova-tunnel-*.service
-rm -f /etc/systemd/system/nova-mtproto.service /etc/systemd/system/nova-mieru.service
+rm -f /etc/systemd/system/nova-mtproto.service /etc/systemd/system/nova-mieru.service /etc/systemd/system/nova-soar.service
 # mieru's own configuration and state live outside /etc/nova, and only ours is
 # removed: the ownership marker is what says Nova put mita there rather than the
 # operator installing the distro package for something else.
 if owned mita; then rm -rf /etc/mita /var/lib/mita /var/run/mita; fi
+if owned soarNova; then rm -rf /etc/nova-soar /var/lib/nova-soar /run/nova-soar /usr/local/bin/soar-nova; fi
 rm -rf /opt/nova-node-agent /opt/masterdnsvpn /opt/cottendns
 if owned sing-box-config; then rm -f /etc/sing-box/config.json; fi
 rmdir /etc/sing-box 2>/dev/null || true

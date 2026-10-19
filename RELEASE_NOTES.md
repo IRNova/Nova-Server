@@ -1,3 +1,55 @@
+# Nova Server 1.87.0
+
+Soar, Lantern's DNS tunnel, as a third engine, per customer if you want.
+
+## What it is
+
+Soar is a DNS tunnel from the Lantern team, built against the two engines
+Nova already ships: it uses every resolver at once with in-country discovery,
+recovers from loss quickly, and connects in seconds rather than tens of
+seconds. It carries TCP only, to ports 80 and 443 unless you widen that.
+
+Upstream's server has no notion of a customer: anyone holding its public key
+can use it. Nova runs it through soar-nova, a small wrapper of our own that
+keeps upstream unmodified and serves one Soar instance per account, each with
+its own key and its own byte counters. That is what makes the second mode
+possible.
+
+## Two modes
+
+Shared: one account, one link, handed to whoever you choose. The same shape
+as MasterDnsVPN and CottenDns, with no per-customer accounting.
+
+Per customer: a switch in each customer's form, like mieru's. Every granted
+customer gets a key and link of their own, their Soar traffic lands in the
+same usage ledger as everything else, so data caps, expiry and the usual
+alerts apply, and revoking closes that one customer. Resellers can be allowed
+to grant it; plans and bulk actions carry it.
+
+The link is WhiteDNS's profile format, because the WhiteDNS app for Android
+(1.6.8 or newer) is today the only client that imports a third-party Soar
+server. It appears on the customer's subscription page and in the panel's
+per-customer links. The health page reports customers who were granted Soar
+while the tunnel is off, on another engine, or in shared mode.
+
+## Caveats
+
+Soar is nine days old upstream and changed four times last week. Its wire
+format may still move; Nova pins the exact version it was built against and
+will update it the same way it updates the other engines. Nobody has measured
+it from inside Iran yet, including WhiteDNS. Treat it as a field test: enable
+it on one server, give it to a few customers, and tell us what you see.
+
+Android only for now. No iOS or desktop client exists. If the engine proves
+itself, the Soar client can be built into the Nova app, which is a separate
+piece of work.
+
+## Upgrading
+
+Update from the panel, or run the installer again. The soar-nova engine is
+installed on demand the first time you enable Soar, checksum-verified from
+Nova's own release, the same way mieru's server is.
+
 # Nova Server 1.86.2
 
 The health page now shows what the last two releases do on their own.

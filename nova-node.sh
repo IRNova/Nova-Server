@@ -975,6 +975,7 @@ fi
 # test/binary-pins.mjs fails if the two ever disagree.
 MTGMULTI_VERSION="1.15.0"
 MITA_VERSION="3.37.0"
+SOARNOVA_VERSION="0.1.0"
 
 # `set -e` is on, so the architecture choice is a case statement rather than a
 # `[ ... ] && var=...` one-liner: on x86_64 that pattern ends the line with a
@@ -984,11 +985,13 @@ case "$(uname -m)" in
     barch="arm64"
     MTGMULTI_SHA256="9ed776b2052b95e8344896d43fbe01250014f36d7cfdd7f29f7903179bce4bed"
     MITA_SHA256="3cf85a6eb70a2ad512e2d10e5c1c0a38868c8ba5291f2a43326c466a10512fe0"
+    SOARNOVA_SHA256="944f353a27d87c045772acba2f7dbb18c75a89f1757e363c55211b9e5f27d5dc"
     ;;
   *)
     barch="amd64"
     MTGMULTI_SHA256="f1f8763504753fb863a0ddff83eab19c856747289c376275c44b717f1747908e"
     MITA_SHA256="ebd7a4f13204ac69864a385a9841708ac17e6622c1d7ef1f4415b39502c08591"
+    SOARNOVA_SHA256="1712aa78a50a1a1c2904eb7628bb8cedd3aa532af1bcccb94c51495000d43bb9"
     ;;
 esac
 
@@ -1049,6 +1052,31 @@ if [ ! -x /usr/local/bin/mita ] || { [ -n "$mita_have" ] && [ "$mita_have" != "$
     fi
   else
     warn "Could not install mita; mieru will be unavailable."
+  fi
+fi
+
+# soar-nova: Nova's per-account wrapper around Lantern's Soar DNS tunnel. Same
+# rules as mita: pinned by version and SHA-256, served from IRNova/Tools,
+# updated on a re-run when older (never down), and the running service is
+# restarted onto the new file only if it was running.
+soar_have="$(/usr/local/bin/soar-nova -version 2>/dev/null | grep -Eo '^[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+if [ ! -x /usr/local/bin/soar-nova ] || { [ -n "$soar_have" ] && [ "$soar_have" != "$SOARNOVA_VERSION" ] \
+     && [ "$(printf '%s\n%s\n' "$soar_have" "$SOARNOVA_VERSION" | sort -V | head -1)" = "$soar_have" ]; }; then
+  if [ -x /usr/local/bin/soar-nova ]; then say "Updating soar-nova (Soar DNS tunnel) $soar_have -> $SOARNOVA_VERSION"; else say "Installing soar-nova (Soar DNS tunnel)"; fi
+  soar_was_running=0; systemctl is-active --quiet nova-soar.service 2>/dev/null && soar_was_running=1
+  if dl --proto '=https' --proto-redir '=https' -o "$btmp/soar-nova.tar.gz" \
+       "https://github.com/IRNova/Tools/releases/download/soar-nova/soar-nova-${SOARNOVA_VERSION}-linux-${barch}.tar.gz" \
+     && sha_is "$btmp/soar-nova.tar.gz" "$SOARNOVA_SHA256" \
+     && tar -xzf "$btmp/soar-nova.tar.gz" -C "$btmp" soar-nova \
+     && install -m 0755 "$btmp/soar-nova" /usr/local/bin/soar-nova; then
+    id -u nova-soar >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin --user-group nova-soar >/dev/null 2>&1 || true
+    mark_owned soarNova
+    ok "soar-nova installed (checksum verified)"
+    if [ "$soar_was_running" = 1 ]; then
+      systemctl restart nova-soar.service >/dev/null 2>&1 && ok "Soar restarted on the new soar-nova" || warn "Soar did not restart and is still running the old soar-nova; run: systemctl restart nova-soar"
+    fi
+  else
+    warn "Could not install soar-nova; the Soar DNS tunnel will be unavailable."
   fi
 fi
 rm -rf "$btmp"
