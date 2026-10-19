@@ -1,3 +1,10 @@
+# Nova Server 1.88.1
+
+Panel polish. A round of small refinements across the panel's newest pages:
+clearer layouts, better keyboard support, a few dialogs that were missing
+their confirm button, and phone-width fixes. Nothing about settings or
+customer configurations changes, and nothing needs doing after the update.
+
 # Nova Server 1.88.0
 
 ECH on your fronted configurations, and an SSH terminal inside the panel.
