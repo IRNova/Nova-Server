@@ -1,3 +1,58 @@
+# Nova Server 1.91.0
+
+The Soar profile travels with the customer's subscription, and its QR code can
+be scanned.
+
+## Soar in the subscription
+
+A customer's own subscription now carries their Soar profile, so a Nova app
+that knows Soar imports it with their servers instead of sending them to find
+the link on their page:
+
+- In the Nova document (`?target=nova`) it is a `soar` outbound under the
+  client's own field names: the zone, the public key, the resolvers and the
+  five tuning values that differ from the Soar library's defaults. It is not
+  named in the selector or the url test. A Soar node has one route and carries
+  no UDP, so the client keeps it out of its pools, and a core that tried to run
+  the document as written would refuse a pool naming it.
+- In the base64 list, which is what the client receives when its link was
+  pasted without a target, it is a `soar://` line after the configs. A client
+  that does not know the scheme skips that one line and keeps the rest.
+- Only the customer's own link carries it. The whole-panel `?token=` link does
+  not, and neither do the sing-box, Clash, Hiddify, Karing and Xray JSON
+  documents: those cores refuse a whole configuration over one unknown entry.
+- The same gates as the customer page: a customer who is expired, out of data,
+  switched off, or sold by a reseller without the Soar permission gets no
+  profile. The page and the Users page are unchanged, and WhiteDNS users keep
+  importing the link from the page.
+
+## The Soar QR code
+
+A tester could not scan the Soar code on the customer page on two client
+builds, and the reason was size: the link was about 830 characters, which is a
+97-module code, drawn in the same 150-pixel tile as a 45-module VLESS code, so
+each module was about 1.5 pixels wide.
+
+- The profile now carries only the five tuning values that differ from the
+  Soar library's own defaults (discovery on, 2 resolvers wanted, 2 probed at a
+  time, 1000 ms apart, 128 streams) plus the country. WhiteDNS reads an absent
+  value as its own default, which is the value Nova used to send, so the app
+  behaves exactly as before. The link drops to about 550 characters, and every
+  subscription that carries it is shorter by the same amount.
+- The customer page draws the Soar code at 300 pixels in a full-width card of
+  its own, with the buttons beside it on a wide screen and under it on a phone.
+
+## Also in this release
+
+- A customer of a volume reseller who has delivered their whole allowance no
+  longer receives the shared Soar link on their page, in their links on the
+  Users page, or in their subscription. In shared mode the engine serves the
+  one account whatever the user list says, so that link kept working after
+  the customer's configs had stopped.
+- In shared mode the one link now rides every active customer's own
+  subscription, and only Rotate revokes it; the card on the DNS tunnel page
+  says so.
+
 # Nova Server 1.90.1
 
 Personal web proxy links on servers that had the web proxy on before 1.90.0.
