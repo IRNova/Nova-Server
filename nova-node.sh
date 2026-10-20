@@ -720,8 +720,26 @@ done
 # no apt/.deb, so this step is reliable on a fresh box.
 HAS_SINGBOX=0
 SINGBOX_BIN=/usr/local/bin/sing-box-nova
-SINGBOX_URL="${NOVA_SINGBOX_URL:-https://github.com/IRNova/Tools/releases/download/sing-box/sing-box-nova.gz}"
-SINGBOX_SHA_URL="${NOVA_SINGBOX_SHA_URL:-${SINGBOX_URL}.sha256}"
+# sing-box asset by architecture.
+#
+# One name per architecture, and the amd64 one keeps the name it has always
+# had: every installer and agent published before 1.89.1 asks for exactly
+# `sing-box-nova.gz` and must keep receiving amd64 bytes. Until 1.89.1 that
+# single asset was the only one, and this script installed it on arm64 servers
+# too, where the kernel answered every start with "Exec format error". The
+# agent then misread that as sing-box rejecting its config, which under its
+# strict certificate transaction rolled back every Let's Encrypt and Cloudflare
+# certificate on every arm64 node and reported xray as unhealthy. src/singbox/
+# update.mjs makes the same choice from process.arch; test/binary-pins.mjs
+# holds the two in step.
+case "$(uname -m)" in
+  aarch64|arm64) SINGBOX_ASSET="sing-box-nova-linux-arm64.gz" ;;
+  x86_64|amd64)  SINGBOX_ASSET="sing-box-nova.gz" ;;
+  *)             SINGBOX_ASSET="" ;;
+esac
+SINGBOX_URL="${NOVA_SINGBOX_URL:-${SINGBOX_ASSET:+https://github.com/IRNova/Tools/releases/download/sing-box/$SINGBOX_ASSET}}"
+# end sing-box asset by architecture
+SINGBOX_SHA_URL="${NOVA_SINGBOX_SHA_URL:-${SINGBOX_URL:+${SINGBOX_URL}.sha256}}"
 # What we installed last time, so a re-run can tell "already current" from
 # "never updated". Lives beside the other node state in /etc/nova.
 SINGBOX_STAMP="$CERT_DIR/singbox.sha256"
@@ -769,6 +787,44 @@ elif [ -n "$sb_want" ] && [ "$sb_want" != "$sb_have" ]; then
   # a worse outcome than staying a version behind.
   sb_need=1
   sb_replacing=1
+fi
+# sing-box must run here
+# A binary the kernel will not execute is not sing-box, it is a file. Until
+# 1.89.1 every arm64 node carried the amd64 build at this path, the unit below
+# was enabled anyway, systemd restarted it into "Exec format error" every three
+# seconds for the life of the node, and the agent read the same failure as a
+# rejected config. The ELF header says which machine a build is for (byte 18,
+# little-endian: 3e00 is x86-64, b700 is aarch64); a file that is not an ELF
+# is not judged. Nothing is deleted here: deleting would send the next run down
+# the fresh-install path, which installs without a checksum when the sidecar is
+# unreachable, and that is a worse place for a root-run binary to come from
+# than staying broken. The unit is stopped, and the verified replacement is
+# requested through the ordinary update path, which refuses without a checksum.
+sb_wrong_arch=0
+if [ -x "$SINGBOX_BIN" ] && [ "$(head -c 4 "$SINGBOX_BIN" 2>/dev/null | od -An -tx1 | tr -d ' \n')" = "7f454c46" ]; then
+  sb_machine="$(od -An -tx1 -j18 -N2 "$SINGBOX_BIN" 2>/dev/null | tr -d ' \n')"
+  case "$(uname -m):$sb_machine" in
+    x86_64:3e00|amd64:3e00|aarch64:b700|arm64:b700|*:) ;;
+    *) sb_wrong_arch=1 ;;
+  esac
+fi
+if [ "$sb_wrong_arch" = 1 ]; then
+  systemctl disable --now sing-box >/dev/null 2>&1 || true
+  if [ -n "$sb_want" ] && [ -n "$SINGBOX_URL" ]; then
+    warn "sing-box at $SINGBOX_BIN was built for another CPU architecture and cannot run on $(uname -m); replacing it with the build for this machine."
+    sb_need=1
+    sb_replacing=1
+  else
+    warn "sing-box at $SINGBOX_BIN was built for another CPU architecture and cannot run on $(uname -m). Its checksum could not be fetched, so it is left in place and Hysteria2 stays unavailable; re-run this installer when github.com is reachable."
+    sb_need=0
+  fi
+fi
+# end sing-box must run here
+if [ "$sb_need" = 1 ] && [ -z "$SINGBOX_URL" ]; then
+  # Nothing to fetch for this machine. Said once, here, rather than as three
+  # download failures below that would read like a network problem.
+  warn "No sing-box build is published for $(uname -m); Hysteria2 will be unavailable on this server."
+  sb_need=0
 fi
 
 if [ "$sb_need" = 1 ]; then
@@ -837,6 +893,7 @@ if [ "$sb_need" = 1 ]; then
     fi
   done
 fi
+
 if [ -x "$SINGBOX_BIN" ]; then
   mkdir -p /etc/sing-box
   # Our own unit: run as root so it can read the origin key, and use our config

@@ -1,3 +1,68 @@
+# Nova Server 1.89.1
+
+Certificates on arm64 servers, and a broken Hysteria2 can no longer block a
+certificate on any server.
+
+## What was wrong
+
+On every arm64 server (Hetzner CAX, Oracle Ampere, Scaleway and the like)
+adding a domain failed, by Let's Encrypt and by Cloudflare alike, with a
+message about not being able to restore the previous setup and xray being
+unhealthy. xray was healthy and the certificate had been issued. Measured on a
+fresh 1.89.0 install in an arm64 container: Let's Encrypt issued the
+certificate in 45 seconds, then the panel reported the rollback failure.
+
+The chain:
+
+- Hysteria2's engine (`sing-box-nova`) was published as a single amd64
+  asset, and the installer put it on arm64 servers too. The kernel answers
+  every start with "Exec format error"; systemd restarted it into that every
+  three seconds for the life of the node.
+- The node checks the engine's configuration before restarting it by running
+  the engine. Running a file the kernel will not execute falls back to
+  `/bin/sh`, which prints garbage and exits non-zero, so the node concluded
+  the engine rejected its configuration.
+- Adding a domain is a transaction that is strict about every service. That
+  verdict aborted it, the rollback hit the same verdict, and the operator was
+  told that the previous setup could not be restored and to check xray.
+
+## What changed
+
+- One engine build per architecture on the mirror. amd64 keeps the asset
+  name every earlier installer asks for; arm64 is `sing-box-nova-linux-arm64.gz`.
+  The installer and the node's engine updater choose by architecture; a machine
+  with no published build skips Hysteria2 with one clear line instead of
+  failing three downloads.
+- The installer reads the engine's header too. A build for another
+  architecture has its unit stopped and is replaced through the ordinary,
+  checksum-verified update path; it is never deleted, because a missing
+  engine would send the next run down the fresh-install path, which installs
+  without a checksum when the mirror's sidecar is unreachable.
+- The node reads the engine's ELF header before asking it anything, and on a
+  mismatch asks the binary itself once (a host with binfmt emulation may run
+  it fine). A build that cannot run is treated as no engine at all, in strict
+  transactions too; the unit is stopped and one journal line says why. The
+  shell's fallback output is recognised as "could not run" by its exit code
+  and signature, never by words a configuration error might also contain.
+- Certificate transactions (the primary domain, additional domains, bridge
+  certificates) are strict about Hysteria2 only when Hysteria2 was serving
+  at the moment the new configuration is written. An engine that was already
+  down cannot be made worse by a certificate and cannot be mended by rolling
+  one back.
+- A failed certificate transaction now writes one journal line naming the
+  stage and the cause, with anything that names a credential withheld.
+
+## Also in this release
+
+- The release archive is now checked against the source tree before it is
+  packaged: a file that is not tracked (an editor's backup beside a module)
+  fails the build instead of shipping inside the archive.
+
+## For arm64 servers already installed
+
+After this update, adding a domain works. To get Hysteria2 itself, re-run the
+install command once; it installs the arm64 engine and starts the service.
+
 # Nova Server 1.89.0
 
 Telegram's web proxy, served from this server through a CDN, and the
