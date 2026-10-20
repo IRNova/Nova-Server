@@ -1,3 +1,105 @@
+# Nova Server 1.90.0
+
+A personal Telegram web proxy for each customer, the Nova app on the
+Distribution page, and a domain can be marked as behind a CDN that is not
+Cloudflare.
+
+## A personal Telegram web proxy per customer
+
+1.89.0 added Telegram's web proxy, the type that keeps working through a CDN,
+as one shared link per server. It is now also per customer, the way the
+MTProto proxy has been since 1.42.0:
+
+- The user form and the plan editor have a **Telegram web proxy** switch, next
+  to the MTProto one. A reseller may set it under the same permission that
+  lets them sell the Telegram proxy.
+- A customer with it on gets a link of their own, with a secret of their own,
+  on their subscription page (a new card under the MTProto one, with the same
+  two buttons) and among their links on the Users page (QR code and copy).
+- Secrets are derived, not stored: revoking the switch and turning it back on
+  gives the same link, renaming the customer changes nothing, and nothing
+  per customer is added to the settings document. Expired and capped
+  customers drop out of the relay the way they drop out of everything else.
+- The shared link on the Inbounds card keeps working beside the personal
+  ones, and the card says how many customers are being served. **New link**
+  still retires every link at once, personal ones included, because it
+  changes the path they all share.
+- Each personal profile is bounded on the relay (8 sessions, 512 streams and
+  a session rate of its own), so one customer, or one leaked personal link,
+  cannot use up the relay and lock out the shared link and the others.
+- The relay is told about profile changes by a restart (it has no reload), so
+  granting or revoking a customer reconnects the others for a few seconds.
+  Changes are applied at most once every 20 seconds, with the last state
+  winning, so a run of edits, or a reseller toggling one customer in a loop,
+  costs one restart per 20 seconds rather than one per edit.
+- Resellers: the switch is sold under the existing Telegram proxy permission,
+  so a reseller who may already sell the MTProto proxy may sell this one too
+  without any change on your side. Traffic through it is not metered against
+  the customer's data limit; expiry and the data limit still withdraw it.
+- Up to 511 personal links per server, the relay's profile limit as Nova
+  configures it. Past that the card says how many customers are over the line
+  and get no link until others are revoked.
+
+## The Nova app on the Distribution page
+
+The Distribution page now opens with Nova's own client. The recommended-apps
+list leads with a Nova card that carries the download link (the GitHub release
+page the website links), and the "Open in app" row has a Nova card beside
+Auto, Base64 and Clash: a QR code and a one-tap button that hand the whole
+node to the app through the same `nova://install-config` link the customer's
+subscription page already uses. The link asks for the `nova` document, the
+one that carries mieru to the app.
+
+## A domain behind another CDN
+
+Each domain row on the Domains card (the panel domain included) offered three
+answers to "is this domain behind Cloudflare": work it out, it is, it is not.
+There is a fourth now: **It is behind another CDN**, for a name fronted by
+ArvanCloud, Gcore, Fastly, Akamai, bunny.net or any CDN that is not
+Cloudflare.
+
+Nova cannot work that one out for you. The only edge addresses it knows are
+Cloudflare's published ranges, so a name on another CDN resolves to addresses
+that look exactly like a direct server's, and the automatic answer was
+"points straight at this server". Everything that read that answer then
+treated the name as your origin: the health check accused it of exposing the
+server, the AmneziaWG, MTProto and mieru pickers offered it as a UDP endpoint
+that a CDN cannot carry, and the subscription announced the panel host on a
+config that dialled the CDN.
+
+What the new choice does:
+
+- The name counts as fronted everywhere a CDN is a CDN. It hides your
+  server, it can carry the WebSocket front and nothing else (widening it to
+  all inbounds is refused, as it is for a Cloudflare name), no UDP protocol
+  is published on it, and a config that dials it announces it.
+- The name is NOT Cloudflare to the two features that publish Cloudflare's
+  own key and addresses. ECH is not written onto its lines, even with the
+  switch on, because the lookup clients are given finds Cloudflare's key and
+  a client told to use it against another CDN fails the handshake rather than
+  falling back. Clean Cloudflare IPs are not published for it, because a
+  Cloudflare edge has no route for a name it does not front.
+- The ECH card on the Distribution page names the domains it leaves alone,
+  and its "nothing to apply to" note asks about Cloudflare specifically. The
+  Clean IPs switch does the same. The health check's ECH warning now also
+  fires on a node whose only fronted name is on another CDN, where before the
+  state would have read as "not established" and kept it quiet.
+
+## Also in this release
+
+- A domain Nova knows a CDN fronts carries the WebSocket front only, and that
+  now holds however the knowledge arrived: one you marked, one that resolves
+  into Cloudflare, or one Nova provisioned. Until now only the last was
+  clamped. Marking an added domain as behind Cloudflare or another CDN narrows
+  it to the front in the same write, adding a domain already marked lands it
+  narrowed, widening it afterwards is refused, and a row that is still wide
+  from before says so and offers the one way out.
+- The subscription-link chooser labels a domain as going through a CDN by the
+  same effective state, so a name you marked yourself carries the warning
+  that the subscription is decrypted at that edge.
+- The Domains search row and the manual cover the new choice; a search row
+  for the Nova app points at the Distribution page.
+
 # Nova Server 1.89.1
 
 Certificates on arm64 servers, and a broken Hysteria2 can no longer block a
