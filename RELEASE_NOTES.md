@@ -1,3 +1,14 @@
+# Nova Server 1.90.1
+
+Personal web proxy links on servers that had the web proxy on before 1.90.0.
+
+A server that already had the Telegram web proxy on when it updated to 1.90.0
+had no per-customer salt yet (1.90.0 minted it when the card was saved), so
+granting a customer the web proxy produced no link until the card on the
+Inbounds page was saved again. The node now completes that record when it
+starts, exactly as it completes an MTProto record that predates per-customer
+secrets. The shared link, its path and its secret are left as they were.
+
 # Nova Server 1.90.0
 
 A personal Telegram web proxy for each customer, the Nova app on the
