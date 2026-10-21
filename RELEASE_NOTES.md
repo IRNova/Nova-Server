@@ -1,3 +1,33 @@
+# Nova Server 1.92.0
+
+Operators can now offer decoy SNI metadata to compatible desktop Nova clients.
+In Routing, enter carrier-tested hostnames and choose a method. Per-carrier
+overrides are available in the ISP editor. The feature is off by default and
+ships no built-in decoy names. Current clients keep their existing behavior;
+desktop packet injection requires a future compatible client and privileges.
+This release does not publish or modify Nova Client build 239.
+
+Only a customer's Nova document carries the new metadata. Eligible raw TLS
+VLESS and Trojan links in Nova requests carry the selected decoy; Reality and ECH links do not.
+Raw parameters are limited to Nova's User-Agent or `target=nova-raw` until a
+real stock-client import has been verified. Generic raw, page and bot links stay unchanged.
+Other structured subscription formats are unchanged. Names are validated on
+save and sanitized on output, including after alias and bridge rewrites.
+
+A decoy is a first-packet technique. The real server name still follows.
+Use an allowed custom domain or an eligible direct Reality inbound when the
+endpoint name itself is filtered. No carrier success is claimed without tests.
+
+Health now warns about ECH on Iran profiles and high-risk shared endpoint
+names. The explicit disable action preserves stored ECH keys, including across
+later inbound saves. ECH remains available for networks where it works.
+Setup Assistant does not enable ECH or decoy names automatically.
+
+Inspect endpoint names in the client transport card to see names emitted by
+the subscription builders for up to three enabled customers. The owner-only
+report includes the subscription hostname and highlights repeated panel names
+and shared endpoints. It returns no credentials and is not a packet capture.
+
 # Nova Server 1.91.1
 
 The Soar card on the customer subscription page now recommends Nova Client on
