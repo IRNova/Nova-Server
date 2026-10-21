@@ -699,6 +699,13 @@ if [ -n "$xray_unit_user" ] && [ "$xray_unit_user" != "nobody" ]; then
   fi
   ok "xray service user pinned to nobody"
 fi
+# Upstream also creates this directory as root:xray 0750. Changing the unit
+# user and config file group alone leaves nobody unable to traverse it. Repair
+# the standard directory even when a previous run already pinned the unit.
+if [ -d /usr/local/etc/xray ]; then
+  chgrp nogroup /usr/local/etc/xray
+  chmod 0750 /usr/local/etc/xray
+fi
 XRAY_BIN="$(command -v xray || echo /usr/local/bin/xray)"
 ok "xray $("$XRAY_BIN" version 2>/dev/null | head -1 | awk '{print $2}')"
 

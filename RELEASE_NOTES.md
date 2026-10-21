@@ -1,3 +1,24 @@
+# Nova Server 1.91.1
+
+The Soar card on the customer subscription page now recommends Nova Client on
+Android or iPhone, in English, Persian and Russian.
+
+- Install opens the Nova Client download page.
+- Open in Nova Client imports the customer's own `target=nova` subscription
+  through the app's registered import link.
+- Copy and the 300 px QR code still carry the same Soar profile for direct
+  import. Accounts, keys, permissions and traffic limits are unchanged.
+
+For Soar delivered through a subscription, use Nova Client build 238 or newer.
+Update Nova Server from the panel or run its installer again, then reload the
+customer subscription page.
+
+The real container install check also exposed an incomplete Xray permission
+repair: upstream creates `/usr/local/etc/xray` as `root:xray 0750`, while Nova
+runs Xray as `nobody:nogroup`. The installer and agent now give that standard
+directory group `nogroup` and mode `0750`, including when the unit user was
+already corrected. This restores config access without making it public.
+
 # Nova Server 1.91.0
 
 The Soar profile travels with the customer's subscription, and its QR code can
