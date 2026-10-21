@@ -1,3 +1,22 @@
+# Nova Server 1.92.1
+
+Keep ECH enabled. This corrects 1.92.0's ECH guidance: repair the legacy lookup
+instead of offering to disable ECH. Only the exact old default
+`https://dns.alidns.com/dns-query` migrates automatically to
+`cloudflare-ech.com+udp://1.1.1.1`. ECH state and stored keypairs are preserved.
+Custom resolvers remain unchanged; Health offers an explicit lookup fix for
+AliDNS and unverified DoH choices. Iran setup selects the verified default
+without changing ECH state or replacing a custom resolver.
+
+Optional decoy parameters now reach customer raw VLESS/Trojan links, the
+subscription page and Telegram through the shared helper. Off by default,
+with no built-in names. Reality and ECH links never receive decoy parameters.
+Desktop packet injection still needs a future compatible Nova Client and
+privileges. No Nova Client build or release was changed.
+
+The endpoint-name report and conditional shared-hostname guidance from 1.92.0
+remain. A decoy never hides the real endpoint name from stateful inspection.
+
 # Nova Server 1.92.0
 
 Operators can now offer decoy SNI metadata to compatible desktop Nova clients.
