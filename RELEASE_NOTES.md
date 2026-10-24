@@ -1,3 +1,24 @@
+# Nova Server 1.92.2
+
+WARP setup no longer depends on one API name. Registering a WARP account,
+applying a WARP+ key and checking the plan now try `api.devices.cloudflare.com`
+(the name Cloudflare's own client calls since 2026.6.0) first, then
+`api.cloudflareclient.com`, then the new name on the Cloudflare edges
+104.24.4.6 and 104.18.0.6 directly. The next route is tried only when there is
+no answer or the answer is not Cloudflare's own (a block page). The route that
+answered goes first for later calls. The edge route still checks the
+certificate against the API name. The route order comes from Aether 2.4.0.
+
+All routes reach one backend, checked live: a device registered through the new
+name was read through the old name and an edge, then deleted. Existing WARP
+accounts keep working and nothing needs to be re-registered. The API version
+and client headers are unchanged.
+
+A reply without a real account (an empty page that answers 200, for example)
+is no longer stored as a WARP account; the next route is tried instead. A
+parent panel now waits long enough for a node to try every route before it
+reports the registration as failed.
+
 # Nova Server 1.92.1
 
 Keep ECH enabled. This corrects 1.92.0's ECH guidance: repair the legacy lookup
