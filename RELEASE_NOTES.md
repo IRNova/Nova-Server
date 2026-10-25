@@ -1,3 +1,28 @@
+# Nova Server 1.92.3
+
+Irancell clients now split TLS records instead of TCP segments. The built-in
+carrier profile served at `/isp-profile` sets Irancell to `tlsFragment: false`
+and adds `recordFragment: true`, which Nova Client turns into sing-box
+`record_fragment`. Two NetDiag runs on Irancell from inside Iran (sing-box
+1.14.1, one tester, one night, two different links) had the TCP split fail 0/3
+in both, while TLS record splitting passed 3/3 in both. A plain connection got
+0/3 and 2/3 in the same runs. Other carriers are unchanged because nothing was
+measured on them.
+
+Older Nova clients ignore the new key and connect on Irancell without a split.
+A custom ISP profile saved in the panel is kept as it is and does not get this
+change.
+
+Saving the per-ISP settings in the panel no longer drops `recordFragment` from
+a carrier rule. The panel's built-in copy of the profile, used when it cannot
+load `/isp-profile` and on Reset, now has the same Irancell setting.
+
+Saving an ISP profile with a wrong value in a known setting is now refused
+instead of stored and served to clients: `tlsFragment`, `recordFragment` and
+`mux` must be true or false, `fingerprint` must be one the panel offers, and
+`mtu` must be a whole number from 576 to 1500. Other keys are kept. A profile
+already saved keeps working; the check runs on the next save.
+
 # Nova Server 1.92.2
 
 WARP setup no longer depends on one API name. Registering a WARP account,
