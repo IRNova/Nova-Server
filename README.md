@@ -14,7 +14,7 @@ and Russian interface.
 [![License: proprietary](https://img.shields.io/badge/license-Proprietary-64748b?style=flat-square)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/IRNova/Nova-Server?style=flat-square&color=0ea5e9)](https://github.com/IRNova/Nova-Server/stargazers)
 
-[Install](#quick-install) | [Features](#features) | [Deployment guide](DEPLOY.md) | [Release notes](RELEASE_NOTES.md) | [Community](#community)
+[What's new](#whats-new) | [Install](#quick-install) | [Features](#features) | [Deployment guide](DEPLOY.md) | [Release notes](RELEASE_NOTES.md) | [Community](#community)
 
 </div>
 
@@ -47,6 +47,8 @@ project, is open source.
 - **Options for restricted networks:** Iran bridge tunnels, clean Cloudflare IPs,
   client-side fragmentation and ECH options where supported, and three DNS tunnel
   engines. Availability depends on the network, configuration, and client.
+- **Smart DNS:** consoles, smart TVs, and routers that cannot run a VPN app can reach
+  sanctioned services by changing their DNS server, with per-customer grants and usage.
 - **Personal delivery:** a customer page with usage and app import links, Nova Client
   integration, Telegram MTProto links, and per-customer Telegram web proxy links
   that can use a CDN. These are separate services with separate client requirements.
@@ -57,6 +59,35 @@ project, is open source.
 The HTTPS front can share TCP port 443 across compatible services. UDP protocols,
 WireGuard/AmneziaWG, DNS tunnels, and standalone services may need additional ports.
 No protocol or configuration is guaranteed to bypass every network restriction.
+
+---
+
+<a id="whats-new"></a>
+
+## What's new in 1.94
+
+- **Smart DNS (1.93):** a PlayStation, Xbox, smart TV, or router that cannot run a VPN
+  app can reach sanctioned services (Docker Hub, Google developer pages, AI services,
+  and optionally game stores) by changing its DNS server. Each customer registers up to
+  three addresses from their subscription page, and the traffic counts against their
+  quota. It works around sanctions, not filtering. [Setup](#smart-dns)
+- **VIP Smart DNS (1.94):** an owner-only grant that relays every foreign site, while
+  `.ir` names and Iranian addresses keep their real answer. It runs only behind a
+  firewall guard that keeps the relay off the server itself and off private networks;
+  without the guard, VIP customers get ordinary Smart DNS.
+- **Smart DNS privacy (1.94):** the panel shows each customer's name and a count, never
+  their addresses. Customers manage their own registrations, and addresses of customers
+  who lost access are deleted after 30 days.
+- **MasterDnsVPN update (1.94):** pinned to upstream build `5f83ee9`, upgraded with one
+  press that takes a backup first and rolls back on failure. The exported client file
+  now sets its local port (1080 by default); customers holding an old file need a new one.
+- **Security fixes:** customer traffic can no longer reach services on the server's own
+  loopback address (1.93; every earlier build is affected), and resellers and managers
+  can no longer read every customer's subscription through `/admin/sub-content` (1.92.4).
+- **Carrier and WARP fixes:** the default Irancell profile uses TLS record fragmentation
+  (1.92.3), and WARP registration tries several Cloudflare API routes (1.92.2).
+
+Details are in the [release notes](RELEASE_NOTES.md).
 
 ---
 
@@ -208,6 +239,31 @@ page also offers a direct profile link and QR code. MasterDnsVPN and CottenDns u
 their respective clients and exported configurations. Generic Clash and sing-box
 subscriptions do not carry Soar.
 
+<a id="smart-dns"></a>
+
+### Smart DNS for consoles, TVs, and routers
+
+Some services refuse every Iranian address. Smart DNS lets a device with no VPN app
+reach them through your server by changing only its DNS server.
+
+1. Switch Smart DNS on from its card on the **Inbounds** page and choose the lists.
+   Developer sites are on by default. Game stores start off, because one game download
+   can use a customer's whole quota. You can add up to 200 names of your own.
+2. Grant it to a customer on the user form or in a plan. A reseller can grant it only
+   if you allow that reseller to.
+3. The customer opens their subscription page, registers the connection they are on
+   (up to three addresses), and sets the device's DNS server to the address shown.
+
+Only registered addresses get an answer, so the server does not become an open resolver
+or relay, and an address registered by another customer is refused. IPv4 only. If your
+domain is behind Cloudflare or an Iran bridge, Nova will not publish the server's
+hidden address by itself; the card asks for the public IPv4 you want customers to use.
+
+**VIP Smart DNS** relays all foreign sites for the customers you choose, while Iranian
+sites stay direct. Apps that use QUIC or a fixed address may not work, and VIP traffic
+uses your bandwidth. Neither mode gets past filtering inside Iran, and some carriers
+may intercept port 53; that has not been tested on every carrier yet.
+
 
 ---
 
@@ -260,6 +316,7 @@ Two operator tools live under **Settings > Security**. That sub-tab appears once
 | **Routing and exits** | Domain, geosite, geoip, CIDR, and protocol rules; domestic bypass; direct, WARP/WARP+, Tor, Psiphon, and custom SOCKS/HTTP exits |
 | **Network options** | Clean Cloudflare IPs, client-side fragmentation, ECH where supported, and carrier-specific client profiles; results depend on the client and network |
 | **Iran bridges** | Backhaul, BackPack, rathole, and wstunnel; multiple bridge addresses, readiness checks, and control-port probes; only configured forwarded ports use the bridge |
+| **Smart DNS** | Sanctioned services for consoles, TVs, and routers by DNS alone; per-customer grants, up to three registered addresses, usage counted against quota; owner-only VIP mode behind a firewall guard; the panel shows names and counts, never addresses |
 | **DNS tunnels** | MasterDnsVPN, CottenDns, or Soar; automatic Cloudflare delegation or manual NS setup; shared or per-customer Soar with compatible clients |
 | **Domains and TLS** | Primary and additional server domains, separate bridge domains, and optional node domains; Let's Encrypt, Cloudflare DNS validation, or a pasted certificate; renewal and activation checks |
 | **Fleet** | One-command enrollment with verified or pinned TLS, central users and usage, supported inbound placement, and AmneziaWG on supported nodes |

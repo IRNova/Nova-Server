@@ -45,7 +45,7 @@ for unit_file in /etc/systemd/system/nova-geo-*.service /etc/systemd/system/nova
       ;;
   esac
 done
-for svc in nova-agent masterdnsvpn cottendns nova-tunnel nova-mtproto nova-mieru nova-soar nova-tgweb-relay nova-tgweb-mtp; do
+for svc in nova-agent masterdnsvpn cottendns nova-tunnel nova-mtproto nova-mieru nova-soar nova-tgweb-relay nova-tgweb-mtp nova-smartdns-vip nova-smartdns; do
   systemctl disable --now "$svc" >/dev/null 2>&1 || true
 done
 # mieru's daemon keeps its own store, so it is told to stop serving before the
@@ -109,9 +109,40 @@ if owned mita; then rm -rf /etc/mita /var/lib/mita /var/run/mita; fi
 if owned soarNova; then rm -rf /etc/nova-soar /var/lib/nova-soar /run/nova-soar /usr/local/bin/soar-nova; fi
 # /etc/nova-tgweb is Nova's own (it holds the web proxy secret and signing key), so it goes regardless.
 rm -rf /etc/nova-tgweb
+# Smart DNS (1.93.0): its unit, config, registration socket and the two
+# firewall chains that redirect registered customers' DNS and HTTPS to it.
+# Always Nova's own, so removed regardless. Each step tolerates absence.
+rm -f /etc/systemd/system/nova-smartdns.service /etc/systemd/system/nova-smartdns-vip.service
+rm -rf /etc/nova-smartdns /run/nova-sdns
+if command -v iptables >/dev/null 2>&1; then
+  while iptables -t nat -D PREROUTING -j NOVA_SDNS >/dev/null 2>&1; do :; done
+  iptables -t nat -F NOVA_SDNS >/dev/null 2>&1 || true
+  iptables -t nat -X NOVA_SDNS >/dev/null 2>&1 || true
+  while iptables -D INPUT -j NOVA_SDNS_IN >/dev/null 2>&1; do :; done
+  iptables -F NOVA_SDNS_IN >/dev/null 2>&1 || true
+  iptables -X NOVA_SDNS_IN >/dev/null 2>&1 || true
+fi
+if command -v ip6tables >/dev/null 2>&1; then
+  while ip6tables -D INPUT -j NOVA_SDNS_IN >/dev/null 2>&1; do :; done
+  ip6tables -F NOVA_SDNS_IN >/dev/null 2>&1 || true
+  ip6tables -X NOVA_SDNS_IN >/dev/null 2>&1 || true
+fi
+# The OUTPUT guard (1.95.0) that keeps the relay off this machine's own and
+# private addresses, plus a rebuild hold rule a crash could leave behind.
+for ipt in iptables ip6tables; do
+  if command -v "$ipt" >/dev/null 2>&1; then
+    while "$ipt" -D OUTPUT -m owner --uid-owner nova-smartdns -j NOVA_SDNS_OUT >/dev/null 2>&1; do :; done
+    while "$ipt" -D OUTPUT -m owner --uid-owner nova-smartdns -m conntrack --ctstate NEW -j REJECT >/dev/null 2>&1; do :; done
+    "$ipt" -F NOVA_SDNS_OUT >/dev/null 2>&1 || true
+    "$ipt" -X NOVA_SDNS_OUT >/dev/null 2>&1 || true
+  fi
+done
 if owned tproxyServer; then rm -f /usr/local/bin/tproxy-server /usr/local/lib/nova/tproxy-server.version; fi
 if owned mtprotoproxy; then rm -f /usr/local/lib/nova/mtprotoproxy.py; fi
 rm -rf /opt/nova-node-agent /opt/masterdnsvpn /opt/cottendns
+# MasterDNS upgrade leftovers: a backup kept only if a rollback itself failed,
+# and a staging dir an interrupted download could leave behind.
+rm -rf /opt/masterdnsvpn.nova-backup /opt/masterdnsvpn.nova-backup.unit /opt/masterdnsvpn.nova-backup.nounit /opt/masterdnsvpn.stage.*
 if owned sing-box-config; then rm -f /etc/sing-box/config.json; fi
 rmdir /etc/sing-box 2>/dev/null || true
 if owned psiphon; then
@@ -142,6 +173,7 @@ if owned mtg || owned mtgMulti; then
 fi
 if owned mita; then userdel mita >/dev/null 2>&1 || true; fi
 if owned tproxyServer; then userdel nova-tgweb >/dev/null 2>&1 || true; fi
+userdel nova-smartdns >/dev/null 2>&1 || true
 rm -f /usr/local/bin/nova-passwd /usr/local/bin/nova-access /usr/local/bin/nova-unlock
 rm -f /usr/local/bin/nova-tgbot /usr/local/bin/nova-uninstall
 rm -f /etc/sysctl.d/99-nova-net.conf

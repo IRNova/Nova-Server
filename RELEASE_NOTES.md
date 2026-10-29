@@ -1,3 +1,166 @@
+# Nova Server 1.94.0
+
+Smart DNS privacy. The owner's Smart DNS card and `/admin/smart-dns` now carry
+each customer's name and a count of registered connections, never the
+addresses. The owner can clear one customer's whole list (confirmed, logged
+with the name and count only); the per-address remove is gone. Customers see
+their own registrations on their subscription page and remove each one there,
+authenticated by their subscription link, including after their grant has
+lapsed. xray and journal text that reaches the panel or logs has registered
+addresses scrubbed. This is not encryption: root on the server, and anyone
+holding a customer's link, can still see that customer's addresses.
+
+Lapsed customers. An address whose customer is no longer served (expired, over
+the cap, grant withdrawn, or Smart DNS switched off) is stamped when the lapse
+is first seen and deleted 30 days later. Being served again clears the stamp.
+The sweep runs when the agent starts and from the automation loop at most every
+6 hours (`SDNS_PRUNE_EVERY_MS`), and also on any Smart DNS sync, so a quiet
+node with no traffic and no operator still deletes them. Ceiling: an entry can
+outlive its 30 days by up to about 6 hours plus one poll while the agent runs;
+a stopped agent sweeps nothing until it starts again, and then sweeps at boot.
+A sweep with nothing stored writes nothing, and a sweep that changes nothing
+writes nothing, so it does not restart the Smart DNS unit.
+While their access is gone the customer's page shows a list-only card: they can
+see and remove their addresses but cannot register new ones.
+
+MasterDnsVPN update. Nova now pins upstream build `v2026.10.26.100415-5f83ee9`
+by SHA-256 per architecture, and the DNS tunnel card offers an update when the
+installed build is older. The update backs up the install directory and the
+unit, installs and verifies the pinned build, keeps `encrypt_key.txt` and file
+modes, and, if the service was running, restarts it, checks that the running
+executable is the new one and that it answers a DNS query on its listen
+address. Any failure restores the previous files, unit, version marker and the
+previous enabled and running state. A refusal before the backup changes
+nothing. The update refuses to replace a build newer than the pin (no downgrade
+is offered for one), checks that the new binary is really in place before
+trusting the install step, and while it runs the route answers 409 and enable
+and stop refuse instead of racing it.
+
+Bind scope. MasterDNS now listens on an IP address this server holds (the same
+helper Soar uses). The 5f83ee9 build refuses a domain name there and exits, and
+older Nova wrote the panel domain into `UDP_HOST` on domain nodes, which the old
+build quietly turned into every address. An empty value, used only when no
+address is known, still means every address.
+
+Client config. The MasterDNS client file Nova hands out wrote
+`LISTEN = "127.0.0.1:1080"`, a key neither the 7de2476 nor the 5f83ee9 client
+reads, so both opened their local SOCKS proxy on their built-in 18000 and an app
+pointed at 1080 reached nothing. It now writes `LISTEN_IP = "127.0.0.1"` and
+`LISTEN_PORT`, with 1080 as the default and an operator-chosen port carried
+through (anything outside 1 to 65535 falls back to the default). CottenDns
+keeps its 18000 default. Customers holding an old file should be given a new
+one.
+
+Interop, measured in an isolated container harness with the official upstream
+binaries rather than on a customer's device: the 7de2476 and 5f83ee9 clients
+both connect to the 5f83ee9 server, bind the port the new file names (1080 and
+a custom 2080 tried), and carry a 2 MB download through the tunnel byte for
+byte. Pausing the server makes the same download fail, so the traffic is going
+through the tunnel. Not verified on the phone apps customers use.
+
+Smart DNS next to the DNS tunnel. Measured on a real systemd harness: a
+customer registered for Smart DNS who queries this server directly reaches
+Smart DNS, not the tunnel; through a recursive resolver such as 1.1.1.1 the
+tunnel works. The DNS tunnel card, the manual and search say so in English,
+Persian and Russian. Only one tunnel engine (MasterDNS, CottenDns or Soar)
+holds port 53 at a time. This is documented, not solved: a per-source DNS
+demultiplexer is a separate piece of work.
+
+VIP Smart DNS. A per-customer grant that only the owner can give, on the user
+form and in plans. A VIP customer's DNS answers send every foreign site through
+this server, not only the sanctioned list. `.ir` names, names that resolve to an
+Iranian address, and this server's own names get their real answer, so Iranian
+sites still go direct and a registered device's own VPN keeps working. It runs
+as a second service (`nova-smartdns-vip`, port 20554) next to Smart DNS.
+
+It does not get past Iran's filtering: a site blocked inside Iran stays
+blocked. Apps that use QUIC or a fixed address may not work, IPv6 answers come
+back empty, and all of a VIP customer's foreign traffic uses this server's
+bandwidth and counts against their quota.
+
+Because VIP relays any name, it depends on a firewall guard: rules on this
+server's outgoing traffic that keep the relay away from this machine, private
+networks and cloud metadata addresses, in IPv4 and IPv6. If the guard is not in
+place for both, VIP customers get ordinary Smart DNS instead, and owner-added
+names are left out until it is. Neither Smart DNS service starts on its own at
+boot; Nova starts them once the guard is back, and stops them if the guard
+disappears. Only the owner can grant or withdraw VIP. A manager editing a
+customer leaves it as it was, and a reseller's customers never get it, whatever
+their plan says. The Smart DNS card counts VIP customers,
+and the health check warns when VIP customers are registered but the VIP
+service is not running.
+
+The uninstaller also removes the MasterDNS upgrade backup, any interrupted
+staging directory, and the VIP Smart DNS service.
+
+# Nova Server 1.93.0
+
+Smart DNS. Some sites refuse every Iranian address: Docker Hub, Google developer
+pages, AI services, game stores. A device that cannot run a VPN app, such as a
+PlayStation, Xbox, smart TV or router, now gets them through this node by
+changing one setting, its DNS server. It fixes sanctions, not filtering: a site
+that is filtered inside Iran stays filtered, because the request still carries
+the real site name in the clear.
+
+How it works. A separate xray process (`nova-smartdns`) answers DNS for the
+listed sites with this node's address and relays those connections by name.
+Nothing new listens on 53, 443 or 80: only registered customer addresses are
+redirected to it, so everyone else still reaches the normal front and the DNS
+tunnel on the same address. Changing the lists or a registration restarts only
+this process, never the customer-facing core.
+
+Who gets it. A per-customer grant, like mieru and AmneziaWG, on the user form or
+in a plan. A reseller can grant it only when the owner allows it in that
+reseller's settings, and taking the permission away removes it from their
+customers. Expiry, the data cap and a revoked grant remove a customer at once.
+Its traffic counts against the customer's allowance.
+
+What the customer does. On their subscription page they open Smart DNS, press
+the button that registers their current connection (up to 3 addresses), and
+set their device's DNS server to the address shown. Only registered addresses
+are answered, so the node is never an open resolver or an open relay. An
+address already registered by another customer (two homes behind one carrier
+NAT) is refused without touching either account. IPv4 only.
+
+Lists. Developer sites are on by default. Game stores are off by default,
+because game downloads cost you bandwidth and use up a customer's allowance in
+an evening. You can add up to 200 of your own names; each covers its
+subdomains and nothing else.
+
+If your domain is behind Cloudflare or an Iran bridge, the server's own
+address is hidden and Nova will not publish it by itself. The card asks you to
+type the IPv4 address you are willing to show customers. Registered addresses
+are not included in backups; customers press the button again after a move.
+
+Security, on every node, whether or not Smart DNS is on: a customer's
+connection could reach services listening on the server's own loopback
+address, including the core's management interface. Both cores now refuse
+loopback and the name `localhost` for customer traffic. Update soon.
+
+Expiry and the data cap now reach the DNS tunnel (Soar) straight away. Before,
+an expired or over-cap customer kept their Soar tunnel until some unrelated
+change happened to refresh it.
+
+A factory reset and the uninstaller now remove Smart DNS completely: the
+service, its firewall chains and every registered address.
+
+Nothing changes on a node until the owner switches it on. Not yet verified from
+inside Iran: whether an ISP intercepts port 53 to a foreign resolver, which
+would stop it working for that customer.
+
+# Nova Server 1.92.4
+
+Security fix. A reseller or manager account could read every customer's
+subscription on the node, including other resellers' customers, through
+`/admin/sub-content`. That route builds one subscription for the whole node
+and was not limited to the owner. It is owner-only now, like the other routes
+that expose the whole node. The owner and the built-in admin keep access, and
+API tokens never reached it.
+
+Every build up to 1.92.3 has this. If you have resellers or managers, update,
+and consider rotating customer credentials you do not want those accounts to
+hold.
+
 # Nova Server 1.92.3
 
 Irancell clients now split TLS records instead of TCP segments. The built-in
