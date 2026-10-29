@@ -1,3 +1,35 @@
+# Nova Server 1.94.2
+
+EA games sign in again with Smart DNS. In 1.94.1 `ea.com` was in
+`SDNS_PASSTHROUGH`, so a console on Smart DNS reached EA from its real Iranian
+address and EA refused it: Battlefield stopped at launch with "Service
+limitations apply", then 0:66003S (the same failure as with no Smart DNS at
+all). EA is out of the passthrough list, so its names are relayed again in both
+views, while the Sony, Xbox and Steam names that fixed the PS5 NAT test (NAT
+type 2) stay direct. Checked on xray 26.3.27 and 26.10.21 in a container:
+`accounts.ea.com`, `gateway.ea.com`, `battlefield.com` and `origin.com` get the
+relay address; PlayStation, Xbox and Steam names get their real addresses.
+Ceiling, named in the code: Activision, Blizzard, Riot and Epic are still
+passed through and may refuse Iran the same way; nobody has measured them.
+If a game keeps failing after the update, clear its cache once.
+
+Also in this release, from the independent review of 1.94.1 (no High, no
+Medium):
+
+- Smart DNS matches names in any letter case. Xray 26.3.27 compares DNS rules
+  case-sensitively, so a console asking for `PlayStation.NET`, or a resolver
+  that randomizes letter case, got the relay instead of its real address in
+  VIP. Every DNS name rule is now a case-insensitive pattern that keeps the
+  label boundary and accepts a trailing dot. Checked against real Xray 26.3.27
+  and 26.10.21.
+- The customer page, the manual and the games category no longer promise that
+  games always get their real answer. The sign-in and network-test names of the
+  main consoles and stores do; with VIP a game whose servers use a generic
+  cloud name can still be relayed, and Smart DNS does nothing for UDP or
+  fixed-address game traffic.
+- A test that a custom suffix like `a.com` is never treated as covering
+  `ea.com`.
+
 # Nova Server 1.94.1
 
 Smart DNS no longer breaks online games. Reported from a live test: with Smart
