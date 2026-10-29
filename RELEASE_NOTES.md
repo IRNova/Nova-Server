@@ -1,3 +1,27 @@
+# Nova Server 1.94.3
+
+Smart DNS now says why a registration failed. On the customer's page, a failed
+register or remove used to show one message for every cause, which made a
+real failure hard to diagnose (one took five rounds). The page now names the
+agent's own reason: Smart DNS switched off, a link that is not valid on this
+server, a plan without Smart DNS, the rate limit, an address that cannot be
+used (private, IPv6, a VPN exit, or already held by another customer), or a
+server error with its HTTP code. When something in front of the server,
+such as a CDN, answers instead of Nova, the page says the server did not
+answer as expected and shows the code. The register and remove buttons always
+come back after an answer, whatever the server sent.
+
+Also in this release:
+
+- While Smart DNS is stopped (it is by design whenever nobody is served), the
+  agent checks systemd first and skips the usage query, so the journal no
+  longer fills with connection-refused lines. Traffic between the last poll
+  and a stop stays uncounted, as before.
+- The game copy in the panel, the manual and the customer's page matches
+  1.94.2's behaviour: PlayStation, Xbox and Steam names stay direct, and EA is
+  relayed in VIP (in list mode only if the owner adds it). Smart DNS still
+  does not guarantee a NAT type or multiplayer.
+
 # Nova Server 1.94.2
 
 EA games sign in again with Smart DNS. In 1.94.1 `ea.com` was in
