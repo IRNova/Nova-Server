@@ -4,9 +4,11 @@ EA games sign in again with Smart DNS. In 1.94.1 `ea.com` was in
 `SDNS_PASSTHROUGH`, so a console on Smart DNS reached EA from its real Iranian
 address and EA refused it: Battlefield stopped at launch with "Service
 limitations apply", then 0:66003S (the same failure as with no Smart DNS at
-all). EA is out of the passthrough list, so its names are relayed again in both
-views, while the Sony, Xbox and Steam names that fixed the PS5 NAT test (NAT
-type 2) stay direct. Checked on xray 26.3.27 and 26.10.21 in a container:
+all). EA is out of the passthrough list, so its names are relayed again in VIP;
+in list mode they are relayed only if the owner adds them. The Sony, Xbox and
+Steam names stay direct; in 1.94.1 that took one tested PS5 from a failed
+network test to NAT type 2. That is one measurement, not a promise: Smart DNS
+does not guarantee a NAT type or multiplayer. Checked on xray 26.3.27 and 26.10.21 in a container:
 `accounts.ea.com`, `gateway.ea.com`, `battlefield.com` and `origin.com` get the
 relay address; PlayStation, Xbox and Steam names get their real addresses.
 Ceiling, named in the code: Activision, Blizzard, Riot and Epic are still
@@ -23,9 +25,11 @@ Medium):
   label boundary and accepts a trailing dot. Checked against real Xray 26.3.27
   and 26.10.21.
 - The customer page, the manual and the games category no longer promise that
-  games always get their real answer. The sign-in and network-test names of the
-  main consoles and stores do; with VIP a game whose servers use a generic
-  cloud name can still be relayed, and Smart DNS does nothing for UDP or
+  games always get their real answer. Sign-in and network-test names on the
+  passthrough list (PlayStation, Xbox, Steam and several other publishers) do;
+  EA is the exception, relayed in VIP and in list mode only if the owner adds
+  it; with VIP a game whose servers use a generic cloud name can still be
+  relayed, and Smart DNS does nothing for UDP or
   fixed-address game traffic.
 - A test that a custom suffix like `a.com` is never treated as covering
   `ea.com`.
