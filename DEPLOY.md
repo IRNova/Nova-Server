@@ -10,7 +10,7 @@ On a fresh Ubuntu 20.04+ or Debian 11+ server (x86_64 or arm64):
 bash <(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)
 ```
 
-Then open the panel on your server's IP or domain and set an admin password. The Setup Wizard walks you through a domain, a recommended protocol, and your first user.
+Then open the printed panel URL and sign in with the admin password printed by the installer. The Setup Wizard walks you through a domain, a recommended protocol, and your first user.
 
 ### Install from your phone (no SSH)
 
@@ -45,11 +45,17 @@ To front your foreign exit with a clean Iran IP, you do not install the full nod
 
 Remove the bridge later with `systemctl disable --now nova-tunnel`. The command contains the shared tunnel secret, so keep it private.
 
-## Reset the admin password
+## Recover panel access
+
+For a lost panel URL or secret path, run `nova-access`. It prints the current address without changing your password or two-factor authentication.
+
+For a forgotten password, reset it from the server:
 
 ```bash
-nova-passwd 'YourNewPassword' --clear-2fa
+nova-passwd 'YourNewPassword'
 ```
+
+Only add `--clear-2fa` if you have also lost your authenticator. It removes two-factor protection; enable it again after signing in.
 
 ## Managed nodes: remove or reclaim
 
