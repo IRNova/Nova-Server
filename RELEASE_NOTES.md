@@ -1,3 +1,31 @@
+# Nova Server 1.94.1
+
+Smart DNS no longer breaks online games. Reported from a live test: with Smart
+DNS as the console's DNS, Battlefield stopped with EA errors 0:85011S and
+0:85008S and the PS5 network test said "NAT type: Failed"; with 1.1.1.1 both
+worked and the NAT type was 2. The relay carries TCP 443 (by SNI) and 80 (by
+Host) and nothing else, so steering a game or console name to it breaks UDP,
+the NAT test and play.
+
+`SDNS_PASSTHROUGH` (`src/smart-dns.mjs`) lists the sign-in, play and
+network-test suffixes of PlayStation, Xbox, EA, Steam, Epic, Riot, Blizzard,
+Nintendo, Activision, Ubisoft and Rockstar. In list mode `smartDnsDomains` drops
+any built-in or custom entry equal to or above one of them; a download host
+BELOW one (`dl.playstation.net`) can still be relayed. In the VIP view they are
+added to the first real-answer server. The `games` category now holds download
+hosts only and is labelled "Game downloads". The VIP DNS also sets
+`disableFallbackIfMatch`, so a non-existent `.ir`, Nova-own or passthrough name
+returns an empty answer instead of falling through to the relay address
+(measured before the fix).
+
+Ceiling, named in the code: in VIP a whole passthrough suffix resolves direct,
+download hosts under it included, and game backends on generic cloud names are
+still relayed. Verified on xray 26.10.21 in a container: both configs pass
+`run -test`; PlayStation, EA and Xbox names get real addresses in both modes;
+chatgpt.com and docker.com get the relay; non-existent names come back empty.
+Not verified: a real console on a live node. Panel card, manual, search and the
+customer page say online gaming is not helped, in EN, FA and RU.
+
 # Nova Server 1.94.0
 
 Smart DNS privacy. The owner's Smart DNS card and `/admin/smart-dns` now carry
