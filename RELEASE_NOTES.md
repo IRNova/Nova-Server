@@ -1,3 +1,16 @@
+# Nova Server 1.94.4
+
+AmneziaWG management now distinguishes installed tools from missing kernel
+support. A restored node without a module for its running kernel no longer
+reports that AmneziaWG is not installed. Disable and peer removal stay available.
+Re-apply reports the missing module before changing saved settings or stopping
+an interface. Offline peer changes reach the saved configuration without a
+misleading startup error. Existing customer keys are preserved.
+
+Restoring a backup does not install kernel modules. Check Health for the result
+of Nova's automatic rebuild attempt. This update does not install packages when
+you press Re-apply. Starting a stopped userspace-only tunnel remains unsupported.
+
 # Nova Server 1.94.3
 
 Smart DNS now says why a registration failed. On the customer's page, a failed
