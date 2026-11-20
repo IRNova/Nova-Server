@@ -1,3 +1,29 @@
+# Nova Server 1.94.5
+
+Fresh Debian and Ubuntu installations now select compatible AmneziaWG packages
+with exact OS detection. Debian uses the vendor's compatible Focal packages;
+Ubuntu keeps its own release suite. Repository setup verifies the complete
+signing-key fingerprint, restricts third-party packages to AmneziaWG, and can
+be repeated unattended with an existing keyring. Failed setup restores Nova's
+repository files and keeps a private diagnostic log. Interrupted package
+configuration remains retryable, and manually installed tools are preserved.
+
+AmneziaWG is optional: an unsupported or failed setup does not stop Nova
+installation. Ubuntu 20.04's original 5.4 kernel and retained 5.4 headers are
+skipped before package changes because the current vendor driver cannot build
+there. A supported HWE-only setup works; no kernel is upgraded automatically.
+
+The native installer, packaged installer and Docker bundle carry the same
+correction. Existing settings, customer keys and saved tunnel state are kept.
+The agent runtime is unchanged from 1.94.4 apart from its version and changelog;
+the separate unreleased DKMS repair-command change is not included.
+
+Validated with fresh package installs, unattended retries, interrupted-package
+recovery and distribution-header DKMS builds on Debian 12/13 and supported
+Ubuntu setups. These isolated checks do not prove a booted guest, Secure Boot
+acceptance or a live tunnel. Thanks to ltraveler for identifying the Debian
+installer issue and to the community reviewers.
+
 # Nova Server 1.94.4
 
 AmneziaWG management now distinguishes installed tools from missing kernel

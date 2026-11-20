@@ -989,12 +989,173 @@ fi
 # Optional: lets the node host an AmneziaWG exit (junk packets + magic headers)
 # that survives DPI where plain WireGuard/WARP is blocked. Best-effort: a failed
 # install just leaves the "AmneziaWG server" panel card showing "not installed".
-if ! command -v awg >/dev/null 2>&1; then
+install_amneziawg() (
+  # A subshell keeps os-release fields, umask and cleanup traps out of the rest
+  # of the installer. Every failure is explicit: callers use this in an `if`,
+  # which disables errexit inside functions even with set -euo pipefail.
+  umask 077
+  ID= VERSION_ID= VERSION_CODENAME=
+  if [ ! -r /etc/os-release ]; then
+    warn "Cannot identify this OS; skipping optional AmneziaWG installation."
+    return 1
+  fi
+  . /etc/os-release || return 1
+  case "${ID:-}:${VERSION_ID:-}" in
+    # The vendor documents Focal for Debian. Its tools require libc6 >= 2.14;
+    # Noble requires >= 2.38 and cannot run on stock Debian 12 (libc6 2.36).
+    # This list is the tested ceiling: validate new releases before adding them.
+    debian:11|debian:12|debian:13) awg_suite=focal ;;
+    ubuntu:20.04) awg_suite=focal ;;
+    ubuntu:22.04) awg_suite=jammy ;;
+    ubuntu:24.04) awg_suite=noble ;;
+    ubuntu:26.04) awg_suite=resolute ;;
+    ubuntu:26.10) awg_suite=stonking ;;
+    *) warn "This OS has no verified AmneziaWG package source; continuing without it."
+       return 1 ;;
+  esac
+  if [ "${ID:-}" = ubuntu ] && [ "${VERSION_CODENAME:-}" != "$awg_suite" ]; then
+    warn "Ubuntu's release codename does not match its verified AmneziaWG suite; continuing without it."
+    return 1
+  fi
+  # The current vendor driver fails on Focal's original 5.4 headers (missing
+  # chacha_init/chacha20_crypt). Refuse before dpkg can leave broken packages;
+  # Focal with its supported HWE kernel uses the normal Focal repository.
+  if [ "${ID:-}:${VERSION_ID:-}" = ubuntu:20.04 ]; then
+    case "$(uname -r)" in
+      5.4.*) warn "AmneziaWG cannot build on Ubuntu 20.04's original 5.4 kernel; continuing without it. Use a supported HWE kernel to enable it."
+             return 1 ;;
+    esac
+    for awg_headers in /lib/modules/5.4.*/build; do
+      if [ -d "$awg_headers" ]; then
+        warn "Ubuntu 20.04 still has 5.4 kernel headers that would fail AmneziaWG's DKMS build; leaving packages unchanged. Review the old headers before enabling it."
+        return 1
+      fi
+    done
+  fi
+
+  awg_key=/etc/apt/keyrings/nova-amneziawg.gpg
+  awg_source=/etc/apt/sources.list.d/nova-amneziawg.sources
+  awg_pin=/etc/apt/preferences.d/nova-amneziawg
+  # Do not introduce a second suite or a conflicting Signed-By beside a
+  # repository owned by the operator or another installer. Never rewrite it.
+  for awg_file in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+    if [ "$awg_file" != "$awg_source" ] && [ -f "$awg_file" ] &&
+       grep -Eq 'ppa\.launchpad(content)?\.net/amnezia/ppa' "$awg_file"; then
+      warn "An existing Amnezia repository is configured in $awg_file; leaving it unchanged and skipping optional installation."
+      return 1
+    fi
+  done
+  for awg_file in "$awg_key" "$awg_source" "$awg_pin"; do
+    if [ -L "$awg_file" ]; then
+      warn "An AmneziaWG repository path is a symbolic link; leaving it unchanged."
+      return 1
+    fi
+  done
+
+  awg_work="$(mktemp -d)" || return 1
+  awg_changed=0 awg_keep=0 awg_atomic=
+  awg_cleanup() {
+    trap '' HUP INT TERM
+    awg_restore_failed=0
+    if [ "$awg_changed" = 1 ] && [ "$awg_keep" != 1 ]; then
+      # Retire the new source before removing its trust restriction.
+      for awg_file in "$awg_source" "$awg_key" "$awg_pin"; do
+        if [ -f "$awg_work/$(basename "$awg_file").before" ]; then
+          if ! awg_replace "$awg_work/$(basename "$awg_file").before" "$awg_file" preserve; then awg_restore_failed=1; fi
+        else
+          if ! rm -f "$awg_file"; then awg_restore_failed=1; fi
+        fi
+      done
+    fi
+    if [ -n "$awg_atomic" ]; then rm -f "$awg_atomic"; fi
+    if [ "$awg_restore_failed" = 1 ]; then
+      warn "Could not restore every AmneziaWG repository file; recovery copies remain in $awg_work."
+    elif [ "$awg_keep" != 1 ] && [ -s "$awg_work/install.log" ]; then
+      warn "AmneziaWG installation details are saved in $awg_work/install.log."
+    else
+      rm -rf "$awg_work"
+    fi
+  }
+  trap awg_cleanup EXIT
+  trap 'exit 1' HUP INT TERM
+  # Write beside each destination, then rename. An interrupted fetch or gpg
+  # invocation must not truncate the keyring used by APT on the next retry.
+  awg_replace() {
+    awg_atomic="$(mktemp "$2.nova.XXXXXX")" || return 1
+    if [ "${3:-}" = preserve ]; then
+      if ! cp -p "$1" "$awg_atomic"; then rm -f "$awg_atomic"; awg_atomic=; return 1; fi
+    else
+      if ! install -m 0644 "$1" "$awg_atomic"; then rm -f "$awg_atomic"; awg_atomic=; return 1; fi
+    fi
+    if ! mv -f "$awg_atomic" "$2"; then rm -f "$awg_atomic"; awg_atomic=; return 1; fi
+    awg_atomic=
+  }
+  apt-get install -y --no-install-recommends ca-certificates curl gnupg >"$awg_work/install.log" 2>&1 || return 1
+  mkdir -m 0700 "$awg_work/gnupg" || return 1
+  dl 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x75C9DD72C799870E310542E24166F2C257290828' \
+    -o "$awg_work/key.asc" 2>>"$awg_work/install.log" || return 1
+  awg_fingerprint="$(gpg --batch --homedir "$awg_work/gnupg" --with-colons --show-keys "$awg_work/key.asc" 2>>"$awg_work/install.log" |
+    awk -F: '$1 == "pub" { primary=1; next } primary && $1 == "fpr" { print $10; primary=0 }')" || return 1
+  if [ "$awg_fingerprint" != 75C9DD72C799870E310542E24166F2C257290828 ]; then
+    warn "AmneziaWG repository signing key does not match its verified fingerprint."
+    return 1
+  fi
+  gpg --batch --yes --homedir "$awg_work/gnupg" --dearmor \
+    --output "$awg_work/key.gpg" "$awg_work/key.asc" >>"$awg_work/install.log" 2>&1 || return 1
+  cat > "$awg_work/source" <<EOF || return 1
+Types: deb
+URIs: https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu
+Suites: $awg_suite
+Components: main
+Signed-By: $awg_key
+EOF
+  # The third-party repository may supply AWG, never replacement OS libraries.
+  cat > "$awg_work/pin" <<'EOF' || return 1
+Package: amneziawg amneziawg-tools amneziawg-dkms
+Pin: release o=LP-PPA-amnezia
+Pin-Priority: 500
+
+Package: *
+Pin: release o=LP-PPA-amnezia
+Pin-Priority: -1
+EOF
+  for awg_file in "$awg_key" "$awg_source" "$awg_pin"; do
+    if [ -e "$awg_file" ]; then
+      cp -p "$awg_file" "$awg_work/$(basename "$awg_file").before" || return 1
+    fi
+  done
+  install -d -m 0755 /etc/apt/keyrings /etc/apt/sources.list.d /etc/apt/preferences.d || return 1
+  awg_changed=1
+  awg_replace "$awg_work/key.gpg" "$awg_key" || return 1
+  awg_replace "$awg_work/pin" "$awg_pin" || return 1
+  # Publish the source only after both its key and package restriction exist.
+  awg_replace "$awg_work/source" "$awg_source" || return 1
+  apt-get update >>"$awg_work/install.log" 2>&1 || return 1
+  apt-get install -y --no-install-recommends linux-headers-"$(uname -r)" \
+    amneziawg amneziawg-tools dkms >>"$awg_work/install.log" 2>&1 || return 1
+  awg_keep=1
+)
+
+awg_packages_configured() {
+  # An interrupted apt run can leave both commands present while DKMS or the
+  # metapackage is unpacked/half-configured. Such a run must remain retryable.
+  # Missing package records alone are not a failed transaction: preserve a
+  # manually installed toolchain just as the original tools-only guard did.
+  for awg_package in amneziawg amneziawg-dkms amneziawg-tools; do
+    awg_status="$(dpkg-query -W -f='${db:Status-Status}' "$awg_package" 2>/dev/null || true)"
+    case "$awg_status" in installed|not-installed|config-files|'') ;; *) return 1 ;; esac
+  done
+}
+
+if ! command -v awg >/dev/null 2>&1 || ! command -v awg-quick >/dev/null 2>&1 ||
+   ! awg_packages_configured; then
   say "Installing AmneziaWG (obfuscated WireGuard)"
-  if add-apt-repository -y ppa:amnezia/ppa >/dev/null 2>&1 && apt-get update >/dev/null 2>&1 \
-     && apt-get install -y linux-headers-"$(uname -r)" amneziawg amneziawg-tools >/dev/null 2>&1; then
-    modprobe amneziawg 2>/dev/null || true
-    ok "AmneziaWG installed"
+  if install_amneziawg; then
+    if modprobe amneziawg 2>/dev/null; then
+      ok "AmneziaWG installed"
+    else
+      warn "AmneziaWG packages installed, but the running kernel cannot load the module. Check the health report before enabling it."
+    fi
   else
     warn "Could not install AmneziaWG; the node will run without the AmneziaWG server."
   fi
